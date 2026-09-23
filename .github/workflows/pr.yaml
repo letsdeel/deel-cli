@@ -1,0 +1,111 @@
+name: pr
+
+# Pull-request gate for the Deel CLI. dev is the release line (the release pipeline builds
+# from dev HEAD), so everything that lands here must already be verified.
+#
+# The repo is going public, so this workflow is written to stay safe with fork PRs:
+#   - `pull_request` only — never `pull_request_target` (fork code must not run with write tokens);
+#   - public actions only, pinned to a commit SHA — no private internal reusable workflows;
+#   - the runner follows repository visibility: Deel's self-hosted runners while the repo is private
+#     (GitHub-hosted runners are blocked by the org IP allow-list), ubuntu-latest once it is public,
+#     so fork PRs can never execute on Deel infrastructure.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, labeled, unlabeled]
+  push:
+    branches: [dev]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate-pr:
+    name: validate-pr
+    if: github.event_name == 'pull_request'
+    runs-on: ${{ github.event.repository.private && 'global-general-small' || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .nvmrc
+
+      - name: Collect changed files
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" --jq '.[].filename' > "$RUNNER_TEMP/pr-files.txt"
+
+      # Title/body/labels are passed through the environment, never interpolated into the script:
+      # a PR body is attacker-controlled text on a public repo.
+      - name: Validate PR requirements
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          PR_IS_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
+          PR_BASE: ${{ github.event.pull_request.base.ref }}
+        run: node scripts/check-pr.ts --files "$RUNNER_TEMP/pr-files.txt"
+
+  check:
+    name: check
+    runs-on: ${{ github.event.repository.private && 'global-general-small' || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install
+        run: npm ci
+
+      # Same steps as `npm run check`, split so a failure names itself in the job summary.
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Tests + coverage gate
+        run: npm run test:coverage
+      - name: Manifest ↔ command map consistency
+        run: npm run check:manifest
+      - name: Lockfile carries every bun platform binary
+        run: npm run check:lockfile
+      - name: package.json ↔ src/version.ts
+        run: npm run check:version
+      - name: Shell scripts (installer, build, hooks)
+        run: npm run check:shell
+
+  build-smoke:
+    name: build-smoke
+    runs-on: ${{ github.event.repository.private && 'global-general-small' || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install
+        run: npm ci
+
+      # The compiled binary is what users actually run; `node --test` never exercises the bun
+      # --compile --bytecode path, so build the host target and make sure it starts.
+      - name: Compile host binary
+        run: npm run build
+
+      - name: Binary reports the package version and renders help
+        run: |
+          expected="deel $(node -p "require('./package.json').version")"
+          actual="$(./dist/deel --version)"
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::dist/deel --version printed '$actual', expected '$expected'"
+            exit 1
+          fi
+          ./dist/deel --help > /dev/null
+          ./dist/deel adjustments create --help > /dev/null
+          ./dist/deel jobs list --help > /dev/null
+          echo "dist/deel: $actual, help renders, $(du -h dist/deel | cut -f1)"

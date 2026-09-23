@@ -1,0 +1,21 @@
+# Keeps the SHA-pinned actions in .github/workflows and the (tiny) npm dependency set current.
+# Dependabot PRs skip the PR-body checks (bot author) but still run `check` + `build-smoke`;
+# check:lockfile guards against a bun bump that drops platform binaries from package-lock.json.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels: [chore, dependencies]
+    commit-message:
+      prefix: "chore(ci)"
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels: [chore, dependencies]
+    commit-message:
+      prefix: "chore(deps)"

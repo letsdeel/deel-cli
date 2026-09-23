@@ -1,0 +1,4 @@
+# Husky v9 hook — runs under `sh -e`.
+
+.husky/scripts/confirm-protected-branch.sh push || exit 1
+.husky/scripts/verify-before-push.sh || exit 1

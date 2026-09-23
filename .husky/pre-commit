@@ -1,0 +1,12 @@
+# Husky v9 hook — runs under `sh -e`. Keep it fast; the full check suite runs in pre-push.
+
+# 1. Never commit straight to dev (the release line) by accident.
+.husky/scripts/confirm-protected-branch.sh commit || exit 1
+
+# 2. Doctor gate: every file that differs from origin/dev must have been verified since it last
+#    changed — `npm run doctor` (or the /doctor skill) runs the checks and clears the gate.
+node scripts/check-doctor.ts > /dev/null || exit 1
+
+# 3. Cheap invariants that are easy to break with an innocent `npm install` or version bump.
+npm run --silent check:lockfile || exit 1
+npm run --silent check:version || exit 1
