@@ -51,7 +51,7 @@
     "jq-wasm": "^3.0.0-jq-1.8.2"
   },
   "devDependencies": {
-    "@types/node": "^22.20.1",
+    "@types/node": "^26.6.2",
     "bun": "^1.4.0",
     "husky": "^9.1.7",
     "typescript": "^5.9.3"
