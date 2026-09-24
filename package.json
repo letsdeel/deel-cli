@@ -1,0 +1,59 @@
+{
+  "name": "@deel-org/cli",
+  "version": "0.2.0",
+  "description": "Deel CLI — a thin, spec-driven command-line client for the Deel Public API",
+  "type": "module",
+  "bin": {
+    "deel": "./src/main.ts"
+  },
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "deel": "node src/main.ts",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test": "node --test test/*.test.ts",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include='src/**/*.ts' --test-coverage-exclude='src/manifest.generated.ts' --test-coverage-lines=80 --test-coverage-branches=75 --test-coverage-functions=70 test/*.test.ts",
+    "check:manifest": "node scripts/check-manifest.ts",
+    "check:lockfile": "node scripts/check-lockfile.ts",
+    "check:version": "node scripts/check-version.ts",
+    "check:shell": "bash scripts/check-shell.sh",
+    "check": "npm run typecheck && npm run test:coverage && npm run check:manifest && npm run check:lockfile && npm run check:version && npm run check:shell",
+    "build": "bun build ./src/main.ts --compile --minify --bytecode --outfile dist/deel",
+    "build:smoke": "npm run build && ./dist/deel --version && ./dist/deel --help > /dev/null",
+    "build:all": "bash scripts/build-all.sh",
+    "doctor": "npm run check && npm run build:smoke && node scripts/check-doctor.ts --mark",
+    "prepare": "husky"
+  },
+  "keywords": [
+    "@deel-org/cli",
+    "@deel-org",
+    "@deel",
+    "deel"
+  ],
+  "license": "MIT",
+  "author": "Deel <deel@deel.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/letsdeel/deel-cli.git"
+  },
+  "homepage": "https://github.com/letsdeel/deel-cli#readme",
+  "bugs": {
+    "url": "https://github.com/letsdeel/deel-cli/issues"
+  },
+  "files": [
+    "src/",
+    "README.md",
+    "SECURITY.md"
+  ],
+  "dependencies": {
+    "citty": "^0.2.2",
+    "jq-wasm": "^3.0.0-jq-1.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.1",
+    "bun": "^1.4.0",
+    "husky": "^9.1.7",
+    "typescript": "^5.9.3"
+  }
+}
