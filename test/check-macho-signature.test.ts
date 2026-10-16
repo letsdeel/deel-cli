@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { verifyMachoSignature } from "../scripts/check-macho-signature.ts";
-import { PAGE, requirementsOffset, signedBinary } from "./macho-fixture.ts";
+import { CD, PAGE, codeDirectoryOffsets, requirementsOffset, signatureOffset, signedBinary } from "./macho-fixture.ts";
 
 test("accepts a binary whose CodeDirectory matches its bytes", () => {
   const { errors, summary } = verifyMachoSignature(signedBinary());
@@ -78,4 +78,96 @@ test("fails cleanly on malformed input instead of throwing", () => {
   assert.match(errors[0], /CodeDirectory is truncated/);
 
   assert.equal(verifyMachoSignature(signedBinary().subarray(0, 50)).errors.length, 1);
+});
+
+test("accepts every supported hash type", () => {
+  for (const [hashType, algorithm] of [[1, "sha1"], [2, "sha256"], [3, "sha256"], [4, "sha384"], [5, "sha512"]] as const) {
+    const { errors, summary } = verifyMachoSignature(signedBinary({ hashType }));
+    assert.deepEqual(errors, [], `hash type ${hashType}`);
+    assert.match(summary, new RegExp(`${algorithm} 3 pages`));
+  }
+});
+
+test("accepts a single-page CodeDirectory (page size 0) and a 64-bit codeLimit", () => {
+  assert.deepEqual(verifyMachoSignature(signedBinary({ pageShift: 0 })).errors, []);
+  assert.match(verifyMachoSignature(signedBinary({ pageShift: 0 })).summary, /sha256 1 pages/);
+  assert.deepEqual(verifyMachoSignature(signedBinary({ codeLimit64: true })).errors, []);
+});
+
+test("verifies every CodeDirectory, including alternates", () => {
+  const good = signedBinary({ alternate: 1 });
+  const { errors, summary } = verifyMachoSignature(good);
+  assert.deepEqual(errors, []);
+  assert.match(summary, /sha256 3 pages.*sha1 3 pages/);
+
+  const tampered = signedBinary({ alternate: 1 });
+  const [, alternateAt] = codeDirectoryOffsets(tampered);
+  const hashOffset = tampered.readUInt32BE(alternateAt + CD.hashOffset);
+  tampered[alternateAt + hashOffset] ^= 0xff; // first page hash of the alternate CodeDirectory only
+  const result = verifyMachoSignature(tampered);
+  assert.equal(result.errors.length, 1);
+  assert.match(result.errors[0], /sha1 CodeDirectory: 1 of 3 page hashes do not match \(first at page 0\)/);
+});
+
+test("rejects a CodeDirectory with an unsupported or inconsistent hash", () => {
+  const unknownType = signedBinary();
+  unknownType[codeDirectoryOffsets(unknownType)[0] + CD.hashType] = 9;
+  assert.match(verifyMachoSignature(unknownType).errors[0], /unsupported hash \(type 9, size 32\)/);
+
+  const wrongSize = signedBinary();
+  wrongSize[codeDirectoryOffsets(wrongSize)[0] + CD.hashSize] = 20; // sha256 does not produce 20 bytes
+  assert.match(verifyMachoSignature(wrongSize).errors[0], /unsupported hash \(type 2, size 20\)/);
+});
+
+test("rejects a page-hash count that does not match the code size", () => {
+  const file = signedBinary();
+  file.writeUInt32BE(5, codeDirectoryOffsets(file)[0] + CD.codeSlots);
+  assert.match(verifyMachoSignature(file).errors[0], /has 5 page hashes, expected 3/);
+});
+
+test("rejects a page-hash table that runs past the end of the CodeDirectory", () => {
+  const file = signedBinary();
+  const at = codeDirectoryOffsets(file)[0];
+  file.writeUInt32BE(file.readUInt32BE(at + 4) - 10, at + CD.hashOffset);
+  assert.match(verifyMachoSignature(file).errors[0], /page hash table runs past the end of the blob/);
+});
+
+test("rejects more special slots than fit in front of the hash table", () => {
+  const file = signedBinary();
+  file.writeUInt32BE(100, codeDirectoryOffsets(file)[0] + CD.specialSlots);
+  assert.match(verifyMachoSignature(file).errors[0], /claims 100 special slots that do not fit/);
+});
+
+test("rejects a damaged SuperBlob", () => {
+  const notSuperBlob = signedBinary();
+  notSuperBlob.writeUInt32BE(0, signatureOffset(notSuperBlob));
+  assert.match(verifyMachoSignature(notSuperBlob).errors[0], /not an embedded SuperBlob/);
+
+  // a SuperBlob cut off after its first index entry, which is not a CodeDirectory slot
+  const full = signedBinary();
+  const at = signatureOffset(full);
+  const cut = Buffer.from(full.subarray(0, at + 20));
+  cut.writeUInt32LE(20, 44); // datasize now covers just the header and one index entry
+  cut.writeUInt32BE(2, at + 12);
+  assert.match(verifyMachoSignature(cut).errors[0], /truncated SuperBlob index/);
+
+  const noDirectory = signedBinary();
+  noDirectory.writeUInt32BE(3, signatureOffset(noDirectory) + 12); // the CodeDirectory entry becomes a resources slot
+  assert.match(verifyMachoSignature(noDirectory).errors[0], /carries no CodeDirectory/);
+
+  const danglingEntry = signedBinary();
+  const danglingAt = signatureOffset(danglingEntry);
+  danglingEntry.writeUInt32BE(requirementsOffset(danglingEntry) - danglingAt, danglingAt + 16); // points at the requirements blob
+  assert.match(verifyMachoSignature(danglingEntry).errors[0], /points at a CodeDirectory that is not there/);
+});
+
+test("rejects damaged load commands", () => {
+  const truncated = signedBinary();
+  truncated.writeUInt32LE(2, 16); // ncmds
+  truncated.writeUInt32LE(0x00ffffff, 36); // first command claims to be 16 MiB long
+  assert.match(verifyMachoSignature(truncated).errors[0], /truncated Mach-O load commands/);
+
+  const corrupt = signedBinary();
+  corrupt.writeUInt32LE(2, 16); // a second load command follows, but it is all zeros
+  assert.match(verifyMachoSignature(corrupt).errors[0], /corrupt Mach-O load command/);
 });

@@ -101,6 +101,7 @@ test("fails the build when a macOS binary still does not verify after signing", 
     encoding: "utf8",
   });
   assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /page hashes do not match/);
   assert.equal(existsSync(join(dist, "SHA256SUMS")), false, "no checksums may be written for an unverified binary");
 });
 
