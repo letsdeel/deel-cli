@@ -109,3 +109,6 @@ jobs:
           ./dist/deel adjustments create --help > /dev/null
           ./dist/deel jobs list --help > /dev/null
           echo "dist/deel: $actual, help renders, $(du -h dist/deel | cut -f1)"
+
+      - name: Cross-compile and sign the macOS binaries
+        run: bash scripts/build-all.sh --only darwin

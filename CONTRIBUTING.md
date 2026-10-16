@@ -30,6 +30,7 @@ Each piece on its own:
 | `npm run check:lockfile` | `package-lock.json` still carries every bun platform binary (an `npm install` against an existing `node_modules` can silently drop them) |
 | `npm run check:version` | `package.json` and `src/version.ts` agree and are a clean `X.Y.Z` |
 | `npm run check:shell` | `packaging/install.sh` (POSIX sh — users pipe it into `sh`), build scripts and hooks pass `sh -n`/`bash -n` and shellcheck |
+| `node scripts/check-macho-signature.ts <binary>...` | a macOS binary's code signature still matches its bytes — page hashes, requirements/entitlements hashes, nothing appended after the signature, expected CPU (what `codesign --verify` checks). Run by `scripts/build-all.sh` on every darwin build |
 
 ## Git hooks
 
@@ -79,6 +80,7 @@ say a minute later.
 | `validate-pr` | `scripts/check-pr.ts` against the PR title, body, labels and changed files |
 | `check` | `npm run check`, one step per script so the failure names itself |
 | `build-smoke` | `npm run build`, then `dist/deel --version` must equal the package version and `--help` must render |
+| | …then cross-compiles both macOS targets (`scripts/build-all.sh --only darwin`), which signs them with `rcodesign` and fails if the signature does not verify |
 
 The workflow uses only public, SHA-pinned actions and picks its runner from the repository's
 visibility, so fork PRs never execute on Deel infrastructure. Releases are cut manually by

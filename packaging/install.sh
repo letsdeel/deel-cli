@@ -131,6 +131,12 @@ main() {
   chmod +x "$tmp"
   mv "$tmp" "$dir/deel"
 
+  # Re-sign ad hoc when the installed macOS binary's signature does not verify.
+  if [ "$os" = "darwin" ] && have codesign && ! codesign --verify "$dir/deel" >/dev/null 2>&1; then
+    echo "deel-install: embedded code signature is invalid — re-signing $dir/deel ad hoc" >&2
+    codesign --force --sign - "$dir/deel" >/dev/null 2>&1 || err "could not re-sign $dir/deel (try: codesign --force --sign - $dir/deel)"
+  fi
+
   echo "deel-install: installed to $dir/deel"
   case ":$PATH:" in
     *":$dir:"*) : ;;

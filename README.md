@@ -320,11 +320,14 @@ npm run build:all   # -> dist/deel-{darwin,linux}-{arm64,x64}, deel-windows-x64.
 packaging/
   install.sh               # POSIX-sh installer shipped on every GitHub Release
 scripts/
-  build-all.sh             # cross-compile all binary targets + checksums
+  build-all.sh             # cross-compile all binary targets, sign + verify the macOS ones, write checksums
+  sign-darwin.sh           # ad-hoc sign and verify macOS binaries (codesign, or rcodesign on Linux)
+  install-rcodesign.sh     # fetch the pinned rcodesign used for signing on Linux
   pack-npm.ts              # assemble the npm launcher + platform packages from dist/
   check-manifest.ts        # assert manifest ↔ command map consistency
   check-lockfile.ts        # assert package-lock.json carries every bun platform binary
   check-version.ts         # assert package.json ↔ src/version.ts, clean semver
+  check-macho-signature.ts # verify a macOS binary's embedded code signature (any OS)
   check-shell.sh           # sh -n / bash -n + shellcheck for installer, build scripts, hooks
   check-pr.ts              # PR requirements (used by CI and by the /ship skill)
   check-doctor.ts          # pre-commit doctor gate; doctor-hashes.json is its ledger
