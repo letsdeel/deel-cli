@@ -1,6 +1,6 @@
 // Helpers for tests that run the repo's shell scripts against stub `uname`, `codesign`, `rcodesign`,
 // `curl` and `bun` executables, so the Linux and macOS code paths run identically on any machine.
-import { chmodSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import type { TestContext } from "node:test";
@@ -25,4 +25,19 @@ export function stubDir(t: TestContext, stubs: Record<string, string>): string {
 /** PATH with the stubs first, then only what the scripts need (node, sh/bash, coreutils, shasum). */
 export function pathWith(stubs: string): string {
   return [stubs, dirname(process.execPath), "/usr/bin", "/bin", "/usr/sbin", "/sbin"].join(":");
+}
+
+const SYSTEM_TOOLS = [
+  "awk", "cat", "chmod", "cp", "cut", "dirname", "grep", "head", "ln", "ls", "mkdir", "mktemp", "mv", "readlink",
+  "rm", "sed", "sha256sum", "shasum", "sort", "tail", "touch", "tr", "uname", "wc", "xargs",
+];
+
+/** PATH made only of the stubs and a short list of system tools: nothing else on the machine can be found. */
+export function hermeticPath(t: TestContext, stubs: string): string {
+  const tools = tempDir(t, "deel-tools-");
+  for (const tool of SYSTEM_TOOLS) {
+    const source = ["/usr/bin", "/bin"].map((dir) => join(dir, tool)).find((path) => existsSync(path));
+    if (source) symlinkSync(source, join(tools, tool));
+  }
+  return [stubs, tools].join(":");
 }
