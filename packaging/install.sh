@@ -38,6 +38,8 @@ fetch_to() {
   fi
 }
 
+canon_dir() { (cd "$1" 2>/dev/null && pwd -P) || echo "$1"; }
+
 sha256_of() {
   if have sha256sum; then
     sha256sum "$1" | awk '{print $1}'
@@ -45,6 +47,29 @@ sha256_of() {
     shasum -a 256 "$1" | awk '{print $1}'
   else
     err "need sha256sum or shasum to verify download"
+  fi
+}
+
+# Warn when a different deel comes first on PATH: that one runs, not the one just installed.
+warn_if_shadowed() {
+  first=""
+  oldifs="$IFS"
+  IFS=":"
+  for p in $PATH; do
+    [ -n "$p" ] || p="."
+    if [ -f "$p/deel" ] && [ -x "$p/deel" ]; then first="$p"; break; fi
+  done
+  IFS="$oldifs"
+  if [ -n "$first" ] && [ "$(canon_dir "$first")" != "$(canon_dir "$1")" ]; then
+    other="$first/deel"
+    if shown="$("$other" --version 2>&1)"; then :; else shown="did not run (exit $?)"; fi
+    echo "deel-install: warning: another deel is first on your PATH and will run instead:" >&2
+    echo "deel-install:   $other ($shown)" >&2
+    case "$(readlink "$other" 2>/dev/null || true)$other" in
+      *node_modules*) echo "deel-install: it looks like an npm install; remove it with: npm uninstall -g @deel-org/cli" >&2 ;;
+      *) echo "deel-install: remove it, or put $1 earlier on your PATH." >&2 ;;
+    esac
+    echo "deel-install: then run 'hash -r' (or open a new terminal) so your shell forgets the old location." >&2
   fi
 }
 
@@ -137,7 +162,18 @@ main() {
     codesign --force --sign - "$dir/deel" >/dev/null 2>&1 || err "could not re-sign $dir/deel (try: codesign --force --sign - $dir/deel)"
   fi
 
-  echo "deel-install: installed to $dir/deel"
+  # The binary must run, but report PATH problems too before failing: the user may have both.
+  problem=""
+  if smoke="$("$dir/deel" --version 2>&1)"; then
+    echo "deel-install: installed to $dir/deel"
+  else
+    rc=$?
+    if [ "$rc" -gt 128 ]; then problem="terminated by signal $((rc - 128))"; else problem="exit $rc: $smoke"; fi
+  fi
+
+  warn_if_shadowed "$dir"
+  [ -z "$problem" ] || err "the installed binary did not run: $problem ($dir/deel)"
+
   case ":$PATH:" in
     *":$dir:"*) : ;;
     *) echo "deel-install: add $dir to your PATH to run 'deel'." ;;
