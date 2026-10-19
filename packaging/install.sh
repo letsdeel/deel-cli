@@ -56,16 +56,16 @@ warn_if_shadowed() {
   oldifs="$IFS"
   IFS=":"
   for p in $PATH; do
-    [ -n "$p" ] || p="."
+    [ -n "$p" ] || p="$PWD"
     if [ -f "$p/deel" ] && [ -x "$p/deel" ]; then first="$p"; break; fi
   done
   IFS="$oldifs"
   if [ -n "$first" ] && [ "$(canon_dir "$first")" != "$(canon_dir "$1")" ]; then
     other="$first/deel"
-    if shown="$("$other" --version 2>&1)"; then :; else shown="did not run (exit $?)"; fi
+    target="$(readlink "$other" 2>/dev/null || true)"
     echo "deel-install: warning: another deel is first on your PATH and will run instead:" >&2
-    echo "deel-install:   $other ($shown)" >&2
-    case "$(readlink "$other" 2>/dev/null || true)$other" in
+    echo "deel-install:   $other${target:+ -> $target}" >&2
+    case "$target$other" in
       *node_modules*) echo "deel-install: it looks like an npm install; remove it with: npm uninstall -g @deel-org/cli" >&2 ;;
       *) echo "deel-install: remove it, or put $1 earlier on your PATH." >&2 ;;
     esac

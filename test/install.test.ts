@@ -1,10 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { chmodSync, existsSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
-import { pathWith, stubDir, tempDir } from "./stubs.ts";
+import { hermeticPath, stubDir, tempDir } from "./stubs.ts";
 
 const INSTALL = new URL("../packaging/install.sh", import.meta.url).pathname;
 const FAKE_BINARY = "#!/bin/sh\necho fake deel\n";
@@ -16,6 +16,8 @@ interface InstallOptions {
   pathFirst?: string[];
   /** Put the install directory first on PATH. */
   installDirFirst?: boolean;
+  /** Working directory of the installer. */
+  cwd?: string;
 }
 
 /** Runs install.sh with stub uname/curl/codesign; `verifyExit` is what `codesign --verify` returns. */
@@ -36,9 +38,10 @@ case "$url" in */SHA256SUMS) printf '%s' '${sums}' > "$out" ;; *) printf '%s' '$
     codesign: `echo "$@" >> "${work}/codesign.log"
 case "$1" in --verify) exit ${verifyExit} ;; --force) exit ${resignExit} ;; esac`,
   });
-  const result = spawnSync("sh", [INSTALL], {
+  const result = spawnSync("/bin/sh", [INSTALL], {
+    cwd: opts.cwd,
     env: {
-      PATH: [...(opts.installDirFirst ? [join(work, "bin")] : []), ...(opts.pathFirst ?? []), pathWith(stubs)].join(":"),
+      PATH: [...(opts.installDirFirst ? [join(work, "bin")] : []), ...(opts.pathFirst ?? []), hermeticPath(t, stubs)].join(":"),
       HOME: work, DEEL_INSTALL_DIR: join(work, "bin"),
       DEEL_VERSION: "v9.9.9",
     },
@@ -90,7 +93,7 @@ test("warns, but still succeeds, when another deel is first on PATH", (t) => {
   const { result } = install(t, "Linux", 0, 0, { pathFirst: [other] });
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stderr, /another deel is first on your PATH and will run instead/);
-  assert.ok(result.stderr.includes(`${other}/deel (deel 0.1.1-beta.6)`), result.stderr);
+  assert.ok(result.stderr.includes(`${other}/deel\n`), result.stderr);
   assert.match(result.stderr, /remove it, or put .* earlier on your PATH/);
   assert.match(result.stderr, /hash -r/);
   assert.doesNotMatch(result.stderr, /npm uninstall/);
@@ -106,14 +109,28 @@ test("recognises an npm install as the shadowing copy and says how to remove it"
   symlinkSync("../lib/node_modules/@deel-org/cli/bin/deel", join(prefix, "bin", "deel"));
   const { result } = install(t, "Linux", 0, 0, { pathFirst: [join(prefix, "bin")] });
   assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.stderr.includes("/bin/deel -> ../lib/node_modules/@deel-org/cli/bin/deel"), result.stderr);
   assert.match(result.stderr, /it looks like an npm install; remove it with: npm uninstall -g @deel-org\/cli/);
 });
 
-test("reports a shadowing deel that does not run", (t) => {
-  const broken = stubDir(t, { deel: "exit 5" });
-  const { result } = install(t, "Linux", 0, 0, { pathFirst: [broken] });
+test("never executes the shadowing deel", (t) => {
+  const marker = join(tempDir(t), "ran");
+  const other = stubDir(t, { deel: `touch "${marker}"` });
+  const { result } = install(t, "Linux", 0, 0, { pathFirst: [other] });
   assert.equal(result.status, 0, result.stderr);
-  assert.match(result.stderr, /did not run \(exit 5\)/);
+  assert.match(result.stderr, /another deel is first on your PATH/);
+  assert.equal(existsSync(marker), false, "the shadowing binary must not be run");
+});
+
+test("reports, but never executes, a deel in the working directory reached through an empty PATH entry", (t) => {
+  const cwd = tempDir(t);
+  const marker = join(tempDir(t), "ran");
+  writeFileSync(join(cwd, "deel"), `#!/bin/sh\ntouch "${marker}"\n`);
+  chmodSync(join(cwd, "deel"), 0o755);
+  const { result } = install(t, "Linux", 0, 0, { pathFirst: [""], cwd });
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(result.stderr.includes(`${realpathSync(cwd)}/deel\n`), result.stderr);
+  assert.equal(existsSync(marker), false, "the planted binary must not be run");
 });
 
 test("stays quiet when the installed copy is the first deel on PATH, even with another behind it", (t) => {
@@ -134,7 +151,7 @@ test("still reports a shadowing deel when the installed binary does not run, wit
   const { result } = install(t, "Linux", 0, 0, { binary: "#!/bin/sh\nkill -9 $$\n", pathFirst: [other] });
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /another deel is first on your PATH and will run instead/);
-  assert.ok(result.stderr.includes(`${other}/deel (deel 0.1.1-beta.6)`), result.stderr);
+  assert.ok(result.stderr.includes(`${other}/deel\n`), result.stderr);
   const lines = result.stderr.trim().split("\n");
   assert.match(lines[lines.length - 1], /the installed binary did not run: terminated by signal 9/);
 });
