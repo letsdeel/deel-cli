@@ -6,9 +6,6 @@ name: pr
 # The repo is going public, so this workflow is written to stay safe with fork PRs:
 #   - `pull_request` only — never `pull_request_target` (fork code must not run with write tokens);
 #   - public actions only, pinned to a commit SHA — no private internal reusable workflows;
-#   - the runner follows repository visibility: Deel's self-hosted runners while the repo is private
-#     (GitHub-hosted runners are blocked by the org IP allow-list), ubuntu-latest once it is public,
-#     so fork PRs can never execute on Deel infrastructure.
 on:
   pull_request:
     types: [opened, edited, synchronize, reopened, labeled, unlabeled]
@@ -28,19 +25,17 @@ jobs:
   validate-pr:
     name: validate-pr
     if: github.event_name == 'pull_request'
-    runs-on: ${{ github.event.repository.private && 'global-general-small' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 2
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version-file: .nvmrc
 
       - name: Collect changed files
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          REPO: ${{ github.repository }}
-          PR_NUMBER: ${{ github.event.pull_request.number }}
-        run: gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/files" --jq '.[].filename' > "$RUNNER_TEMP/pr-files.txt"
+        run: git diff --name-only HEAD^1 HEAD > "$RUNNER_TEMP/pr-files.txt"
 
       # Title/body/labels are passed through the environment, never interpolated into the script:
       # a PR body is attacker-controlled text on a public repo.
@@ -56,7 +51,7 @@ jobs:
 
   check:
     name: check
-    runs-on: ${{ github.event.repository.private && 'global-general-small' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
@@ -82,7 +77,7 @@ jobs:
 
   build-smoke:
     name: build-smoke
-    runs-on: ${{ github.event.repository.private && 'global-general-small' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
