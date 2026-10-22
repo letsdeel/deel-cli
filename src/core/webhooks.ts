@@ -1,11 +1,13 @@
-// Webhook reads (list / get / event types) over the injected transport, plus the
-// signing_key strip that every rendered webhook must go through: the API returns
-// the signing key on every webhook response, and the CLI never prints it.
+// Webhook reads (list / get / event types) and writes (create / update / delete)
+// over the injected transport, plus the signing_key strip that every rendered
+// webhook must go through: the API returns the signing key on every webhook
+// response, and the CLI never prints it.
 
 import type { Ctx } from "./context.ts";
 import { CliError } from "./errors.ts";
 import { HEADER } from "./constants.ts";
 import { errorFromResponse } from "./executor.ts";
+import { deriveIdempotencyKey } from "./idempotency.ts";
 
 // Shape of GET /webhooks items and GET /webhooks/{id} `data`.
 export type Webhook = {
@@ -48,6 +50,37 @@ export type ListFlags = {
   status?: string;
   search?: string;
   order?: string;
+};
+
+// `deel webhooks create` / `update` flags. `events` holds every --event occurrence.
+export type WriteFlags = {
+  name?: string;
+  url?: string;
+  description?: string;
+  status?: string;
+  events: string[];
+  includeChildOrgs?: boolean;
+};
+
+// POST /webhooks body. api_version is always "v2" (the only version the API accepts).
+export type CreateWebhookBody = {
+  name: string;
+  url: string;
+  events: string[];
+  status: "enabled" | "disabled";
+  api_version: "v2";
+  description?: string;
+  include_child_orgs?: boolean;
+};
+
+// PATCH /webhooks/{id} body: only the fields the user passed.
+export type UpdateWebhookBody = {
+  name?: string;
+  url?: string;
+  description?: string;
+  events?: string[];
+  status?: "enabled" | "disabled";
+  include_child_orgs?: boolean;
 };
 
 export const SIGNING_KEY_HINT = "reveal the signing key in Developer Center → Webhooks";
@@ -121,6 +154,94 @@ export function buildListQuery(flags: ListFlags): URLSearchParams {
     params.set("_order", flags.order);
   }
   return params;
+}
+
+function checkStatus(status: string): "enabled" | "disabled" {
+  if (!WEBHOOK_STATUSES.includes(status)) {
+    throw new CliError(USAGE, `--status must be one of: ${WEBHOOK_STATUSES.join(", ")}, got "${status}"`);
+  }
+  return status as "enabled" | "disabled";
+}
+
+// `deel webhooks create` flags -> POST body. --name, --url and one --event are
+// required; --status defaults to enabled.
+export function buildCreateBody(flags: WriteFlags): CreateWebhookBody {
+  const missing = [!flags.name && "--name", !flags.url && "--url", flags.events.length === 0 && "--event"].filter(Boolean);
+  if (missing.length > 0) {
+    throw new CliError(
+      USAGE,
+      `deel webhooks create requires ${missing.join(", ")}`,
+      "Usage: deel webhooks create --name <name> --url <https-url> --event <type> [--event <type> ...]",
+    );
+  }
+  const body: CreateWebhookBody = {
+    name: flags.name as string,
+    url: flags.url as string,
+    events: flags.events,
+    status: checkStatus(flags.status ?? "enabled"),
+    api_version: "v2",
+  };
+  if (flags.description !== undefined) body.description = flags.description;
+  if (flags.includeChildOrgs !== undefined) body.include_child_orgs = flags.includeChildOrgs;
+  return body;
+}
+
+// `deel webhooks update` flags -> PATCH body holding only the given fields; at
+// least one is required (the API rejects an empty PATCH).
+export function buildUpdateBody(flags: WriteFlags): UpdateWebhookBody {
+  const body: UpdateWebhookBody = {};
+  if (flags.name !== undefined) body.name = flags.name;
+  if (flags.url !== undefined) body.url = flags.url;
+  if (flags.description !== undefined) body.description = flags.description;
+  if (flags.events.length > 0) body.events = flags.events;
+  if (flags.status !== undefined) body.status = checkStatus(flags.status);
+  if (flags.includeChildOrgs !== undefined) body.include_child_orgs = flags.includeChildOrgs;
+  if (Object.keys(body).length === 0) {
+    throw new CliError(
+      USAGE,
+      "deel webhooks update needs at least one field to change",
+      "Pass one or more of --name, --url, --description, --event, --status, --include-child-orgs/--no-include-child-orgs.",
+    );
+  }
+  return body;
+}
+
+// Mutating call, sent like the generic executor: JSON body, an Idempotency-Key
+// (the --idempotency-key override or one derived from the request) and retries.
+async function sendJson(ctx: Ctx, method: string, path: string, body: unknown, command: string, idempotencyKey?: string): Promise<unknown> {
+  const requestId = ctx.newRequestId();
+  const key = idempotencyKey ?? deriveIdempotencyKey({ method, path, query: {}, body });
+  const headers: Record<string, string> = {
+    [HEADER.accept]: "application/json",
+    [HEADER.requestId]: requestId,
+    [HEADER.idempotencyKey]: key,
+  };
+  if (body !== undefined) headers[HEADER.contentType] = "application/json";
+  const response = await ctx.http({
+    method,
+    url: `${ctx.config.baseUrl}${path}`,
+    headers,
+    body: body === undefined ? null : JSON.stringify(body),
+    retryable: true,
+    meta: { command, idempotency_key: key },
+  });
+  if (response.status >= 400) throw errorFromResponse(response.status, response.json, requestId);
+  return response.json;
+}
+
+export async function createWebhook(ctx: Ctx, body: CreateWebhookBody, idempotencyKey?: string): Promise<Webhook | null> {
+  const json = (await sendJson(ctx, "POST", "/webhooks", body, "webhooks create", idempotencyKey)) as any;
+  return json?.data ?? null;
+}
+
+export async function updateWebhook(ctx: Ctx, id: string, body: UpdateWebhookBody, idempotencyKey?: string): Promise<Webhook | null> {
+  const json = (await sendJson(ctx, "PATCH", `/webhooks/${encodeURIComponent(id)}`, body, "webhooks update", idempotencyKey)) as any;
+  return json?.data ?? null;
+}
+
+export async function deleteWebhook(ctx: Ctx, id: string, idempotencyKey?: string): Promise<Record<string, unknown>> {
+  const json = (await sendJson(ctx, "DELETE", `/webhooks/${encodeURIComponent(id)}`, undefined, "webhooks delete", idempotencyKey)) as any;
+  return json?.data && typeof json.data === "object" ? json.data : { deleted: true };
 }
 
 async function getJson(ctx: Ctx, url: string, command: string): Promise<unknown> {
