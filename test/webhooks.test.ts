@@ -179,6 +179,33 @@ test("webhooks list --all walks every page by cursor with limit=100", async () =
   assert.deepEqual(JSON.parse(out).data.map((item: { id: string }) => item.id), ["wh_1", "wh_2", "wh_3"]);
 });
 
+test("webhooks list --all collects more than one full page of 100, in order", async () => {
+  const ids = (from: number, count: number) => Array.from({ length: count }, (_, index) => webhook(`wh_${from + index}`));
+  const { ctx, io, seen } = ctxWith((req) => {
+    const cursor = new URL(req.url).searchParams.get("cursor");
+    if (cursor === null) return ok({ data: ids(0, 100), cursor: "c1" });
+    if (cursor === "c1") return ok({ data: ids(100, 100), cursor: "c2" });
+    return ok({ data: ids(200, 5), cursor: null });
+  });
+  await runList(ctx, buildListQuery({ all: true }), true, JSON_OUTPUT);
+  assert.equal(seen.length, 3);
+  assert.deepEqual(seen.map((req) => new URL(req.url).searchParams.get("cursor")), [null, "c1", "c2"]);
+  const out = JSON.parse(io.stdout.join("")).data.map((item: { id: string }) => item.id);
+  assert.equal(out.length, 205);
+  assert.equal(out[0], "wh_0");
+  assert.equal(out[204], "wh_204");
+});
+
+test("webhooks list --all stops when the API repeats a cursor instead of looping forever", async () => {
+  const { ctx, io, seen } = ctxWith((req) => {
+    const cursor = new URL(req.url).searchParams.get("cursor");
+    return cursor === null ? ok({ data: [webhook("wh_1")], cursor: "stuck" }) : ok({ data: [webhook("wh_2")], cursor: "stuck" });
+  });
+  await runList(ctx, buildListQuery({ all: true }), true, JSON_OUTPUT);
+  assert.equal(seen.length, 2);
+  assert.deepEqual(JSON.parse(io.stdout.join("")).data.map((item: { id: string }) => item.id), ["wh_1", "wh_2"]);
+});
+
 test("webhooks get fetches one webhook by encoded id, strips signing_key and hints on stderr", async () => {
   const { ctx, io, seen } = ctxWith(() => ok({ data: webhook("wh/1") }));
   await runGet(ctx, "wh/1", JSON_OUTPUT);

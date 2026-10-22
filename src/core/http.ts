@@ -89,6 +89,14 @@ export function withAuth(token: string | null): Middleware {
   };
 }
 
+// --beta: opt in to beta API versions. Outermost, so every request of the command carries it.
+export function withBeta(enabled: boolean | undefined): Middleware {
+  return (next) => (request) => {
+    if (enabled) request.headers[HEADER.beta] = "true";
+    return next(request);
+  };
+}
+
 export function withVersion(version: string): Middleware {
   return (next) => (request) => {
     if (!request.headers[HEADER.cliVersion]) request.headers[HEADER.cliVersion] = version;

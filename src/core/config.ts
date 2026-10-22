@@ -11,9 +11,10 @@ export const ENVIRONMENTS: Record<string, string> = {
 export type Config = {
   env: string;
   baseUrl: string;
+  beta?: boolean; // --beta: send X-Beta: true so beta endpoints are reachable
 };
 
-export function resolveConfig(opts: { env?: string; baseUrl?: string }): Config {
+export function resolveConfig(opts: { env?: string; baseUrl?: string; beta?: boolean }): Config {
   const env = opts.env ?? process.env.DEEL_ENV ?? "prod";
   let baseUrl = opts.baseUrl;
   if (!baseUrl) {
@@ -32,5 +33,7 @@ export function resolveConfig(opts: { env?: string; baseUrl?: string }): Config 
   if (parsed.protocol !== "https:") {
     throw new CliError("config.baseurl", `--base-url must use https (got "${baseUrl}").`, "The API token is only sent over https.");
   }
-  return { env, baseUrl: baseUrl.replace(/\/$/, "") };
+  const config: Config = { env, baseUrl: baseUrl.replace(/\/$/, "") };
+  if (opts.beta) config.beta = true;
+  return config;
 }

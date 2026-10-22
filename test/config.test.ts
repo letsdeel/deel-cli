@@ -35,3 +35,9 @@ test("DEEL_ENV is honored when no --env is passed", () => {
     else process.env.DEEL_ENV = prev;
   }
 });
+
+test("--beta sets config.beta, and it is unset otherwise", () => {
+  assert.equal(resolveConfig({ beta: true }).beta, true);
+  assert.equal(resolveConfig({}).beta, undefined);
+  assert.equal(resolveConfig({ beta: false }).beta, undefined);
+});

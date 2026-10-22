@@ -213,6 +213,8 @@ export function errorFromResponse(status: number, json: unknown, requestId: stri
     next = payload.next;
   }
 
+  if (code === "BETA_ACCESS_REQUIRED") next = next ?? "This endpoint is in beta. Re-run with --beta.";
+
   const error = new CliError(code, message, next);
   error.requestId = requestId;
   return error;
