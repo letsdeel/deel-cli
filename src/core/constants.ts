@@ -28,7 +28,7 @@ export const IDEMPOTENCY_NAMESPACE = "8f4b6c1e-3d2a-4f9c-9a1b-7e5d0c2a1f00";
 export const AGENT_ENV_SIGNALS = ["CI", "CLAUDE_CODE", "CURSOR", "CODEX"] as const;
 
 // --- Command resolver vocabulary ---
-export const RESERVED_COMMANDS = new Set(["job", "auth"]);
+export const RESERVED_COMMANDS = new Set(["job", "auth", "tokens"]);
 export const COMMAND_SUFFIX_MODIFIERS = ["-bulk", "-async"];
 
 // --- Header names (lowercase; fetch normalizes) ---

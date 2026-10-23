@@ -191,7 +191,7 @@ async function multipartFingerprint(descriptor: Descriptor, call: ParsedCall): P
 // `{ errors: [{ code, message, field }] }` array (per the API style guide). We
 // surface the field-level messages from the array so validation failures are
 // actionable instead of a generic "Request failed with status 400".
-function errorFromResponse(status: number, json: unknown, requestId: string): CliError {
+export function errorFromResponse(status: number, json: unknown, requestId: string): CliError {
   const body = json as any;
   const list: any[] | undefined = Array.isArray(body?.errors) ? body.errors : undefined;
 
