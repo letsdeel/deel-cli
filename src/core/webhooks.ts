@@ -1,5 +1,5 @@
-// Webhook reads (list / get / event types) and writes (create / update / delete)
-// over the injected transport, plus the signing_key strip that every rendered
+// Webhook reads (list / get / event types), writes (create / update / delete) and
+// simulate over the injected transport, plus the signing_key strip that every rendered
 // webhook must go through: the API returns the signing key on every webhook
 // response, and the CLI never prints it.
 
@@ -83,7 +83,24 @@ export type UpdateWebhookBody = {
   include_child_orgs?: boolean;
 };
 
+// POST /webhooks/{id}/simulate body and its 200 `data`; `delivery` is null when no delivery was made.
+export type SimulateWebhookBody = { data: { event_type: string } };
+
+export type WebhookSimulation = {
+  is_success: boolean;
+  delivery: {
+    attempt_id: number | null;
+    status: "success" | "failed" | string;
+    response_status_code: number | null;
+    duration_ms: number | null;
+  } | null;
+};
+
 export const SIGNING_KEY_HINT = "reveal the signing key in Developer Center → Webhooks";
+export const SIMULATE_USAGE = "deel webhooks simulate <id> --event <type>";
+export const SIMULATE_RATE_LIMIT_HINT = "Simulations are limited to 10 simulations per hour per event type; wait before trying again.";
+export const SIMULATE_NOT_FOUND_HINT =
+  "No webhook with this id in your organization, or the event type has no sample payload; check `deel webhooks list` and `deel webhooks event-types`.";
 export const WEBHOOKS_PAGE_SIZE = 100;
 export const WEBHOOKS_MAX_PAGES = 1000;
 const WEBHOOK_STATUSES = ["enabled", "disabled"];
@@ -207,42 +224,90 @@ export function buildUpdateBody(flags: WriteFlags): UpdateWebhookBody {
   return body;
 }
 
-// Mutating call, sent like the generic executor: JSON body, an Idempotency-Key
-// (the --idempotency-key override or one derived from the request) and retries.
-async function sendJson(ctx: Ctx, method: string, path: string, body: unknown, command: string, idempotencyKey?: string): Promise<unknown> {
+// `deel webhooks simulate` flag -> POST body. --event is required.
+export function buildSimulateBody(eventType: string | undefined): SimulateWebhookBody {
+  const value = eventType?.trim();
+  if (!value) throw new CliError(USAGE, "deel webhooks simulate requires --event", `Usage: ${SIMULATE_USAGE}`);
+  return { data: { event_type: value } };
+}
+
+function appendNext(error: CliError, hint: string): void {
+  error.next = error.next ? `${error.next} ${hint}` : hint;
+}
+
+// Simulate error -> CliError. Hints are chosen on the HTTP status, never on the
+// code string (the gateway mostly sends a generic code per status). Also accepts
+// the pre-gateway flat `{ error_code, message }` body.
+export function simulateErrorFromResponse(status: number, json: unknown, requestId: string, betaSent = false): CliError {
+  const error = errorFromResponse(status, json, requestId, betaSent);
+  const body = json as any;
+  if (!Array.isArray(body?.errors) && body?.error == null && body?.code == null && typeof body?.error_code === "string") {
+    error.code = body.error_code;
+  }
+  if (status === 429) appendNext(error, SIMULATE_RATE_LIMIT_HINT);
+  if (status === 404) appendNext(error, SIMULATE_NOT_FOUND_HINT);
+  return error;
+}
+
+// `retryable: false` sends the request once; `deriveKey: false` sends an
+// Idempotency-Key only when the caller passes one. `toError` replaces the shared
+// errorFromResponse mapping.
+type SendOpts = {
+  idempotencyKey?: string;
+  retryable?: boolean;
+  deriveKey?: boolean;
+  toError?: (status: number, json: unknown, requestId: string, betaSent?: boolean) => CliError;
+};
+
+// Mutating call, sent like the generic executor by default: JSON body, an
+// Idempotency-Key (the --idempotency-key override or one derived from the request) and retries.
+async function sendJson(ctx: Ctx, method: string, path: string, body: unknown, command: string, opts: SendOpts = {}): Promise<unknown> {
   const requestId = ctx.newRequestId();
-  const key = idempotencyKey ?? deriveIdempotencyKey({ method, path, query: {}, body });
+  const key = opts.idempotencyKey ?? (opts.deriveKey === false ? undefined : deriveIdempotencyKey({ method, path, query: {}, body }));
   const headers: Record<string, string> = {
     [HEADER.accept]: "application/json",
     [HEADER.requestId]: requestId,
-    [HEADER.idempotencyKey]: key,
   };
+  if (key !== undefined) headers[HEADER.idempotencyKey] = key;
   if (body !== undefined) headers[HEADER.contentType] = "application/json";
   const response = await ctx.http({
     method,
     url: `${ctx.config.baseUrl}${path}`,
     headers,
     body: body === undefined ? null : JSON.stringify(body),
-    retryable: true,
-    meta: { command, idempotency_key: key },
+    retryable: opts.retryable ?? true,
+    meta: key === undefined ? { command } : { command, idempotency_key: key },
   });
-  if (response.status >= 400) throw errorFromResponse(response.status, response.json, requestId);
+  if (response.status >= 400) throw (opts.toError ?? errorFromResponse)(response.status, response.json, requestId, ctx.config.beta === true);
   return response.json;
 }
 
 export async function createWebhook(ctx: Ctx, body: CreateWebhookBody, idempotencyKey?: string): Promise<Webhook | null> {
-  const json = (await sendJson(ctx, "POST", "/webhooks", body, "webhooks create", idempotencyKey)) as any;
+  const json = (await sendJson(ctx, "POST", "/webhooks", body, "webhooks create", { idempotencyKey })) as any;
   return json?.data ?? null;
 }
 
 export async function updateWebhook(ctx: Ctx, id: string, body: UpdateWebhookBody, idempotencyKey?: string): Promise<Webhook | null> {
-  const json = (await sendJson(ctx, "PATCH", `/webhooks/${encodeURIComponent(id)}`, body, "webhooks update", idempotencyKey)) as any;
+  const json = (await sendJson(ctx, "PATCH", `/webhooks/${encodeURIComponent(id)}`, body, "webhooks update", { idempotencyKey })) as any;
   return json?.data ?? null;
 }
 
 export async function deleteWebhook(ctx: Ctx, id: string, idempotencyKey?: string): Promise<Record<string, unknown>> {
-  const json = (await sendJson(ctx, "DELETE", `/webhooks/${encodeURIComponent(id)}`, undefined, "webhooks delete", idempotencyKey)) as any;
+  const json = (await sendJson(ctx, "DELETE", `/webhooks/${encodeURIComponent(id)}`, undefined, "webhooks delete", { idempotencyKey })) as any;
   return json?.data && typeof json.data === "object" ? json.data : { deleted: true };
+}
+
+// Each simulation is meant to be a new delivery: no retry (a 429 retry would burn
+// the hourly quota) and no derived Idempotency-Key (a gateway could replay the
+// previous response for the same {id, event_type}).
+export async function simulateWebhook(ctx: Ctx, id: string, body: SimulateWebhookBody, idempotencyKey?: string): Promise<WebhookSimulation | null> {
+  const json = (await sendJson(ctx, "POST", `/webhooks/${encodeURIComponent(id)}/simulate`, body, "webhooks simulate", {
+    idempotencyKey,
+    retryable: false,
+    deriveKey: false,
+    toError: simulateErrorFromResponse,
+  })) as any;
+  return json?.data ?? null;
 }
 
 async function getJson(ctx: Ctx, url: string, command: string): Promise<unknown> {
@@ -256,7 +321,7 @@ async function getJson(ctx: Ctx, url: string, command: string): Promise<unknown>
     retryable: true,
     meta: { command },
   });
-  if (response.status >= 400) throw errorFromResponse(response.status, response.json, requestId);
+  if (response.status >= 400) throw errorFromResponse(response.status, response.json, requestId, ctx.config.beta === true);
   return response.json;
 }
 

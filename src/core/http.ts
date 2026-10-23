@@ -89,6 +89,14 @@ export function withAuth(token: string | null): Middleware {
   };
 }
 
+// --beta: opt in to beta API versions. Wired inside withRetry, so every attempt of a request carries the header.
+export function withBeta(enabled: boolean | undefined): Middleware {
+  return (next) => (request) => {
+    if (enabled) request.headers[HEADER.beta] = "true";
+    return next(request);
+  };
+}
+
 export function withVersion(version: string): Middleware {
   return (next) => (request) => {
     if (!request.headers[HEADER.cliVersion]) request.headers[HEADER.cliVersion] = version;

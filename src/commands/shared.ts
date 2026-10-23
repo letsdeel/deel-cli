@@ -22,6 +22,7 @@ export const commonArgs: ArgsDef = {
   raw: { type: "boolean", description: "With --jq, print scalar string results unquoted (like jq -r)" },
   form: { type: "boolean", description: "Send as multipart/form-data (for endpoints that also accept a file upload)" },
   env: { type: "string", description: "Environment: prod | demo (default prod)" },
+  beta: { type: "boolean", description: "Call beta endpoints: sends the X-Beta: true header" },
   "ca-cert": { type: "string", description: "Extra CA certificate (PEM) to trust, on top of the OS store — e.g. an internal/dev root" },
   "token-stdin": { type: "boolean", description: "Read the PAT from stdin" },
   "idempotency-key": { type: "string", description: "Override the auto-derived idempotency key" },
@@ -75,7 +76,7 @@ export function gatherFiles(rawArgs: string[]): Record<string, string[]> {
 }
 
 export function configFrom(args: Args, rawArgs: string[]): Config {
-  return resolveConfig({ env: args.env as string | undefined, baseUrl: readHidden(rawArgs, "base-url") });
+  return resolveConfig({ env: args.env as string | undefined, baseUrl: readHidden(rawArgs, "base-url"), beta: Boolean(args.beta) });
 }
 
 // Collect every occurrence of a repeatable flag (`--name v1 --name v2` or

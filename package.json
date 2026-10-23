@@ -1,6 +1,6 @@
 {
   "name": "@deel-org/cli",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "description": "Deel CLI — a thin, spec-driven command-line client for the Deel Public API",
   "type": "module",
   "bin": {
