@@ -85,6 +85,7 @@ export type UpdateWebhookBody = {
 
 export const SIGNING_KEY_HINT = "reveal the signing key in Developer Center → Webhooks";
 export const WEBHOOKS_PAGE_SIZE = 100;
+export const WEBHOOKS_MAX_PAGES = 1000;
 const WEBHOOK_STATUSES = ["enabled", "disabled"];
 const ORDER_PATTERN = /^(name|created_at|status)(:(asc|desc))?$/;
 const USAGE = "usage.webhooks";
@@ -267,20 +268,29 @@ export async function listWebhooks(ctx: Ctx, params: URLSearchParams): Promise<W
   return { data: Array.isArray(json?.data) ? json.data : [], cursor };
 }
 
-// --all: pages of WEBHOOKS_PAGE_SIZE following `cursor` until the API returns null.
+// --all: pages of WEBHOOKS_PAGE_SIZE following `cursor` until the API returns null. A cursor the API already
+// returned (an A -> B -> A cycle, or the same one twice) or more than WEBHOOKS_MAX_PAGES pages is an error rather
+// than a loop that grows without bound or a silently truncated list.
 export async function listAllWebhooks(ctx: Ctx, params: URLSearchParams): Promise<Webhook[]> {
   const webhooks: Webhook[] = [];
+  const seen = new Set<string>();
   let cursor: string | null = null;
-  do {
+  for (let pages = 0; ; pages++) {
+    if (pages >= WEBHOOKS_MAX_PAGES) {
+      throw new CliError("webhooks.paging_limit", `Stopped after ${WEBHOOKS_MAX_PAGES} pages of webhooks`, "Narrow the list with --status or --search, or page manually with --limit and --cursor.");
+    }
     const pageParams = new URLSearchParams(params);
     pageParams.set("limit", String(WEBHOOKS_PAGE_SIZE));
     if (cursor !== null) pageParams.set("cursor", cursor);
     const page: WebhookPage = await listWebhooks(ctx, pageParams);
     webhooks.push(...page.data);
-    // Guard against a cursor that does not advance, which would loop forever.
-    cursor = page.cursor === cursor ? null : page.cursor;
-  } while (cursor !== null);
-  return webhooks;
+    if (page.cursor === null) return webhooks;
+    if (seen.has(page.cursor)) {
+      throw new CliError("webhooks.paging_stuck", "The API returned the same cursor twice, so the list cannot be completed", "Retry, or page manually with --limit and --cursor.");
+    }
+    seen.add(page.cursor);
+    cursor = page.cursor;
+  }
 }
 
 export async function getWebhook(ctx: Ctx, id: string): Promise<Webhook | null> {
