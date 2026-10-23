@@ -162,7 +162,7 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
 
   if (opts.debug) ctx.io.err(`[debug] ${descriptor.method} ${url} -> ${response.status}  x-request-id=${requestId}\n`);
 
-  if (response.status >= 400) throw errorFromResponse(response.status, response.json, requestId);
+  if (response.status >= 400) throw errorFromResponse(response.status, response.json, requestId, ctx.config.beta === true);
 
   const data = (response.json as any)?.data ?? response.json ?? null;
   await render(ctx.io, envelope(data, { request_id: requestId }), opts.output);
@@ -191,7 +191,8 @@ async function multipartFingerprint(descriptor: Descriptor, call: ParsedCall): P
 // `{ errors: [{ code, message, field }] }` array (per the API style guide). We
 // surface the field-level messages from the array so validation failures are
 // actionable instead of a generic "Request failed with status 400".
-export function errorFromResponse(status: number, json: unknown, requestId: string): CliError {
+// `betaSent`: the request already carried X-Beta, so a BETA_ACCESS_REQUIRED answer must not tell the user to add --beta.
+export function errorFromResponse(status: number, json: unknown, requestId: string, betaSent = false): CliError {
   const body = json as any;
   const list: any[] | undefined = Array.isArray(body?.errors) ? body.errors : undefined;
 
@@ -213,7 +214,7 @@ export function errorFromResponse(status: number, json: unknown, requestId: stri
     next = payload.next;
   }
 
-  if (code === "BETA_ACCESS_REQUIRED") next = next ?? "This endpoint is in beta. Re-run with --beta.";
+  if (code === "BETA_ACCESS_REQUIRED" && !betaSent) next = next ?? "This endpoint is in beta. Re-run with --beta.";
 
   const error = new CliError(code, message, next);
   error.requestId = requestId;

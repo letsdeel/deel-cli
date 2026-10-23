@@ -40,6 +40,14 @@ function optionalString(value: unknown): string | undefined {
   return value === undefined ? undefined : String(value);
 }
 
+// simulate --event: exactly one event type. A repeated flag is a usage error (the parser would silently keep the last
+// one) and a flag without a value is treated as missing (the parser hands back a boolean, not a string).
+export function eventFlag(args: Args, rawArgs: string[]): string | undefined {
+  const given = rawArgs.filter((token) => token === "--event" || token.startsWith("--event=")).length;
+  if (given > 1) throw new CliError("usage.webhooks", "deel webhooks simulate takes one --event", `Usage: ${SIMULATE_USAGE}`);
+  return typeof args.event === "string" ? args.event : undefined;
+}
+
 export function listFlagsFrom(args: Args): ListFlags {
   return {
     limit: optionalString(args.limit),
@@ -301,7 +309,7 @@ export const webhooksCommand = defineCommand({
       async run(cittyCtx) {
         const args = cittyCtx.args as Args;
         const id = requireId(args, cittyCtx.rawArgs, SIMULATE_USAGE);
-        const body = buildSimulateBody(optionalString(args.event)); // usage errors before any token lookup
+        const body = buildSimulateBody(eventFlag(args, cittyCtx.rawArgs)); // usage errors before any token lookup
         await runSimulate(contextFor(cittyCtx), id, body, outputOpts(args), optionalString(args["idempotency-key"]));
       },
     }),

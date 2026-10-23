@@ -5,7 +5,7 @@ import { captureIO } from "../src/core/io.ts";
 import type { HttpRequest, HttpResponse } from "../src/core/http.ts";
 import { HEADER } from "../src/core/constants.ts";
 import { buildSimulateBody } from "../src/core/webhooks.ts";
-import { runSimulate, webhooksCommand } from "../src/commands/webhooks.ts";
+import { eventFlag, runSimulate, webhooksCommand } from "../src/commands/webhooks.ts";
 import { run } from "../src/cli.ts";
 
 const CONFIG = { env: "demo", baseUrl: "https://example.test/rest" };
@@ -243,4 +243,29 @@ test("--beta sends X-Beta on the simulate request, and a BETA_ACCESS_REQUIRED re
 
 test("deel webhooks simulate without an id points at --id=<id> for ids that start with a dash", async () => {
   await assert.rejects(() => run(["webhooks", "simulate", "--event", "contract.created"]), (err: any) => usage(err) && /--id=<id>/.test(err.next));
+});
+
+test("a BETA_ACCESS_REQUIRED answer does not tell the user to add --beta when it was already sent", async () => {
+  const betaBody = { errors: [{ code: "BETA_ACCESS_REQUIRED", message: "This API version is in beta. Please include the X-Beta: true header." }] };
+  const ctx = createContext({
+    config: { ...CONFIG, beta: true },
+    token: "tok_SECRET",
+    io: captureIO({ isTTY: false }),
+    rng: () => "req-fixed-id",
+    logger: () => {},
+    baseTransport: async () => ok(betaBody, 403),
+  });
+  await assert.rejects(
+    () => runSimulate(ctx, "wh_1", buildSimulateBody("contract.created"), JSON_OUTPUT),
+    (err: any) => err.code === "BETA_ACCESS_REQUIRED" && !/--beta/.test(String(err.next ?? "")),
+  );
+});
+
+test("simulate takes exactly one --event: a repeated flag is a usage error and a bare flag counts as missing", () => {
+  assert.equal(eventFlag({ event: "contract.created" }, ["wh_1", "--event", "contract.created"]), "contract.created");
+  assert.equal(eventFlag({ event: "contract.created" }, ["--event=contract.created"]), "contract.created");
+  assert.throws(() => eventFlag({ event: "b" }, ["wh_1", "--event", "a", "--event", "b"]), usage);
+  assert.throws(() => eventFlag({ event: "b" }, ["--event=a", "--event", "b"]), usage);
+  assert.equal(eventFlag({ event: true }, ["wh_1", "--event"]), undefined);
+  assert.throws(() => buildSimulateBody(eventFlag({ event: true }, ["wh_1", "--event"])), usage);
 });

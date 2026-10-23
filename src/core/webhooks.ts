@@ -238,8 +238,8 @@ function appendNext(error: CliError, hint: string): void {
 // Simulate error -> CliError. Hints are chosen on the HTTP status, never on the
 // code string (the gateway mostly sends a generic code per status). Also accepts
 // the pre-gateway flat `{ error_code, message }` body.
-export function simulateErrorFromResponse(status: number, json: unknown, requestId: string): CliError {
-  const error = errorFromResponse(status, json, requestId);
+export function simulateErrorFromResponse(status: number, json: unknown, requestId: string, betaSent = false): CliError {
+  const error = errorFromResponse(status, json, requestId, betaSent);
   const body = json as any;
   if (!Array.isArray(body?.errors) && body?.error == null && body?.code == null && typeof body?.error_code === "string") {
     error.code = body.error_code;
@@ -256,7 +256,7 @@ type SendOpts = {
   idempotencyKey?: string;
   retryable?: boolean;
   deriveKey?: boolean;
-  toError?: (status: number, json: unknown, requestId: string) => CliError;
+  toError?: (status: number, json: unknown, requestId: string, betaSent?: boolean) => CliError;
 };
 
 // Mutating call, sent like the generic executor by default: JSON body, an
@@ -278,7 +278,7 @@ async function sendJson(ctx: Ctx, method: string, path: string, body: unknown, c
     retryable: opts.retryable ?? true,
     meta: key === undefined ? { command } : { command, idempotency_key: key },
   });
-  if (response.status >= 400) throw (opts.toError ?? errorFromResponse)(response.status, response.json, requestId);
+  if (response.status >= 400) throw (opts.toError ?? errorFromResponse)(response.status, response.json, requestId, ctx.config.beta === true);
   return response.json;
 }
 
@@ -321,7 +321,7 @@ async function getJson(ctx: Ctx, url: string, command: string): Promise<unknown>
     retryable: true,
     meta: { command },
   });
-  if (response.status >= 400) throw errorFromResponse(response.status, response.json, requestId);
+  if (response.status >= 400) throw errorFromResponse(response.status, response.json, requestId, ctx.config.beta === true);
   return response.json;
 }
 
