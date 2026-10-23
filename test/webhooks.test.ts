@@ -8,7 +8,7 @@ import { log, setLoggingEnabled, setLogBodiesEnabled } from "../src/core/logging
 import type { Logger } from "../src/core/logging.ts";
 import type { HttpRequest, HttpResponse } from "../src/core/http.ts";
 import { RESERVED_COMMANDS, SENSITIVE_LOG_KEYS } from "../src/core/constants.ts";
-import { DASH_ID_HINT, SIGNING_KEY_HINT, buildListQuery, resolveWebhookId, stripSigningKey } from "../src/core/webhooks.ts";
+import { DASH_ID_HINT, SIGNING_KEY_HINT, WEBHOOKS_MAX_PAGES, buildListQuery, resolveWebhookId, stripSigningKey } from "../src/core/webhooks.ts";
 import { listFlagsFrom, requireId, runEventTypes, runGet, runList } from "../src/commands/webhooks.ts";
 import { staticCommands } from "../src/commands/index.ts";
 import { run } from "../src/cli.ts";
@@ -177,6 +177,31 @@ test("webhooks list --all walks every page by cursor with limit=100", async () =
   const out = io.stdout.join("");
   assert.equal(out.includes(SIGNING_KEY), false);
   assert.deepEqual(JSON.parse(out).data.map((item: { id: string }) => item.id), ["wh_1", "wh_2", "wh_3"]);
+});
+
+test("webhooks list --all fails instead of looping when the API returns the same cursor again", async () => {
+  const { ctx, seen } = ctxWith((req) => {
+    const cursor = new URL(req.url).searchParams.get("cursor");
+    return ok({ data: [webhook(cursor === null ? "wh_1" : "wh_2")], cursor: "stuck" });
+  });
+  await assert.rejects(() => runList(ctx, buildListQuery({ all: true }), true, JSON_OUTPUT), (err: any) => err.code === "webhooks.paging_stuck");
+  assert.equal(seen.length, 2);
+});
+
+test("webhooks list --all fails on a cursor cycle that is not adjacent (A -> B -> A)", async () => {
+  const next: Record<string, string> = { A: "B", B: "A" };
+  const { ctx, seen } = ctxWith((req) => {
+    const cursor = new URL(req.url).searchParams.get("cursor");
+    return ok({ data: [webhook(`wh_${seen.length}`)], cursor: next[cursor ?? "B"] ?? "A" });
+  });
+  await assert.rejects(() => runList(ctx, buildListQuery({ all: true }), true, JSON_OUTPUT), (err: any) => err.code === "webhooks.paging_stuck");
+  assert.equal(seen.length, 3);
+});
+
+test("webhooks list --all stops after WEBHOOKS_MAX_PAGES pages even when every cursor is new", async () => {
+  const { ctx, seen } = ctxWith(() => ok({ data: [webhook("wh_1")], cursor: `c${seen.length}` }));
+  await assert.rejects(() => runList(ctx, buildListQuery({ all: true }), true, JSON_OUTPUT), (err: any) => err.code === "webhooks.paging_limit");
+  assert.equal(seen.length, WEBHOOKS_MAX_PAGES);
 });
 
 test("webhooks get fetches one webhook by encoded id, strips signing_key and hints on stderr", async () => {
