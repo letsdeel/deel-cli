@@ -1,4 +1,5 @@
 import { test } from "node:test";
+import { PassThrough } from "node:stream";
 import assert from "node:assert/strict";
 import { createContext } from "../src/core/context.ts";
 import { captureIO } from "../src/core/io.ts";
@@ -6,7 +7,7 @@ import type { HttpRequest, HttpResponse } from "../src/core/http.ts";
 import { HEADER } from "../src/core/constants.ts";
 import { deriveIdempotencyKey } from "../src/core/idempotency.ts";
 import { DASH_ID_HINT, SIGNING_KEY_HINT, buildCreateBody, buildUpdateBody } from "../src/core/webhooks.ts";
-import { isYes, readBooleanFlag, runCreate, runDelete, runUpdate, webhooksCommand, writeFlagsFrom } from "../src/commands/webhooks.ts";
+import { isYes, promptConfirm, readBooleanFlag, runCreate, runDelete, runUpdate, webhooksCommand, writeFlagsFrom } from "../src/commands/webhooks.ts";
 import { run } from "../src/cli.ts";
 
 const CONFIG = { env: "demo", baseUrl: "https://example.test/rest" };
@@ -217,6 +218,38 @@ test("webhooks delete --yes sends DELETE without prompting and prints the id", a
   assert.equal(seen[0].body, null);
   assert.ok(seen[0].headers[HEADER.idempotencyKey]);
   assert.deepEqual(JSON.parse(io.stdout.join("")).data, { id: "wh_1", deleted: true });
+});
+
+test("webhooks delete falls back to { deleted: true } when the API answers without a body", async () => {
+  const { ctx, io } = ctxWith(() => ({ status: 204, headers: {}, text: "", json: undefined }));
+  await runDelete(ctx, "wh_1", { yes: true }, JSON_OUTPUT);
+  assert.deepEqual(JSON.parse(io.stdout.join("")).data, { id: "wh_1", deleted: true });
+});
+
+test("webhooks delete never prints a signing_key the API echoes back, and hints on stderr", async () => {
+  const { ctx, io } = ctxWith(() => ok({ data: webhook("wh_1") }));
+  await runDelete(ctx, "wh_1", { yes: true }, JSON_OUTPUT);
+  const out = io.stdout.join("");
+  assert.equal(out.includes(SIGNING_KEY), false);
+  assert.equal(out.includes("signing_key"), false);
+  assert.equal(JSON.parse(out).data.id, "wh_1");
+  assert.equal(io.stderr.join(""), `signing_key omitted: ${SIGNING_KEY_HINT}\n`);
+});
+
+test("promptConfirm answers yes and no from one line of input", async () => {
+  for (const [line, expected] of [["y\n", true], ["yes\n", true], ["n\n", false], ["\n", false]] as const) {
+    const input = new PassThrough();
+    const answer = promptConfirm("Delete? ", input, new PassThrough());
+    input.write(line);
+    assert.equal(await answer, expected, JSON.stringify(line));
+  }
+});
+
+test("promptConfirm settles as no when the input closes without an answer (EOF)", async () => {
+  const input = new PassThrough();
+  const answer = promptConfirm("Delete? ", input, new PassThrough());
+  input.end();
+  assert.equal(await answer, false);
 });
 
 test("webhooks delete on an interactive terminal asks and deletes on yes", async () => {
