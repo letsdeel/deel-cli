@@ -165,7 +165,11 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   if (response.status >= 400) throw errorFromResponse(response.status, response.json, requestId, ctx.config.beta === true);
 
   const data = (response.json as any)?.data ?? response.json ?? null;
-  await render(ctx.io, envelope(data, { request_id: requestId }), opts.output);
+  // Paged list responses carry the next-page cursor beside `data`; surface it so --cursor can be used.
+  const nextCursor = (response.json as any)?.cursor;
+  const meta: Record<string, unknown> = { request_id: requestId };
+  if (typeof nextCursor === "string" && nextCursor !== "") meta.cursor = nextCursor;
+  await render(ctx.io, envelope(data, meta), opts.output);
 }
 
 async function multipartFingerprint(descriptor: Descriptor, call: ParsedCall): Promise<unknown> {

@@ -6,6 +6,7 @@ A command-line client for selected endpoints from the [Deel Public API](https://
 deel auth status --json                              # verify your token and identity
 deel adjustments create --invoice --generate-input  # explore required fields
 deel jobs list --jq '.[] | {job_id, status}'        # filter recent async jobs
+deel apps list --api_access enabled                 # list your organization's integration apps
 ```
 
 ## Contents
@@ -20,6 +21,7 @@ deel jobs list --jq '.[] | {job_id, status}'        # filter recent async jobs
 - [Output (`--json`, `--fields`, `--jq`, `--quiet`)](#output)
 - [Idempotency](#idempotency)
 - [Webhooks](#webhooks)
+- [Apps](#apps)
 - [Environments](#environments)
 - [Corporate proxies & custom CAs](#corporate-proxies--custom-cas)
 - [Exit codes](#exit-codes)
@@ -247,6 +249,17 @@ deel webhooks simulate <id> --event contract.created           # Deel delivers a
 A webhook id can start with `-`, which the argument parser reads as a flag. Pass such an id as `--id=<id>` on `get`, `update`, `delete` and `simulate`: `deel webhooks get --id=-WZ1uT2DFF01`. `--id` wins over a positional id.
 
 `simulate` runs the delivery from Deel's servers, so the receiver URL must be publicly reachable; it is limited to 10 simulations per hour per event type, is never retried and gets no auto-derived `Idempotency-Key`, and exits 1 when the receiver does not answer 2xx.
+
+## Apps
+
+`deel apps list` and `deel apps get --app_id <id>` read the integration apps that belong to your organization (the app secret is never returned). The commands are generated from the API spec like the others, so path parameters are flags.
+
+```bash
+deel apps list --api_access disabled --limit 20      # filter by API access; --limit and --cursor page the list
+deel apps get --app_id 00000000-0000-0000-0000-000000000000
+```
+
+`apps list` has no `--all`: when more results exist the next-page cursor is printed as `meta.cursor`; pass it back with `--cursor`.
 
 ## Environments
 
