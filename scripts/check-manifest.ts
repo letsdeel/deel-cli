@@ -36,7 +36,19 @@ function check(): string[] {
     }
   }
 
-  // 3. Variant groups: distinct variants; variant name must not collide with a param flag.
+  // 3. A descriptor's confirm text matches its map entry.
+  const mapConfirm = new Map(commandMap.map((e) => [entryKey(e.command, e.method, e.path, e.variant), e.confirm]));
+  for (const d of manifest.descriptors) {
+    const k = entryKey(d.command.join(" "), d.method, d.path, d.variant);
+    if (!mapConfirm.has(k)) continue; // orphan, reported above
+    const want = mapConfirm.get(k);
+    const have = (d as { confirm?: string }).confirm;
+    if (want !== have) {
+      errors.push(`[confirm] ${d.command.join(" ")} ${d.method} ${d.path}: manifest confirm ${JSON.stringify(have)} differs from map ${JSON.stringify(want)}`);
+    }
+  }
+
+  // 4. Variant groups: distinct variants; variant name must not collide with a param flag.
   const groups = new Map<string, AnyDescriptor[]>();
   for (const d of manifest.descriptors) {
     const cmd = d.command.join(" ");

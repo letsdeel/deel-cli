@@ -164,6 +164,7 @@ type CommandEntry = {
   variant?: string;
   method: string;
   path: string;
+  confirm?: string;
 };
 
 // ---------------------------------------------------------------------------
@@ -209,6 +210,7 @@ export function extract(spec: AnyObj, entries: CommandEntry[]): ExtractionResult
       path: entry.path,
       ...(operation.summary ? { summary: operation.summary } : {}),
       ...(operation["x-version"] ? { version: operation["x-version"] } : {}),
+      ...(entry.confirm ? { confirm: entry.confirm } : {}),
       async: isAsync,
       bodyKind,
       supportsMultipart,

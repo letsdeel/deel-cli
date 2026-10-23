@@ -134,6 +134,8 @@ export function printActionHelp(descriptor: Descriptor): void {
     }
   }
 
+  if (descriptor.confirm) out(`  --yes   Skip the confirmation prompt (required when not running in a terminal)\n`);
+
   printContract(descriptor);
   out(`Global options (--json, --jq, --fields, --quiet, --env, ...) — run 'deel --help'.\n`);
   out(`Machine-readable contract: 'deel ${descriptor.command.join(" ")} --help --json'.\n`);

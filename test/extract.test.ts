@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { splitFields, bodyFrom, responseFrom } from "../.claude/skills/deel-cli-extractor/extract.ts";
+import { extract, splitFields, bodyFrom, responseFrom } from "../.claude/skills/deel-cli-extractor/extract.ts";
 
 test("splitFields recursively expands nested object schemas into properties", () => {
   const { textProps } = splitFields({
@@ -105,4 +105,16 @@ test("responseFrom expands a response field that is an array of objects into ite
     ["status", "external_id"],
   );
   assert.equal(items!.properties!.find((field) => field.name === "status")!.required, true);
+});
+
+test("extract copies a map entry's confirm text into its descriptor and only there", () => {
+  const spec = { paths: { "/things/{id}": { post: { summary: "Drop" }, get: { summary: "Get" } } } };
+  const { manifest, hardErrors } = extract(spec, [
+    { command: "things drop", method: "POST", path: "/things/{id}", confirm: "Drop {id}?" },
+    { command: "things get", method: "GET", path: "/things/{id}" },
+  ]);
+  assert.deepEqual(hardErrors, []);
+  const byName = Object.fromEntries(manifest.descriptors.map((d) => [d.command.join(" "), d]));
+  assert.equal(byName["things drop"].confirm, "Drop {id}?");
+  assert.ok(!("confirm" in byName["things get"]));
 });
