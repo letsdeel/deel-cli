@@ -14,6 +14,7 @@ import {
   CREATE_HINT,
   TOKEN_SIGNALS,
   TOKEN_SORTS,
+  TOKEN_TYPES,
   buildTokenListQuery,
   getApiToken,
   listAllApiTokens,
@@ -85,8 +86,8 @@ export async function runList(ctx: Ctx, query: URLSearchParams, all: boolean, ou
     return;
   }
   const page = await listApiTokens(ctx, query);
-  await render(ctx.io, envelope(page.data, { next_cursor: page.cursor, total: page.total }), output);
-  if (page.cursor !== null) ctx.io.err(`next page: --cursor ${page.cursor}\n`);
+  await render(ctx.io, envelope(page.data, { next_cursor: page.next_cursor, has_more: page.has_more, total_count: page.total_count }), output);
+  if (page.next_cursor !== null) ctx.io.err(`next page: --cursor ${page.next_cursor}\n`);
 }
 
 export async function runGet(ctx: Ctx, id: string, output: OutputOpts): Promise<void> {
@@ -97,7 +98,7 @@ export async function runGet(ctx: Ctx, id: string, output: OutputOpts): Promise<
 
 export type InvalidateOpts = { yes: boolean; reason?: string; idempotencyKey?: string; confirm?: Confirm };
 
-// No DELETE is sent without --yes or an interactive yes: a invalidated token stops working at once and cannot be restored.
+// No invalidation is sent without --yes or an interactive yes: an invalidated token cannot be restored.
 export async function runInvalidate(ctx: Ctx, id: string, opts: InvalidateOpts, output: OutputOpts): Promise<void> {
   if (!opts.yes) {
     if (!ctx.io.interactive) {
@@ -118,11 +119,11 @@ export const tokensCommand = defineCommand({
         limit: { type: "string", description: "Page size, 4-100 (default 100)" },
         cursor: { type: "string", description: "Next page cursor from a previous call (keeps that call's filters)" },
         all: { type: "boolean", description: "Fetch every page (100 per request)" },
-        type: { type: "string", description: "Filter by type: personal | organization" },
-        signal: { type: "string", description: `Only tokens that need attention: ${TOKEN_SIGNALS.join(" | ")}` },
+        type: { type: "string", description: `Filter by type: ${TOKEN_TYPES.join(" | ")} (any case)` },
+        signal: { type: "string", description: `Only tokens that need attention: ${TOKEN_SIGNALS.join(" | ")} (any case)` },
         search: { type: "string", description: "Match label, scope, or owner name or email" },
         owner: { type: "string", description: "Only tokens owned by this profile id" },
-        sort: { type: "string", description: `Sort: ${TOKEN_SORTS.join(" | ")}` },
+        sort: { type: "string", description: `Sort: ${TOKEN_SORTS.join(" | ")} (any case)` },
         ...commonArgs,
       },
       async run(cittyCtx) {

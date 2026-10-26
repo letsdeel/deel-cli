@@ -232,13 +232,13 @@ deel jobs list --quiet
 
 ## API tokens
 
-`deel tokens` lists, inspects and invalidates the API tokens of your organization, and your own personal tokens. The calling token needs the `tokens:read` scope, plus `tokens:write` to invalidate. The API never returns a token's secret value.
+`deel tokens` lists, inspects and invalidates the API tokens of your organization, and your own personal tokens. The calling token needs the `tokens:read` scope, plus `tokens:write` to invalidate. The API never returns a token's secret value. These endpoints are in beta, so pass `--beta` (it sends `X-Beta: true`) until they are promoted.
 
 ```bash
-deel tokens list                                        # newest first, one page (--all for every page)
-deel tokens list --signal stale                         # tokens that need attention: stale | expiring | orphaned | full_access | ...
-deel tokens get <id>
-deel tokens invalidate <id> --reason "rotated"              # asks to confirm; --yes when non-interactive
+deel tokens list --beta                                 # newest first, one page (--all for every page)
+deel tokens list --beta --signal stale                  # tokens that need attention: STALE | EXPIRING | ORPHANED | FULL_ACCESS | ... (any case)
+deel tokens get <id> --beta
+deel tokens invalidate <id> --beta --reason "rotated"  # asks to confirm; --yes when non-interactive
 ```
 
 An invalidated token stops working at once and cannot be restored. The CLI cannot create tokens: create them in Developer Center → API tokens.
