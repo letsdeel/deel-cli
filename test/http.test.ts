@@ -68,3 +68,29 @@ test("withRetry does not retry a non-retryable request", async () => {
   assert.equal(response.status, 503);
   assert.equal(call, 1);
 });
+
+test("withAuth resolves an async token provider at send time", async () => {
+  const a = capturing();
+  let calls = 0;
+  await withAuth(async () => (calls++, "fresh"))(a.next)(req());
+  assert.equal(a.seen[0].headers["authorization"], "Bearer fresh");
+  assert.equal(calls, 1);
+});
+
+test("withAuth does not call the provider when a credential is already set or the URL is not https", async () => {
+  let calls = 0;
+  const provider = async () => (calls++, "fresh");
+  const a = capturing();
+  await withAuth(provider)(a.next)(req({ headers: { authorization: "Bearer preset" } }));
+  assert.equal(calls, 0);
+  await assert.rejects(async () => {
+    await withAuth(provider)(a.next)(req({ url: "http://x" }));
+  }, /non-https/);
+  assert.equal(calls, 0);
+});
+
+test("withAuth sends no header when the provider has no token", async () => {
+  const a = capturing();
+  await withAuth(async () => null)(a.next)(req());
+  assert.equal(a.seen[0].headers["authorization"], undefined);
+});

@@ -8,7 +8,7 @@ import { defineCommand, runCommand, showUsage } from "citty";
 import type { ArgsDef, CommandDef } from "citty";
 import type { Descriptor } from "./types.ts";
 import { manifest } from "./manifest.generated.ts";
-import { resolveToken, requireToken } from "./core/auth.ts";
+import { resolveToken, authFor } from "./core/auth.ts";
 import { parseInput } from "./core/input.ts";
 import { createContext } from "./core/context.ts";
 import { execute } from "./core/executor.ts";
@@ -60,7 +60,7 @@ async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<st
     idempotencyKey: args["idempotency-key"] as string | undefined,
   };
   const config = configFrom(args, cittyCtx.rawArgs);
-  const token = requireToken(resolveToken({ tokenStdin: Boolean(args["token-stdin"]), env: config.env }));
+  const token = authFor(resolveToken({ tokenStdin: Boolean(args["token-stdin"]), config }));
   const ctx = createContext({ config, token });
   await execute(descriptor, call, ctx, { output: outputOpts(args), debug: Boolean(args.debug), form: Boolean(args.form) });
 }

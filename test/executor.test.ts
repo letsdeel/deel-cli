@@ -9,7 +9,7 @@ import { captureIO } from "../src/core/io.ts";
 import type { Descriptor } from "../src/types.ts";
 import type { HttpRequest, HttpResponse } from "../src/core/http.ts";
 
-const CONFIG = { env: "demo", baseUrl: "https://example.test/rest" };
+const CONFIG = { env: "demo", baseUrl: "https://example.test/rest", issuer: null, clientId: "test-client", oauthBaseUrlOk: false };
 
 function ctxWith(handler: (req: HttpRequest) => HttpResponse, io = captureIO({})) {
   const seen: HttpRequest[] = [];

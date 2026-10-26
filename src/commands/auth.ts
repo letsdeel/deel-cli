@@ -7,7 +7,7 @@ import { defineCommand } from "citty";
 import { readFileSync } from "node:fs";
 import { createInterface } from "node:readline";
 import { Writable } from "node:stream";
-import { resolveToken, requireToken, maskToken, extractIdentity } from "../core/auth.ts";
+import { resolveToken, requireToken, authFor, accessTokenScope, maskToken, extractIdentity } from "../core/auth.ts";
 import { credentialStore } from "../core/keychain.ts";
 import { createContext } from "../core/context.ts";
 import { envelope, render } from "../core/output.ts";
@@ -59,14 +59,22 @@ export const authCommand = defineCommand({
         setLoggingEnabled(args.log !== false);
         setLogBodiesEnabled(args["log-bodies"] === true);
         const config = configFrom(args, cittyCtx.rawArgs);
-        const resolved = resolveToken({ tokenStdin: Boolean(args["token-stdin"]), env: config.env });
-        const token = requireToken(resolved);
-        const ctx = createContext({ config, token });
+        const resolved = resolveToken({ tokenStdin: Boolean(args["token-stdin"]), config });
+        requireToken(resolved);
+        const ctx = createContext({ config, token: authFor(resolved) });
         const response = await checkToken(ctx, config, "auth status");
         if (response.status >= 400) throw new CliError("auth.invalid", `Token check failed (${response.status})`);
+        const oauth = resolved.oauth?.current(); // read after the request: it may have refreshed the login
         await render(
           ctx.io,
-          envelope({ valid: true, source: resolved.source, token: maskToken(token), identity: extractIdentity(response.json) }),
+          envelope({
+            valid: true,
+            auth: oauth ? "oauth" : "pat",
+            source: resolved.source,
+            token: maskToken(oauth?.access_token ?? (resolved.token as string)),
+            ...(oauth ? { expires_at: oauth.expires_at, scope: accessTokenScope(oauth.access_token) } : {}),
+            identity: extractIdentity(response.json),
+          }),
           outputOpts(args),
         );
       },
