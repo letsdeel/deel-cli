@@ -265,11 +265,9 @@ deel apps disable --app_id <id>                                 # asks to confir
 deel apps enable --app_id <id>
 ```
 
-While the Apps endpoints are in beta, every call needs the `X-Beta: true` header: pass `--beta` (see [Beta endpoints](#beta-endpoints)), for example `deel apps list --beta`. Without it the API answers `BETA_ACCESS_REQUIRED`, and the CLI suggests re-running with `--beta`.
-
 `deel apps disable` revokes every consent and token issued to the app; `enable` does not restore them, so people must authorize the app again. It asks `[y/N]` in a terminal. `--yes` skips the prompt and is required when not running in a terminal (no TTY, or `CI` / an agent environment is detected); without it nothing is sent.
 
-`apps list` has no `--all`: when more results exist the next-page cursor is printed as `meta.cursor`; pass it back with `--cursor`.
+`apps list` returns one page at a time. When more results exist, the next-page cursor is printed as `meta.cursor`; pass it back with `--cursor` to get the next page.
 
 ## Environments
 
