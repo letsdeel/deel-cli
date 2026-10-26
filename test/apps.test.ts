@@ -84,6 +84,34 @@ test("apps get maps a 404 to a not-found error", async () => {
   await assert.rejects(() => execute(descriptor(["apps", "get"]), { flags: { app_id: APP_ID }, files: {} }, ctx, { output: OUTPUT, debug: false, form: false }), /App not found/);
 });
 
+test("apps commands send X-Beta: true with --beta and hint at --beta when it is missing", async () => {
+  const headers: Record<string, string>[] = [];
+  const originalFetch = globalThis.fetch;
+  const originalToken = process.env.DEEL_TOKEN;
+  const originalWrite = process.stdout.write;
+  process.env.DEEL_TOKEN = "tok_TEST";
+  process.stdout.write = (() => true) as typeof process.stdout.write;
+  globalThis.fetch = (async (_url: string, init: RequestInit) => {
+    const sent = init.headers as Record<string, string>;
+    headers.push(sent);
+    const betaSent = Object.keys(sent).some((name) => name.toLowerCase() === "x-beta");
+    return betaSent
+      ? new Response(JSON.stringify({ data: { id: APP_ID } }), { status: 200 })
+      : new Response(JSON.stringify({ errors: [{ code: "BETA_ACCESS_REQUIRED", message: "Beta only" }] }), { status: 403 });
+  }) as typeof fetch;
+  try {
+    await assert.rejects(() => run(["apps", "get", "--app_id", APP_ID]), (err: { code: string; next?: string }) => /--beta/.test(err.next ?? ""));
+    await run(["apps", "get", "--app_id", APP_ID, "--beta"]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.stdout.write = originalWrite;
+    if (originalToken === undefined) delete process.env.DEEL_TOKEN;
+    else process.env.DEEL_TOKEN = originalToken;
+  }
+  assert.equal(headers.length, 2);
+  assert.equal(Object.entries(headers[1]).find(([name]) => name.toLowerCase() === "x-beta")?.[1], "true");
+});
+
 test("apps list --help --json describes the filters and the app fields", async () => {
   const { code, out } = await capture(["apps", "list", "--help", "--json"]);
   assert.equal(code, 0);

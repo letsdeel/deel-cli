@@ -259,6 +259,8 @@ deel apps list --api_access disabled --limit 20      # filter by API access; --l
 deel apps get --app_id 00000000-0000-0000-0000-000000000000
 ```
 
+While the Apps endpoints are in beta, every call needs the `X-Beta: true` header: pass `--beta` (see [Beta endpoints](#beta-endpoints)), for example `deel apps list --beta`. Without it the API answers `BETA_ACCESS_REQUIRED`, and the CLI suggests re-running with `--beta`.
+
 `apps list` has no `--all`: when more results exist the next-page cursor is printed as `meta.cursor`; pass it back with `--cursor`.
 
 ## Environments

@@ -520,6 +520,13 @@ export const manifest: Manifest = {
           "description": "Unique identifier of the app."
         },
         {
+          "name": "name",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Name of the app."
+        },
+        {
           "name": "type",
           "in": "body",
           "type": "string",
@@ -528,41 +535,6 @@ export const manifest: Manifest = {
             "integration"
           ],
           "description": "Kind of app. Integration apps connect your organization to Deel."
-        },
-        {
-          "name": "name",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "description": "Name of the app."
-        },
-        {
-          "name": "description",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "description": "What the app does."
-        },
-        {
-          "name": "logo_url",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "description": "URL of the app logo. Empty when the app has no logo."
-        },
-        {
-          "name": "website_url",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "description": "Website of the app."
-        },
-        {
-          "name": "redirect_uris",
-          "in": "body",
-          "type": "array",
-          "required": true,
-          "description": "URLs Deel may send the user back to after they authorize the app."
         },
         {
           "name": "audience",
@@ -576,15 +548,11 @@ export const manifest: Manifest = {
           "description": "Whom the app acts for: `personal` for the user who authorizes it, `organization` for the organization."
         },
         {
-          "name": "client_type",
+          "name": "logo_url",
           "in": "body",
           "type": "string",
           "required": true,
-          "enum": [
-            "public",
-            "confidential"
-          ],
-          "description": "Whether the app can keep a secret. `confidential` apps authenticate with a client secret."
+          "description": "URL of the app logo. Empty when the app has no logo."
         },
         {
           "name": "api_access",
@@ -603,13 +571,6 @@ export const manifest: Manifest = {
           "type": "string",
           "required": true,
           "description": "Time at which the app was created."
-        },
-        {
-          "name": "updated_at",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "description": "Time at which the app was last updated."
         },
         {
           "name": "created_by",
@@ -637,6 +598,45 @@ export const manifest: Manifest = {
               "description": "Whether the creator still belongs to your organization (`active`) or no longer does (`left`)."
             }
           ]
+        },
+        {
+          "name": "updated_at",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Time at which the app was last updated."
+        },
+        {
+          "name": "client_type",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "public",
+            "confidential"
+          ],
+          "description": "Whether the app can keep a secret. `confidential` apps authenticate with a client secret."
+        },
+        {
+          "name": "description",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "What the app does."
+        },
+        {
+          "name": "website_url",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Website of the app."
+        },
+        {
+          "name": "redirect_uris",
+          "in": "body",
+          "type": "array",
+          "required": true,
+          "description": "URLs Deel may send the user back to after they authorize the app."
         }
       ]
     },
@@ -691,6 +691,13 @@ export const manifest: Manifest = {
           "description": "Unique identifier of the app."
         },
         {
+          "name": "name",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Name of the app."
+        },
+        {
           "name": "type",
           "in": "body",
           "type": "string",
@@ -699,41 +706,6 @@ export const manifest: Manifest = {
             "integration"
           ],
           "description": "Kind of app. Integration apps connect your organization to Deel."
-        },
-        {
-          "name": "name",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "description": "Name of the app."
-        },
-        {
-          "name": "description",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "description": "What the app does."
-        },
-        {
-          "name": "logo_url",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "description": "URL of the app logo. Empty when the app has no logo."
-        },
-        {
-          "name": "website_url",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "description": "Website of the app."
-        },
-        {
-          "name": "redirect_uris",
-          "in": "body",
-          "type": "array",
-          "required": true,
-          "description": "URLs Deel may send the user back to after they authorize the app."
         },
         {
           "name": "audience",
@@ -747,15 +719,11 @@ export const manifest: Manifest = {
           "description": "Whom the app acts for: `personal` for the user who authorizes it, `organization` for the organization."
         },
         {
-          "name": "client_type",
+          "name": "logo_url",
           "in": "body",
           "type": "string",
           "required": true,
-          "enum": [
-            "public",
-            "confidential"
-          ],
-          "description": "Whether the app can keep a secret. `confidential` apps authenticate with a client secret."
+          "description": "URL of the app logo. Empty when the app has no logo."
         },
         {
           "name": "api_access",
@@ -774,13 +742,6 @@ export const manifest: Manifest = {
           "type": "string",
           "required": true,
           "description": "Time at which the app was created."
-        },
-        {
-          "name": "updated_at",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "description": "Time at which the app was last updated."
         },
         {
           "name": "created_by",
@@ -808,6 +769,45 @@ export const manifest: Manifest = {
               "description": "Whether the creator still belongs to your organization (`active`) or no longer does (`left`)."
             }
           ]
+        },
+        {
+          "name": "updated_at",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Time at which the app was last updated."
+        },
+        {
+          "name": "client_type",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "public",
+            "confidential"
+          ],
+          "description": "Whether the app can keep a secret. `confidential` apps authenticate with a client secret."
+        },
+        {
+          "name": "description",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "What the app does."
+        },
+        {
+          "name": "website_url",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Website of the app."
+        },
+        {
+          "name": "redirect_uris",
+          "in": "body",
+          "type": "array",
+          "required": true,
+          "description": "URLs Deel may send the user back to after they authorize the app."
         }
       ]
     },
