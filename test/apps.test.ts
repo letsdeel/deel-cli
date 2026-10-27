@@ -119,8 +119,59 @@ test("apps list --help --json describes the filters and the app fields", async (
   for (const name of ["api_access", "limit", "cursor", "redirect_uris", "client_type"]) assert.match(contract, new RegExp(name));
 });
 
+test("apps disable --help --json exposes the confirmation and apps enable does not", async () => {
+  const disable = JSON.parse((await capture(["apps", "disable", "--help", "--json"])).out);
+  assert.deepEqual(disable.confirm, {
+    message: "Disable app {app_id}? This revokes all consents and tokens; enable does not restore them.",
+    flag: "yes",
+    requiredWhenNonInteractive: true,
+  });
+  const enable = JSON.parse((await capture(["apps", "enable", "--help", "--json"])).out);
+  assert.equal("confirm" in enable, false);
+});
+
 test("apps get --help lists the --app_id flag", async () => {
   const { code, out } = await capture(["apps", "get", "--help"]);
   assert.equal(code, 0);
   assert.match(out, /app_id/);
+});
+
+test("apps update wraps the body under data and sends PATCH to the app path", async () => {
+  const { ctx, seen } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { id: APP_ID, name: "New" } } }));
+  await execute(
+    descriptor(["apps", "update"]),
+    { flags: { app_id: APP_ID }, body: { name: "New", redirect_uris: ["https://example.com/cb"] }, files: {} },
+    ctx,
+    { output: OUTPUT, debug: false, form: false },
+  );
+  const req = seen[0];
+  assert.equal(req.method, "PATCH");
+  assert.equal(new URL(req.url).pathname, `/rest/apps/${APP_ID}`);
+  assert.deepEqual(JSON.parse(String(req.body)), { data: { name: "New", redirect_uris: ["https://example.com/cb"] } });
+  assert.ok(req.headers["idempotency-key"]);
+});
+
+test("apps update describes its body fields", () => {
+  const names = descriptor(["apps", "update"]).bodyProps.map((p) => p.name);
+  assert.deepEqual(names, ["name", "description", "website_url", "redirect_uris"]);
+});
+
+test("apps disable and enable send a POST with no body to their own paths", async () => {
+  for (const action of ["disable", "enable"]) {
+    const { ctx, seen } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { id: APP_ID, api_access: action === "enable" ? "enabled" : "disabled" } } }));
+    await execute(descriptor(["apps", action]), { flags: { app_id: APP_ID }, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
+    assert.equal(seen[0].method, "POST");
+    assert.equal(new URL(seen[0].url).pathname, `/rest/apps/${APP_ID}/${action}`);
+    assert.equal(seen[0].body, null);
+  }
+});
+
+test("only apps disable asks for confirmation", () => {
+  const confirming = manifest.descriptors.filter((d) => d.confirm).map((d) => d.command.join(" "));
+  assert.deepEqual(confirming, ["apps disable"]);
+});
+
+test("apps disable --help documents --yes; enable --help does not", async () => {
+  assert.match((await capture(["apps", "disable", "--help"])).out, /--yes/);
+  assert.doesNotMatch((await capture(["apps", "enable", "--help"])).out, /--yes/);
 });

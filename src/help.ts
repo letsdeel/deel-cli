@@ -103,6 +103,7 @@ export function printContractJson(descriptor: Descriptor): void {
     ...(descriptor.variant ? { variant: descriptor.variant } : {}),
     usage: buildUsage(descriptor),
     version: descriptor.version,
+    ...(descriptor.confirm ? { confirm: { message: descriptor.confirm, flag: "yes", requiredWhenNonInteractive: true } } : {}),
     params: descriptor.params.map((param) => ({ name: param.name, in: param.in, type: param.type, required: param.required, enum: param.enum, description: param.description })),
     body: {
       kind: descriptor.bodyKind,
@@ -133,6 +134,8 @@ export function printActionHelp(descriptor: Descriptor): void {
       out(`  --${param.name}=<${param.type}>${requiredTag}${options}${param.description ? `   ${param.description}` : ""}\n`);
     }
   }
+
+  if (descriptor.confirm) out(`  --yes   Skip the confirmation prompt (required when not running in a terminal)\n`);
 
   printContract(descriptor);
   out(`Global options (--json, --jq, --fields, --quiet, --env, ...) — run 'deel --help'.\n`);

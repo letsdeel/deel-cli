@@ -25,6 +25,7 @@ export type Descriptor = {
   path: string; // e.g. /adjustments/{id}
   summary?: string;
   version?: string; // from x-version
+  confirm?: string; // from the command map: ask before sending ({param} placeholders filled from the flags); adds --yes
   async: boolean; // true when the operation returns 202
   bodyKind: BodyKind; // the default body encoding
   supportsMultipart: boolean; // operation also accepts multipart/form-data (use --form)

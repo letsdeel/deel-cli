@@ -22,6 +22,7 @@ export type Descriptor = {
   path: string;
   summary?: string;
   version?: string;
+  confirm?: string;
   async: boolean;
   bodyKind: BodyKind;
   supportsMultipart: boolean;

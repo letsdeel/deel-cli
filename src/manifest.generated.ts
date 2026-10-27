@@ -490,6 +490,313 @@ export const manifest: Manifest = {
     {
       "command": [
         "apps",
+        "disable"
+      ],
+      "method": "POST",
+      "path": "/apps/{app_id}/disable",
+      "summary": "Disable an app",
+      "confirm": "Disable app {app_id}? This revokes all consents and tokens; enable does not restore them.",
+      "async": false,
+      "bodyKind": "none",
+      "supportsMultipart": false,
+      "bodyWrapper": "none",
+      "params": [
+        {
+          "name": "app_id",
+          "in": "path",
+          "type": "string",
+          "required": true,
+          "description": "Unique identifier of the app."
+        }
+      ],
+      "bodyProps": [],
+      "fileFields": [],
+      "responseKind": "object",
+      "responseFields": [
+        {
+          "name": "id",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Unique identifier of the app."
+        },
+        {
+          "name": "name",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Name of the app."
+        },
+        {
+          "name": "type",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "integration"
+          ],
+          "description": "Kind of app. Integration apps connect your organization to Deel."
+        },
+        {
+          "name": "audience",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "personal",
+            "organization"
+          ],
+          "description": "Whom the app acts for: `personal` for the user who authorizes it, `organization` for the organization."
+        },
+        {
+          "name": "logo_url",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "URL of the app logo. Empty when the app has no logo."
+        },
+        {
+          "name": "api_access",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "enabled",
+            "disabled"
+          ],
+          "description": "Whether the app can currently obtain tokens and call the API."
+        },
+        {
+          "name": "created_at",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Time at which the app was created."
+        },
+        {
+          "name": "created_by",
+          "in": "body",
+          "type": "object",
+          "required": true,
+          "description": "Who created the app, or null when unknown.",
+          "properties": [
+            {
+              "name": "name",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Name of the person who created the app."
+            },
+            {
+              "name": "status",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "enum": [
+                "active",
+                "left"
+              ],
+              "description": "Whether the creator still belongs to your organization (`active`) or no longer does (`left`)."
+            }
+          ]
+        },
+        {
+          "name": "updated_at",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Time at which the app was last updated."
+        },
+        {
+          "name": "client_type",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "public",
+            "confidential"
+          ],
+          "description": "Whether the app can keep a secret. `confidential` apps authenticate with a client secret."
+        },
+        {
+          "name": "description",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "What the app does."
+        },
+        {
+          "name": "website_url",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Website of the app."
+        },
+        {
+          "name": "redirect_uris",
+          "in": "body",
+          "type": "array",
+          "required": true,
+          "description": "URLs Deel may send the user back to after they authorize the app."
+        }
+      ]
+    },
+    {
+      "command": [
+        "apps",
+        "enable"
+      ],
+      "method": "POST",
+      "path": "/apps/{app_id}/enable",
+      "summary": "Enable an app",
+      "async": false,
+      "bodyKind": "none",
+      "supportsMultipart": false,
+      "bodyWrapper": "none",
+      "params": [
+        {
+          "name": "app_id",
+          "in": "path",
+          "type": "string",
+          "required": true,
+          "description": "Unique identifier of the app."
+        }
+      ],
+      "bodyProps": [],
+      "fileFields": [],
+      "responseKind": "object",
+      "responseFields": [
+        {
+          "name": "id",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Unique identifier of the app."
+        },
+        {
+          "name": "name",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Name of the app."
+        },
+        {
+          "name": "type",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "integration"
+          ],
+          "description": "Kind of app. Integration apps connect your organization to Deel."
+        },
+        {
+          "name": "audience",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "personal",
+            "organization"
+          ],
+          "description": "Whom the app acts for: `personal` for the user who authorizes it, `organization` for the organization."
+        },
+        {
+          "name": "logo_url",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "URL of the app logo. Empty when the app has no logo."
+        },
+        {
+          "name": "api_access",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "enabled",
+            "disabled"
+          ],
+          "description": "Whether the app can currently obtain tokens and call the API."
+        },
+        {
+          "name": "created_at",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Time at which the app was created."
+        },
+        {
+          "name": "created_by",
+          "in": "body",
+          "type": "object",
+          "required": true,
+          "description": "Who created the app, or null when unknown.",
+          "properties": [
+            {
+              "name": "name",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Name of the person who created the app."
+            },
+            {
+              "name": "status",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "enum": [
+                "active",
+                "left"
+              ],
+              "description": "Whether the creator still belongs to your organization (`active`) or no longer does (`left`)."
+            }
+          ]
+        },
+        {
+          "name": "updated_at",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Time at which the app was last updated."
+        },
+        {
+          "name": "client_type",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "public",
+            "confidential"
+          ],
+          "description": "Whether the app can keep a secret. `confidential` apps authenticate with a client secret."
+        },
+        {
+          "name": "description",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "What the app does."
+        },
+        {
+          "name": "website_url",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Website of the app."
+        },
+        {
+          "name": "redirect_uris",
+          "in": "body",
+          "type": "array",
+          "required": true,
+          "description": "URLs Deel may send the user back to after they authorize the app."
+        }
+      ]
+    },
+    {
+      "command": [
+        "apps",
         "get"
       ],
       "method": "GET",
@@ -801,6 +1108,189 @@ export const manifest: Manifest = {
           "type": "string",
           "required": true,
           "description": "Website of the app. Empty when none was set."
+        },
+        {
+          "name": "redirect_uris",
+          "in": "body",
+          "type": "array",
+          "required": true,
+          "description": "URLs Deel may send the user back to after they authorize the app."
+        }
+      ]
+    },
+    {
+      "command": [
+        "apps",
+        "update"
+      ],
+      "method": "PATCH",
+      "path": "/apps/{app_id}",
+      "summary": "Update an app",
+      "async": false,
+      "bodyKind": "json",
+      "supportsMultipart": false,
+      "bodyWrapper": "data",
+      "params": [
+        {
+          "name": "app_id",
+          "in": "path",
+          "type": "string",
+          "required": true,
+          "description": "Unique identifier of the app."
+        }
+      ],
+      "bodyProps": [
+        {
+          "name": "name",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "description": "New name of the app."
+        },
+        {
+          "name": "description",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "description": "New description of the app."
+        },
+        {
+          "name": "website_url",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "description": "New website of the app. Must use https."
+        },
+        {
+          "name": "redirect_uris",
+          "in": "body",
+          "type": "array",
+          "required": false,
+          "description": "New list of redirect URLs. It replaces the current list. At most 10, no duplicates, https only (http is accepted for 127.0.0.1 and [::1] outside production).",
+          "maxItems": 10
+        }
+      ],
+      "fileFields": [],
+      "responseKind": "object",
+      "responseFields": [
+        {
+          "name": "id",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Unique identifier of the app."
+        },
+        {
+          "name": "name",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Name of the app."
+        },
+        {
+          "name": "type",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "integration"
+          ],
+          "description": "Kind of app. Integration apps connect your organization to Deel."
+        },
+        {
+          "name": "audience",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "personal",
+            "organization"
+          ],
+          "description": "Whom the app acts for: `personal` for the user who authorizes it, `organization` for the organization."
+        },
+        {
+          "name": "logo_url",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "URL of the app logo. Empty when the app has no logo."
+        },
+        {
+          "name": "api_access",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "enabled",
+            "disabled"
+          ],
+          "description": "Whether the app can currently obtain tokens and call the API."
+        },
+        {
+          "name": "created_at",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Time at which the app was created."
+        },
+        {
+          "name": "created_by",
+          "in": "body",
+          "type": "object",
+          "required": true,
+          "description": "Who created the app, or null when unknown.",
+          "properties": [
+            {
+              "name": "name",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Name of the person who created the app."
+            },
+            {
+              "name": "status",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "enum": [
+                "active",
+                "left"
+              ],
+              "description": "Whether the creator still belongs to your organization (`active`) or no longer does (`left`)."
+            }
+          ]
+        },
+        {
+          "name": "updated_at",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Time at which the app was last updated."
+        },
+        {
+          "name": "client_type",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "public",
+            "confidential"
+          ],
+          "description": "Whether the app can keep a secret. `confidential` apps authenticate with a client secret."
+        },
+        {
+          "name": "description",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "What the app does."
+        },
+        {
+          "name": "website_url",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Website of the app."
         },
         {
           "name": "redirect_uris",
