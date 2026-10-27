@@ -129,26 +129,32 @@ Use `--env demo` for staging or `--env prod` (default) for production.
 
 ## Authentication
 
-A Personal Access Token (PAT) is required for every command that hits the API. It is never logged (the local log redacts `Authorization` to `Bearer ***`).
+Sign in with your browser; the CLI keeps a short-lived access token and refreshes it for you.
+
+```bash
+deel auth login                  # opens your browser, asks for consent, stores the login in the OS keychain
+deel auth login --no-browser     # print the sign-in URL without opening a browser (open it in a browser on this machine)
+deel auth login --read-only      # request read-only (*:read) scopes only
+deel auth login --scopes people:read,contracts:read   # request specific scopes (default: all available)
+deel auth status                 # validates; reports the auth type (oauth / pat), source, scope and expiry
+deel auth logout                 # revokes the login on the server (best effort) and removes it from the keychain
+```
+
+`deel auth login` listens on a one-time port on `127.0.0.1` for the browser's redirect and shuts it down after the first response. Browser sign-in needs an OS keychain (macOS Keychain or Linux libsecret via `secret-tool`); it is not available on Windows yet.
+
+For CI and other non-interactive use, a Personal Access Token (PAT) works without signing in. Tokens are never logged (the local log redacts `Authorization` to `Bearer ***`).
 
 Resolution precedence (first match wins):
 
 | Source          | How                                                          |
 | --------------- | ------------------------------------------------------------ |
 | `--token-stdin` | `echo "$PAT" \| deel <cmd> --token-stdin`                    |
-| `DEEL_TOKEN`    | the token value directly (handy for CI)                      |
-| OS keychain     | stored by `deel auth login`, used automatically otherwise    |
+| `DEEL_TOKEN`    | the PAT value directly (handy for CI)                        |
+| OS keychain     | the login stored by `deel auth login`, used automatically otherwise |
 
-`--token-stdin` and `DEEL_TOKEN` are pass-through and never written to disk. For a long-lived token, prefer the OS keychain over exporting `DEEL_TOKEN`.
+`--token-stdin` and `DEEL_TOKEN` are pass-through and never written to disk. `deel auth login` no longer accepts a PAT: use `DEEL_TOKEN` or `--token-stdin`. A PAT saved in the keychain by an earlier version keeps working until you run `deel auth login` or `deel auth logout`, which remove it.
 
-```bash
-deel auth login                  # prompts for the PAT (hidden input), validates, stores in the OS keychain
-echo "$PAT" | deel auth login    # non-interactive (CI): read the PAT from stdin
-deel auth status                 # validates; reports the source (stdin / env / keychain)
-deel auth logout                 # removes the stored token
-```
-
-Keychain backends: macOS Keychain (`security`) and Linux libsecret (`secret-tool`); tokens are stored per environment. Where no keychain is available, use `--token-stdin` or `DEEL_TOKEN`.
+A browser login is only sent to the API of the environment it was issued for (`--env`), so combining it with `--base-url` pointing at another host is refused; use a PAT for that.
 
 ## Discovering commands
 
