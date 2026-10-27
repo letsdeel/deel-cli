@@ -255,7 +255,7 @@ A webhook id can start with `-`, which the argument parser reads as a flag. Pass
 `deel apps list` and `deel apps get --app_id <id>` read the integration apps that belong to your organization (the app secret is never returned). The commands are generated from the API spec like the others, so path parameters are flags.
 
 ```bash
-deel apps list --api_access disabled --limit 20      # filter by API access; --limit and --cursor page the list
+deel apps list --api_access disabled --limit 20      # filter by API access; --limit (1 to 100, default 100) and --cursor page the list
 deel apps get --app_id 00000000-0000-0000-0000-000000000000
 ```
 
