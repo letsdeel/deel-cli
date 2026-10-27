@@ -265,7 +265,7 @@ deel apps disable --app_id <id>                                 # asks to confir
 deel apps enable --app_id <id>
 ```
 
-`deel apps disable` revokes every consent and token issued to the app; `enable` does not restore them, so people must authorize the app again. It asks `[y/N]` in a terminal. `--yes` skips the prompt and is required when not running in a terminal (no TTY, or `CI` / an agent environment is detected); without it nothing is sent.
+`deel apps disable` revokes every consent and token issued to the app; `enable` does not restore them, so people must authorize the app again. It asks `[y/N]` in a terminal. `--yes` skips the prompt and is required when not running in a terminal (no TTY, or `CI` / an agent environment is detected) and when stdin carries the token or the body (`--token-stdin`, `--input -`), since the prompt would read that line as the answer; without it nothing is sent. `deel apps disable --help --json` lists the confirmation under `confirm`.
 
 `apps list` returns one page at a time. When more results exist, the next-page cursor is printed as `meta.cursor`; pass it back with `--cursor` to get the next page.
 

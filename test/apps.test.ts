@@ -119,6 +119,17 @@ test("apps list --help --json describes the filters and the app fields", async (
   for (const name of ["api_access", "limit", "cursor", "redirect_uris", "client_type"]) assert.match(contract, new RegExp(name));
 });
 
+test("apps disable --help --json exposes the confirmation and apps enable does not", async () => {
+  const disable = JSON.parse((await capture(["apps", "disable", "--help", "--json"])).out);
+  assert.deepEqual(disable.confirm, {
+    message: "Disable app {app_id}? This revokes all consents and tokens; enable does not restore them.",
+    flag: "yes",
+    requiredWhenNonInteractive: true,
+  });
+  const enable = JSON.parse((await capture(["apps", "enable", "--help", "--json"])).out);
+  assert.equal("confirm" in enable, false);
+});
+
 test("apps get --help lists the --app_id flag", async () => {
   const { code, out } = await capture(["apps", "get", "--help"]);
   assert.equal(code, 0);

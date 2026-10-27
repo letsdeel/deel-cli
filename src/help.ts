@@ -103,6 +103,7 @@ export function printContractJson(descriptor: Descriptor): void {
     ...(descriptor.variant ? { variant: descriptor.variant } : {}),
     usage: buildUsage(descriptor),
     version: descriptor.version,
+    ...(descriptor.confirm ? { confirm: { message: descriptor.confirm, flag: "yes", requiredWhenNonInteractive: true } } : {}),
     params: descriptor.params.map((param) => ({ name: param.name, in: param.in, type: param.type, required: param.required, enum: param.enum, description: param.description })),
     body: {
       kind: descriptor.bodyKind,

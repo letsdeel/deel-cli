@@ -58,6 +58,17 @@ test("confirmDescriptor without a terminal and without --yes is a usage error th
   );
 });
 
+test("confirmDescriptor in a terminal refuses without --yes when stdin carries the token or the input, and never prompts", async () => {
+  await assert.rejects(
+    () => confirmDescriptor(withConfirm, {}, false, terminal(), async () => assert.fail("must not prompt"), true),
+    (err: CliError) => err.code === "usage.confirm" && /Pass --yes: stdin carries the token or the input/.test(err.next ?? ""),
+  );
+});
+
+test("confirmDescriptor with --yes proceeds when stdin carries the token or the input", async () => {
+  await confirmDescriptor(withConfirm, {}, true, terminal(), async () => assert.fail("must not prompt"), true);
+});
+
 test("confirmDescriptor leaves commands without confirm alone", async () => {
   await confirmDescriptor(withoutConfirm, {}, false, noTerminal(), async () => assert.fail("must not prompt"));
 });

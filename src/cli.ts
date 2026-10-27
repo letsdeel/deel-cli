@@ -45,16 +45,21 @@ const YES_ARG = { type: "boolean", description: "Skip the confirmation prompt (r
 
 // Commands whose map entry sets `confirm` ask before anything is sent. A terminal gets a [y/N] prompt on stderr
 // (only y/yes goes on); --yes skips it; without a terminal (no TTY, CI or an agent) --yes is required, so a
-// script never runs the command by accident. Runs before the token lookup and the request.
+// script never runs the command by accident. Reading the token or the body from stdin (--token-stdin, --input -)
+// leaves nothing to answer the prompt, so those runs need --yes too. Runs before the token lookup and the request.
 export async function confirmDescriptor(
   descriptor: Descriptor,
   flags: Record<string, string | string[]>,
   yes: boolean,
   io: IOStreams,
   ask: Confirm = promptConfirm,
+  stdinInUse = false,
 ): Promise<void> {
   if (!descriptor.confirm || yes) return;
   const name = descriptor.command.join(" ");
+  if (stdinInUse) {
+    throw new CliError("usage.confirm", `Refusing to run \`${name}\` without confirmation`, "Pass --yes: stdin carries the token or the input, so there is no prompt to answer.");
+  }
   if (!io.interactive) {
     throw new CliError("usage.confirm", `Refusing to run \`${name}\` without confirmation`, "Pass --yes to run this non-interactively.");
   }
@@ -85,7 +90,8 @@ async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<st
     files: gatherFiles(cittyCtx.rawArgs),
     idempotencyKey: args["idempotency-key"] as string | undefined,
   };
-  await confirmDescriptor(descriptor, flags, args.yes === true, realIO());
+  const stdinInUse = args.input === "-" || Boolean(args["token-stdin"]);
+  await confirmDescriptor(descriptor, flags, args.yes === true, realIO(), promptConfirm, stdinInUse);
   const config = configFrom(args, cittyCtx.rawArgs);
   const token = requireToken(resolveToken({ tokenStdin: Boolean(args["token-stdin"]), env: config.env }));
   const ctx = createContext({ config, token });
