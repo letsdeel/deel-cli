@@ -929,14 +929,14 @@ export const manifest: Manifest = {
           "in": "body",
           "type": "string",
           "required": true,
-          "description": "What the app does."
+          "description": "What the app does. Empty when none was set."
         },
         {
           "name": "website_url",
           "in": "body",
           "type": "string",
           "required": true,
-          "description": "Website of the app."
+          "description": "Website of the app. Empty when none was set."
         },
         {
           "name": "redirect_uris",
@@ -965,7 +965,7 @@ export const manifest: Manifest = {
           "in": "query",
           "type": "integer",
           "required": false,
-          "description": "Maximum number of apps to return in one page, newest first."
+          "description": "Maximum number of apps to return in one page, from 1 to 100 (100 when omitted), newest first."
         },
         {
           "name": "cursor",
@@ -1100,14 +1100,14 @@ export const manifest: Manifest = {
           "in": "body",
           "type": "string",
           "required": true,
-          "description": "What the app does."
+          "description": "What the app does. Empty when none was set."
         },
         {
           "name": "website_url",
           "in": "body",
           "type": "string",
           "required": true,
-          "description": "Website of the app."
+          "description": "Website of the app. Empty when none was set."
         },
         {
           "name": "redirect_uris",
