@@ -13,4 +13,7 @@ export const commandMap: CommandEntry[] = [
 
   { command: "jobs list",   method: "GET", path: "/jobs" },
   { command: "jobs status", method: "GET", path: "/jobs/{job_id}" },
+
+  { command: "apps list", method: "GET", path: "/apps" },
+  { command: "apps get",  method: "GET", path: "/apps/{app_id}" },
 ];
