@@ -1,7 +1,8 @@
 // OAuth 2.0 client plumbing shared by `deel auth` and the token provider:
 // server discovery, the stored credential, and refresh-token rotation under a cross-process lock.
 
-import { mkdirSync, openSync, closeSync, unlinkSync, statSync } from "node:fs";
+import { createHash, randomBytes } from "node:crypto";
+import { mkdirSync, openSync, closeSync, writeSync, readFileSync, unlinkSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { CliError } from "./errors.ts";
 import { HEADER } from "./constants.ts";
@@ -10,7 +11,8 @@ import type { CredentialStore } from "./keychain.ts";
 import type { HttpResponse, Transport } from "./http.ts";
 
 export const REFRESH_SKEW_MS = 60_000; // refresh when the access token has less than this left
-export const LOCK_STALE_MS = 30_000; // a lock older than this belongs to a dead process
+export const LOCK_STALE_MS = 30_000; // a lock file with no owner recorded and older than this was left by a crash
+export const LOCK_MAX_AGE_MS = 5 * 60_000; // past this a lock is stale even if its pid is alive (the pid may have been reused)
 export const LOCK_WAIT_MS = 35_000; // how long to wait for another process's refresh
 const LOCK_POLL_MS = 100;
 const OAUTH_REQUEST_TIMEOUT_MS = 15_000;
@@ -26,9 +28,10 @@ export type OAuthEntry = {
   expires_at: string; // ISO-8601
 };
 
-// The keychain account is derived from the issuer, which binds a login to its server: another configured
-// issuer (for example through DEEL_OAUTH_ISSUER) simply finds no login.
-export const oauthAccount = (issuer: string): string => `oauth:${new URL(issuer).origin}`;
+// The keychain account is derived from the full issuer, which binds a login to its server: another configured
+// issuer (for example through DEEL_OAUTH_ISSUER, including another path on the same host) simply finds no login.
+const issuerKey = (issuer: string): string => new URL(issuer).href.replace(/\/+$/, "");
+export const oauthAccount = (issuer: string): string => `oauth:${issuerKey(issuer)}`;
 
 function isEntry(value: unknown): value is OAuthEntry {
   if (!value || typeof value !== "object") return false;
@@ -39,34 +42,55 @@ function isEntry(value: unknown): value is OAuthEntry {
 }
 
 // The entry is stored in pieces: `security -i` truncates a command line at about 4 KB, and a login that
-// carries every scope easily exceeds that. `oauth:<issuer>` holds a small manifest, the JSON text lives in
-// `oauth:<issuer>#0..N-1`. Tokens are never passed in argv.
+// carries every scope easily exceeds that. `oauth:<issuer>` holds a small manifest naming a generation; the JSON
+// text lives in `oauth:<issuer>#<generation>.0..N-1`. Every write uses a new generation and switches the manifest
+// last, so a reader that runs without the lock never combines pieces of two logins. Tokens are never passed in argv.
 export const CHUNK_SIZE = 3000; // characters per item before quoting; keeps each `security -i` line well under 4 KB
 const MAX_CHUNKS = 64;
-const chunkAccount = (issuer: string, index: number): string => `${oauthAccount(issuer)}#${index}`;
+type Manifest = { chunks: number; gen: string };
+const chunkAccount = (issuer: string, manifest: Manifest, index: number): string => `${oauthAccount(issuer)}#${manifest.gen}.${index}`;
 
-function readManifest(store: CredentialStore, issuer: string): number | null {
+function readManifest(store: CredentialStore, issuer: string): Manifest | null {
   const raw = store.get(oauthAccount(issuer));
   if (!raw) return null;
   try {
-    const manifest = JSON.parse(raw) as { v?: unknown; chunks?: unknown };
-    const count = manifest.chunks;
-    return manifest.v === 2 && Number.isInteger(count) && (count as number) >= 1 && (count as number) <= MAX_CHUNKS ? (count as number) : null;
+    const { v, chunks, gen } = JSON.parse(raw) as { v?: unknown; chunks?: unknown; gen?: unknown };
+    const valid = v === 2 && Number.isInteger(chunks) && (chunks as number) >= 1 && (chunks as number) <= MAX_CHUNKS && typeof gen === "string" && /^[0-9a-f]{12}$/.test(gen);
+    return valid ? { chunks: chunks as number, gen: gen as string } : null;
   } catch {
     return null;
   }
 }
 
+function readChunks(store: CredentialStore, issuer: string, manifest: Manifest): string | null {
+  let json = "";
+  for (let index = 0; index < manifest.chunks; index++) {
+    const part = store.get(chunkAccount(issuer, manifest, index));
+    if (part === null) return null;
+    json += part;
+  }
+  return json;
+}
+
+function removeChunks(store: CredentialStore, issuer: string, manifest: Manifest, from = 0): boolean {
+  let removed = false;
+  for (let index = from; index < manifest.chunks; index++) removed = store.remove(chunkAccount(issuer, manifest, index)) || removed;
+  return removed;
+}
+
 // Returns null for anything that is not a complete v2 OAuth entry (missing, a missing chunk, invalid JSON).
 export function readOAuthEntry(store: CredentialStore, issuer: string): OAuthEntry | null {
   if (!store.available()) return null;
-  const count = readManifest(store, issuer);
-  if (count === null) return null;
-  let json = "";
-  for (let index = 0; index < count; index++) {
-    const part = store.get(chunkAccount(issuer, index));
-    if (part === null) return null;
-    json += part;
+  let manifest = readManifest(store, issuer);
+  if (manifest === null) return null;
+  let json = readChunks(store, issuer, manifest);
+  if (json === null) {
+    // A writer may have switched generations and removed the old pieces while we read: read the new ones once.
+    const latest = readManifest(store, issuer);
+    if (latest === null || latest.gen === manifest.gen) return null;
+    manifest = latest;
+    json = readChunks(store, issuer, manifest);
+    if (json === null) return null;
   }
   try {
     const parsed: unknown = JSON.parse(json);
@@ -76,29 +100,33 @@ export function readOAuthEntry(store: CredentialStore, issuer: string): OAuthEnt
   }
 }
 
-// Chunks first, manifest last, so a reader never sees a manifest for pieces that are not there yet.
+// New generation's pieces first, then the manifest switch, then the previous generation's pieces.
 export function writeOAuthEntry(store: CredentialStore, issuer: string, entry: OAuthEntry): boolean {
   const json = JSON.stringify(entry);
-  const count = Math.ceil(json.length / CHUNK_SIZE);
-  if (count > MAX_CHUNKS) return false;
-  const previous = readManifest(store, issuer) ?? 0;
-  for (let index = 0; index < count; index++) {
-    if (!store.set(chunkAccount(issuer, index), json.slice(index * CHUNK_SIZE, (index + 1) * CHUNK_SIZE))) return false;
+  const next: Manifest = { chunks: Math.ceil(json.length / CHUNK_SIZE), gen: randomBytes(6).toString("hex") };
+  if (next.chunks > MAX_CHUNKS) return false;
+  const previous = readManifest(store, issuer);
+  for (let index = 0; index < next.chunks; index++) {
+    if (!store.set(chunkAccount(issuer, next, index), json.slice(index * CHUNK_SIZE, (index + 1) * CHUNK_SIZE))) {
+      removeChunks(store, issuer, { ...next, chunks: index });
+      return false;
+    }
   }
-  if (!store.set(oauthAccount(issuer), JSON.stringify({ v: 2, chunks: count }))) return false;
-  for (let index = count; index < previous; index++) store.remove(chunkAccount(issuer, index)); // left over from a larger entry
+  if (!store.set(oauthAccount(issuer), JSON.stringify({ v: 2, ...next }))) {
+    removeChunks(store, issuer, next);
+    return false;
+  }
+  if (previous) removeChunks(store, issuer, previous);
   return true;
 }
 
-// Removes the manifest and every chunk, including strays whose manifest is gone or unreadable.
+// Removes the manifest and every piece it names, carrying on past any that are already gone.
 export function removeOAuthEntry(store: CredentialStore, issuer: string): boolean {
   if (!store.available()) return false;
-  let removed = store.remove(oauthAccount(issuer));
-  for (let index = 0; index < MAX_CHUNKS; index++) {
-    if (!store.remove(chunkAccount(issuer, index))) break;
-    removed = true;
-  }
-  return removed;
+  const manifest = readManifest(store, issuer);
+  const removedManifest = store.remove(oauthAccount(issuer));
+  const removedChunks = manifest ? removeChunks(store, issuer, manifest) : false;
+  return removedManifest || removedChunks;
 }
 
 export function isFresh(entry: OAuthEntry, now: number): boolean {
@@ -180,10 +208,37 @@ export function entryFromTokenResponse(json: unknown, now: number, previous?: OA
 // ---------------- cross-process lock ----------------
 
 export function lockPath(issuer: string): string {
-  return join(dirname(logLocation()), `oauth-${new URL(issuer).host.replace(/[^A-Za-z0-9.-]/g, "_")}.lock`);
+  const host = new URL(issuer).host.replace(/[^A-Za-z0-9.-]/g, "_");
+  const digest = createHash("sha256").update(issuerKey(issuer)).digest("hex").slice(0, 12);
+  return join(dirname(logLocation()), `oauth-${host}-${digest}.lock`);
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+
+function readLock(path: string): string | null {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+function isAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return (error as NodeJS.ErrnoException).code === "EPERM"; // exists, owned by another user
+  }
+}
+
+// The lock file holds "<pid>:<nonce>". It is stale when that process is gone, when it is implausibly old, or,
+// with no owner recorded (a crash between create and write), when it is older than staleMs.
+function isStale(owner: string, ageMs: number, staleMs: number): boolean {
+  const pid = Number(owner.split(":")[0]);
+  if (!Number.isInteger(pid) || pid <= 0) return ageMs > staleMs;
+  return !isAlive(pid) || ageMs > LOCK_MAX_AGE_MS;
+}
 
 export async function withLock<T>(
   path: string,
@@ -193,17 +248,24 @@ export async function withLock<T>(
   const now = opts.now ?? Date.now;
   const staleMs = opts.staleMs ?? LOCK_STALE_MS;
   const deadline = now() + (opts.waitMs ?? LOCK_WAIT_MS);
+  const owner = `${process.pid}:${randomBytes(8).toString("hex")}`;
   mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
   for (;;) {
     try {
-      closeSync(openSync(path, "wx", 0o600));
+      const fd = openSync(path, "wx", 0o600);
+      try {
+        writeSync(fd, owner);
+      } finally {
+        closeSync(fd);
+      }
       break;
     } catch (error) {
       if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
     }
     try {
-      if (now() - statSync(path).mtimeMs > staleMs) {
-        unlinkSync(path); // stale: its owner is gone
+      const held = readLock(path);
+      if (held !== null && isStale(held, now() - statSync(path).mtimeMs, staleMs)) {
+        if (readLock(path) === held) unlinkSync(path); // still the stale owner's file, not a fresh lock taken meanwhile
         continue;
       }
     } catch {
@@ -216,7 +278,7 @@ export async function withLock<T>(
     return await body();
   } finally {
     try {
-      unlinkSync(path);
+      if (readLock(path) === owner) unlinkSync(path); // never remove a lock another process took over
     } catch {
       /* already gone */
     }

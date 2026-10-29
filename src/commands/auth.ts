@@ -6,8 +6,7 @@
 import { defineCommand } from "citty";
 import { resolveToken, requireToken, authFor, accessTokenScope, maskToken, extractIdentity } from "../core/auth.ts";
 import { credentialStore } from "../core/keychain.ts";
-import { readOAuthEntry } from "../core/oauth.ts";
-import { browserLogin, removeStoredLogin, revokeLogin } from "../core/oauth-login.ts";
+import { browserLogin, logout } from "../core/oauth-login.ts";
 import { fetchTransport } from "../core/http.ts";
 import { createContext } from "../core/context.ts";
 import { envelope, render } from "../core/output.ts";
@@ -94,7 +93,15 @@ export const authCommand = defineCommand({
         if (response.status >= 400) throw new CliError("auth.invalid", `Signed in, but the identity check failed (${response.status}).`, "Run 'deel auth status' to retry.");
         await render(
           ctx.io,
-          envelope({ stored: true, env: config.env, auth: "oauth", identity: extractIdentity(response.json), scope: accessTokenScope(entry.access_token), expires_at: entry.expires_at }),
+          envelope({
+            stored: true,
+            env: config.env,
+            auth: "oauth",
+            token: maskToken(entry.access_token),
+            identity: extractIdentity(response.json),
+            scope: accessTokenScope(entry.access_token),
+            expires_at: entry.expires_at,
+          }),
           outputOpts(args),
         );
       },
@@ -108,17 +115,9 @@ export const authCommand = defineCommand({
         const config = configFrom(args, cittyCtx.rawArgs);
         const store = credentialStore();
         const ctx = createContext({ config, token: null });
-        let revoked: boolean | "unsupported" = false;
-        let removed = false;
-        if (store.available()) {
-          const entry = config.issuer ? readOAuthEntry(store, config.issuer) : null;
-          if (entry && config.issuer) {
-            revoked = await revokeLogin(entry, { issuer: config.issuer, clientId: config.clientId }, fetchTransport);
-            if (revoked === "unsupported") ctx.io.err("The server does not support revocation; the login was only removed from this machine.\n");
-            else if (!revoked) ctx.io.err("Could not revoke the login on the server; it was removed from this machine.\n");
-          }
-          removed = removeStoredLogin(store, config);
-        }
+        const { removed, revoked, hadLogin } = await logout(store, config, fetchTransport);
+        if (hadLogin && revoked === "unsupported") ctx.io.err("The server does not support revocation; the login was only removed from this machine.\n");
+        else if (hadLogin && !revoked) ctx.io.err("Could not revoke the login on the server; it was removed from this machine.\n");
         await render(ctx.io, envelope({ removed, env: config.env, revoked }), outputOpts(args));
       },
     }),

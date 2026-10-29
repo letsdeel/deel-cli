@@ -94,3 +94,17 @@ test("withAuth sends no header when the provider has no token", async () => {
   await withAuth(async () => null)(a.next)(req());
   assert.equal(a.seen[0].headers["authorization"], undefined);
 });
+
+test("a retry asks the token provider again and the caller's request is left untouched", async () => {
+  const tokens = ["first", "second"];
+  const seen: HttpRequest[] = [];
+  const base: Transport = async (request) => (seen.push(request), seen.length === 1 ? res(503) : res(200));
+  const request = req({ retryable: true });
+  const response = await withRetry()(withAuth(async () => tokens.shift() as string)(base))(request);
+  assert.equal(response.status, 200);
+  assert.deepEqual(
+    seen.map((sent) => sent.headers["authorization"]),
+    ["Bearer first", "Bearer second"],
+  );
+  assert.equal(request.headers["authorization"], undefined);
+});

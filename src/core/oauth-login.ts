@@ -6,7 +6,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { platform } from "node:os";
 import { CliError } from "./errors.ts";
-import { discover, entryFromTokenResponse, postForm, removeOAuthEntry, writeOAuthEntry } from "./oauth.ts";
+import { discover, entryFromTokenResponse, lockPath, postForm, readOAuthEntry, removeOAuthEntry, withLock, writeOAuthEntry } from "./oauth.ts";
 import type { OAuthEntry, ServerMetadata } from "./oauth.ts";
 import { ENVIRONMENTS } from "./config.ts";
 import type { Config } from "./config.ts";
@@ -204,10 +204,12 @@ export async function browserLogin(opts: BrowserLoginOpts): Promise<OAuthEntry> 
       throw new CliError("oauth.token", `The sign-in could not be completed (${response.status}${detail ? `: ${detail}` : ""}).`, "Run 'deel auth login' again.");
     }
     const entry = entryFromTokenResponse(response.json, (opts.now ?? Date.now)());
-    if (!writeOAuthEntry(opts.store, config.issuer, entry)) {
-      throw new CliError("auth.keychain", "Failed to store the login in the keychain.");
-    }
-    if (ownsLegacyPat(config)) opts.store.remove(config.env); // drop a PAT saved by an earlier release
+    const issuer = config.issuer;
+    // Under the refresh lock, so a refresh of the previous login in another process cannot overwrite or delete this one.
+    await withLock(lockPath(issuer), async () => {
+      if (!writeOAuthEntry(opts.store, issuer, entry)) throw new CliError("auth.keychain", "Failed to store the login in the keychain.");
+      if (ownsLegacyPat(config)) opts.store.remove(config.env); // drop a PAT saved by an earlier release
+    });
     return entry;
   } finally {
     loopback.close();
@@ -231,6 +233,21 @@ export function removeStoredLogin(store: CredentialStore, config: Config): boole
   const oauthRemoved = config.issuer ? removeOAuthEntry(store, config.issuer) : false;
   const legacyRemoved = ownsLegacyPat(config) ? store.remove(config.env) : false;
   return oauthRemoved || legacyRemoved;
+}
+
+export type LogoutResult = { removed: boolean; revoked: boolean | "unsupported"; hadLogin: boolean };
+
+// Revoke and remove under the refresh lock, re-reading the login inside it, so a refresh in another process can
+// neither rotate the token being revoked nor store a replacement after the removal.
+export async function logout(store: CredentialStore, config: Config, transport: Transport): Promise<LogoutResult> {
+  if (!store.available()) return { removed: false, revoked: false, hadLogin: false };
+  const issuer = config.issuer;
+  if (!issuer) return { removed: removeStoredLogin(store, config), revoked: false, hadLogin: false };
+  return withLock(lockPath(issuer), async () => {
+    const entry = readOAuthEntry(store, issuer);
+    const revoked = entry ? await revokeLogin(entry, { issuer, clientId: config.clientId }, transport) : false;
+    return { removed: removeStoredLogin(store, config), revoked, hadLogin: entry !== null };
+  });
 }
 
 // Best-effort RFC 7009 revocation of the refresh token (which also ends the access token's grant).

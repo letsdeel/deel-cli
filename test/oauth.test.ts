@@ -1,16 +1,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, utimesSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdtempSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { discover, entryFromTokenResponse, isFresh, readOAuthEntry, withLock, writeOAuthEntry } from "../src/core/oauth.ts";
+import { discover, entryFromTokenResponse, isFresh, lockPath, readOAuthEntry, withLock, writeOAuthEntry } from "../src/core/oauth.ts";
 import type { HttpResponse, Transport } from "../src/core/http.ts";
 import { tempDir } from "./stubs.ts";
-import { authorizationUrl, browserLogin, ownsLegacyPat, removeStoredLogin, challengeFor, chooseScopes, newState, newVerifier, revokeLogin, startLoopback } from "../src/core/oauth-login.ts";
+import { authorizationUrl, browserLogin, logout, ownsLegacyPat, removeStoredLogin, challengeFor, chooseScopes, newState, newVerifier, revokeLogin, startLoopback } from "../src/core/oauth-login.ts";
 import { resolveConfig } from "../src/core/config.ts";
 import type { CredentialStore } from "../src/core/keychain.ts";
 import type { OAuthEntry } from "../src/core/oauth.ts";
 
 const ISSUER = "https://api.letsdeel.com";
+// Login and logout take the refresh lock, which lives next to the log file: keep it out of the real one.
+process.env.DEEL_LOG_DIR = mkdtempSync(join(tmpdir(), "deel-oauth-test-"));
 const METADATA = {
   issuer: ISSUER,
   authorization_endpoint: `${ISSUER}/oauth/authorize`,
@@ -79,6 +83,31 @@ test("withLock steals a stale lock", async (t) => {
   const old = new Date(Date.now() - 120_000);
   utimesSync(path, old, old);
   assert.equal(await withLock(path, async () => "ran", { staleMs: 30_000 }), "ran");
+});
+
+test("withLock records its owner and steals a lock whose process is gone", async (t) => {
+  const path = join(tempDir(t), "x.lock");
+  await withLock(path, async () => assert.match(readFileSync(path, "utf8"), new RegExp(`^${process.pid}:[0-9a-f]{16}$`)));
+  const gone = spawnSync(process.execPath, ["-e", ""]).pid as number; // exited by the time spawnSync returns
+  writeFileSync(path, `${gone}:0123456789abcdef`);
+  assert.equal(await withLock(path, async () => "ran", { waitMs: 500 }), "ran");
+});
+
+test("withLock waits for a live owner even past the no-owner stale age", async (t) => {
+  const path = join(tempDir(t), "x.lock");
+  writeFileSync(path, `${process.pid}:0123456789abcdef`);
+  const old = new Date(Date.now() - 120_000);
+  utimesSync(path, old, old);
+  await assert.rejects(
+    () => withLock(path, async () => "never", { staleMs: 30_000, waitMs: 150 }),
+    (error: Error & { code?: string }) => error.code === "auth.lock",
+  );
+});
+
+test("withLock never removes a lock another process has taken over", async (t) => {
+  const path = join(tempDir(t), "x.lock");
+  await withLock(path, async () => writeFileSync(path, "424242:fedcba9876543210")); // as if our lock had been stolen
+  assert.equal(readFileSync(path, "utf8"), "424242:fedcba9876543210");
 });
 
 test("withLock gives up when a live lock is held past the wait limit", async (t) => {
@@ -387,6 +416,65 @@ test("revokeLogin reports unsupported, failed and unreachable servers", async ()
       : { status: 500, headers: {}, text: "", json: {} };
   assert.equal(await revokeLogin(sample, SERVER, failing), false);
   assert.equal(await revokeLogin(sample, SERVER, async () => Promise.reject(new Error("offline"))), false);
+});
+
+const deferred = () => {
+  let resolve!: () => void;
+  const promise = new Promise<void>((done) => (resolve = done));
+  return { promise, resolve };
+};
+
+test("logout waits for a refresh in flight and revokes the refresh token that refresh stored", async () => {
+  const { store, items } = memoryStore();
+  writeOAuthEntry(store, ISSUER, { ...sample, refresh_token: "rt-old" });
+  const revokedTokens: string[] = [];
+  const transport: Transport = async (request) => {
+    if (request.url.endsWith("/.well-known/oauth-authorization-server")) return { status: 200, headers: {}, text: "", json: METADATA };
+    revokedTokens.push(new URLSearchParams(String(request.body)).get("token") as string);
+    return { status: 200, headers: {}, text: "", json: undefined };
+  };
+  const inRefresh = deferred();
+  const refresh = withLock(lockPath(ISSUER), async () => {
+    inRefresh.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    writeOAuthEntry(store, ISSUER, { ...sample, refresh_token: "rt-rotated" });
+  });
+  await inRefresh.promise;
+  const result = await logout(store, config, transport);
+  await refresh;
+  assert.deepEqual(result, { removed: true, revoked: true, hadLogin: true });
+  assert.deepEqual(revokedTokens, ["rt-rotated"]);
+  assert.equal(items.size, 0);
+});
+
+test("logout without a stored login revokes nothing", async () => {
+  const { store } = memoryStore();
+  const transport: Transport = async () => assert.fail("no request expected");
+  assert.deepEqual(await logout(store, config, transport), { removed: false, revoked: false, hadLogin: false });
+});
+
+test("browserLogin stores its login after a refresh in flight, so the refresh cannot overwrite it", async () => {
+  const { store } = memoryStore();
+  const { transport } = loginTransport(() => ({ status: 200, headers: {}, text: "", json: { access_token: "at-new", refresh_token: "rt-new", expires_in: 3600 } }));
+  const inRefresh = deferred();
+  const refresh = withLock(lockPath(ISSUER), async () => {
+    inRefresh.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    writeOAuthEntry(store, ISSUER, { ...sample, access_token: "at-refreshed-old-login" });
+  });
+  await inRefresh.promise;
+  await browserLogin({
+    config,
+    store,
+    transport,
+    say: () => {},
+    openUrl: (url) => {
+      const parsed = new URL(url);
+      void get(`${parsed.searchParams.get("redirect_uri")}?code=c&state=${parsed.searchParams.get("state")}&iss=${encodeURIComponent(ISSUER)}`);
+    },
+  });
+  await refresh;
+  assert.equal(readOAuthEntry(store, ISSUER)?.access_token, "at-new");
 });
 
 // ---------------- the legacy PAT belongs to the environment's own server ----------------
