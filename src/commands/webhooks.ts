@@ -207,6 +207,23 @@ export function requireId(args: Args, rawArgs: string[], usage: string): string 
   return resolveWebhookId(args.id, readHidden(rawArgs, "id"), usage);
 }
 
+// `enable` / `disable`: shorthand for `update <id> --status enabled|disabled`, sending only the status.
+function statusCommand(status: UpdateWebhookBody["status"] & string) {
+  const name = status === "enabled" ? "enable" : "disable";
+  return defineCommand({
+    meta: { name, description: `${status === "enabled" ? "Enable" : "Disable"} a webhook: deel webhooks ${name} <id> (an id that starts with '-': --id=<id>)` },
+    args: {
+      id: { type: "positional", required: false, description: "Webhook id" },
+      ...commonArgs,
+    },
+    async run(cittyCtx) {
+      const args = cittyCtx.args as Args;
+      const id = requireId(args, cittyCtx.rawArgs, `deel webhooks ${name} <id>`);
+      await runUpdate(contextFor(cittyCtx), id, { status }, outputOpts(args), optionalString(args["idempotency-key"]));
+    },
+  });
+}
+
 const writeArgs: ArgsDef = {
   name: { type: "string", description: "Webhook name" },
   url: { type: "string", description: "HTTPS endpoint that receives the events" },
@@ -281,6 +298,8 @@ export const webhooksCommand = defineCommand({
         await runUpdate(contextFor(cittyCtx), id, body, outputOpts(args), optionalString(args["idempotency-key"]));
       },
     }),
+    enable: statusCommand("enabled"),
+    disable: statusCommand("disabled"),
     delete: defineCommand({
       meta: { name: "delete", description: "Delete a webhook: deel webhooks delete <id> (asks to confirm; --yes when non-interactive; an id that starts with '-': --id=<id>)" },
       args: {

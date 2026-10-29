@@ -39,7 +39,7 @@
   "src/commands/index.ts": "46b686860fa205cbae3baf3320a5cea5262e525f42b4b2cf3454cab0e67ac7a8",
   "src/commands/job.ts": "a0ca25eb4dbc62a19a3fcff5d2623afec59762652b4181b12f4ae33513b23c6b",
   "src/commands/shared.ts": "bb310f3a9e82f8d5ac06c7fe077c4640755e328d61cf8c5fa99e2a014f7b74f4",
-  "src/commands/webhooks.ts": "693a949e5ce16483e1ea627c994e286d4e3fd1c6ad2d5ba2bcea4b5d2f54f3bd",
+  "src/commands/webhooks.ts": "572d318815168fe45338dad7997f3075ce9b49686b95f6338c05f6d814c45921",
   "src/core/auth.ts": "4311891cf5bff3c443321192e14ecff57dac93904d5af8157e5c2871edb6dbc5",
   "src/core/config.ts": "07584a33f1a3bb2eed2713eb1058ed67c8443048f0f52017db1efa1b60ec33f0",
   "src/core/constants.ts": "ef6ef49800798446f447bfd49df446d2a2eb4d57183e735710094c7052da0f78",
@@ -85,7 +85,7 @@
   "test/stubs.ts": "dcbf3fd49a134bebf2282a5f43f56954ce3bf4f6b3806fb126ed7e288da15121",
   "test/tls.test.ts": "4e6633bb1f770384994d307b45a8539caf0e640ea077d743766894ee0c89acdf",
   "test/webhooks-simulate.test.ts": "9bb43929e73e46db45f962f16ae9d0b1f40fd79d9f47a41a7326e4daa834c493",
-  "test/webhooks-write.test.ts": "7684b9d31ed3131cac3f40315cb1159cc38918fb2171496e1760c7c3d25b54ee",
+  "test/webhooks-write.test.ts": "da5e364f5e729dde14530a9c89cac9f03160d2f7b4af4ecef31d39f25c0b3e2b",
   "test/webhooks.test.ts": "96354a4764f1340d831a09a0e87fb5769bb3c8011581a89be92b013959c4ad6a",
   "tsconfig.json": "8bc19f7dcad83961db3a95a1d2bcf648b4ea52fefc895ab3dd403d6144cb3939"
 }

@@ -295,9 +295,14 @@ test("deel webhooks delete without an id is a usage error", async () => {
   await assert.rejects(() => run(["webhooks", "delete", "--yes"]), usage);
 });
 
-test("the webhooks group exposes create, update and delete", () => {
+test("the webhooks group exposes create, update, enable, disable and delete", () => {
   const subCommands = webhooksCommand.subCommands as unknown as Record<string, unknown>;
-  for (const name of ["list", "get", "event-types", "create", "update", "delete"]) assert.ok(subCommands[name], name);
+  for (const name of ["list", "get", "event-types", "create", "update", "enable", "disable", "delete"]) assert.ok(subCommands[name], name);
+});
+
+test("deel webhooks enable and disable without an id are a usage error", async () => {
+  await assert.rejects(() => run(["webhooks", "enable"]), (err: any) => usage(err) && err.next === DASH_ID_HINT);
+  await assert.rejects(() => run(["webhooks", "disable"]), (err: any) => usage(err) && err.next === DASH_ID_HINT);
 });
 
 test("deel webhooks update and delete without an id point at --id=<id> for ids that start with a dash", async () => {
