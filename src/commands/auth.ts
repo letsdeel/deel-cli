@@ -1,14 +1,13 @@
-// `deel auth` — validate, store, and clear the API token.
-//   status  validate the current token and report identity + where it came from
-//   login   read a PAT from stdin, validate it, and store it in the OS keychain
-//   logout  remove the stored token from the OS keychain
+// `deel auth` — sign in, inspect and clear the stored login.
+//   status  validate the current credential and report identity + where it came from
+//   login   sign in through the browser (OAuth) and store the login in the OS keychain
+//   logout  revoke the login (best effort) and remove it from the OS keychain
 
 import { defineCommand } from "citty";
-import { readFileSync } from "node:fs";
-import { createInterface } from "node:readline";
-import { Writable } from "node:stream";
-import { resolveToken, requireToken, maskToken, extractIdentity } from "../core/auth.ts";
+import { resolveToken, requireToken, authFor, accessTokenScope, maskToken, extractIdentity } from "../core/auth.ts";
 import { credentialStore } from "../core/keychain.ts";
+import { browserLogin, logout } from "../core/oauth-login.ts";
+import { fetchTransport } from "../core/http.ts";
 import { createContext } from "../core/context.ts";
 import { envelope, render } from "../core/output.ts";
 import { setLoggingEnabled, setLogBodiesEnabled } from "../core/logging.ts";
@@ -18,25 +17,6 @@ import { commonArgs, configFrom, outputOpts } from "./shared.ts";
 import type { Args } from "./shared.ts";
 import type { Config } from "../core/config.ts";
 import type { Ctx } from "../core/context.ts";
-
-function promptSecret(question: string): Promise<string> {
-  return new Promise((resolve) => {
-    let muted = false;
-    const out = new Writable({
-      write(chunk, encoding, callback) {
-        if (!muted) process.stdout.write(chunk, encoding as BufferEncoding);
-        callback();
-      },
-    });
-    const rl = createInterface({ input: process.stdin, output: out, terminal: true });
-    rl.question(question, (answer) => {
-      rl.close();
-      process.stdout.write("\n");
-      resolve(answer.trim());
-    });
-    muted = true;
-  });
-}
 
 function checkToken(ctx: Ctx, config: Config, command: string) {
   return ctx.http({
@@ -59,55 +39,86 @@ export const authCommand = defineCommand({
         setLoggingEnabled(args.log !== false);
         setLogBodiesEnabled(args["log-bodies"] === true);
         const config = configFrom(args, cittyCtx.rawArgs);
-        const resolved = resolveToken({ tokenStdin: Boolean(args["token-stdin"]), env: config.env });
-        const token = requireToken(resolved);
-        const ctx = createContext({ config, token });
+        const resolved = resolveToken({ tokenStdin: Boolean(args["token-stdin"]), config });
+        requireToken(resolved);
+        const ctx = createContext({ config, token: authFor(resolved) });
         const response = await checkToken(ctx, config, "auth status");
         if (response.status >= 400) throw new CliError("auth.invalid", `Token check failed (${response.status})`);
+        const oauth = resolved.oauth?.current(); // read after the request: it may have refreshed the login
         await render(
           ctx.io,
-          envelope({ valid: true, source: resolved.source, token: maskToken(token), identity: extractIdentity(response.json) }),
+          envelope({
+            valid: true,
+            auth: oauth ? "oauth" : "pat",
+            source: resolved.source,
+            token: maskToken(oauth?.access_token ?? (resolved.token as string)),
+            ...(oauth ? { expires_at: oauth.expires_at, scope: accessTokenScope(oauth.access_token) } : {}),
+            identity: extractIdentity(response.json),
+          }),
           outputOpts(args),
         );
       },
     }),
     login: defineCommand({
-      meta: { name: "login", description: "Validate a PAT from stdin and store it in the OS keychain" },
-      args: commonArgs,
+      meta: { name: "login", description: "Sign in through your browser and store the login in the OS keychain" },
+      args: {
+        ...commonArgs,
+        browser: { type: "boolean", default: true, description: "Open the browser (--no-browser to only print the sign-in URL)" },
+        scopes: { type: "string", description: "Comma-separated scopes to request (default: the server's default set)" },
+        "read-only": { type: "boolean", description: "Request read-only (*:read) scopes only" },
+      },
       async run(cittyCtx) {
         const args = cittyCtx.args as Args;
         setLoggingEnabled(args.log !== false);
         const config = configFrom(args, cittyCtx.rawArgs);
         const store = credentialStore();
         if (!store.available()) {
-          throw new CliError("auth.keychain", "No OS keychain available on this platform.", "Use DEEL_TOKEN or --token-stdin instead.");
+          throw new CliError("auth.keychain", "No OS keychain available on this platform.", "Use DEEL_TOKEN or --token-stdin with a PAT instead.");
         }
-        const token = process.stdin.isTTY
-          ? await promptSecret("Paste your Deel PAT (input hidden): ")
-          : readFileSync(0, "utf8").trim();
-        if (!token) throw new CliError("auth.login", "No token provided.", 'Run `deel auth login` and paste your PAT, or pipe it: echo "$PAT" | deel auth login');
-        const ctx = createContext({ config, token });
-        const response = await checkToken(ctx, config, "auth login");
-        if (response.status >= 400) throw new CliError("auth.invalid", `Token check failed (${response.status}) — not stored.`);
-        if (!store.set(config.env, token)) throw new CliError("auth.keychain", "Failed to store the token in the keychain.");
+        if (!config.oauthBaseUrlOk) {
+          throw new CliError("auth.base_url", "A browser login is only sent to its own environment's API host.", "Drop --base-url, or use DEEL_TOKEN or --token-stdin with a PAT.");
+        }
+        const ctx = createContext({ config, token: null });
+        const entry = await browserLogin({
+          config,
+          store,
+          transport: fetchTransport,
+          say: (text) => ctx.io.err(text),
+          open: args.browser !== false,
+          scopes: args.scopes as string | undefined,
+          readOnly: Boolean(args["read-only"]),
+        });
+        const authed = createContext({ config, token: entry.access_token });
+        const response = await checkToken(authed, config, "auth login");
+        if (response.status >= 400) throw new CliError("auth.invalid", `Signed in, but the identity check failed (${response.status}).`, "Run 'deel auth status' to retry.");
         await render(
           ctx.io,
-          envelope({ stored: true, env: config.env, token: maskToken(token), identity: extractIdentity(response.json) }),
+          envelope({
+            stored: true,
+            env: config.env,
+            auth: "oauth",
+            token: maskToken(entry.access_token),
+            identity: extractIdentity(response.json),
+            scope: accessTokenScope(entry.access_token),
+            expires_at: entry.expires_at,
+          }),
           outputOpts(args),
         );
       },
     }),
     logout: defineCommand({
-      meta: { name: "logout", description: "Remove the stored token from the OS keychain" },
+      meta: { name: "logout", description: "Revoke the login and remove it from the OS keychain" },
       args: commonArgs,
       async run(cittyCtx) {
         const args = cittyCtx.args as Args;
         setLoggingEnabled(args.log !== false);
         const config = configFrom(args, cittyCtx.rawArgs);
         const store = credentialStore();
-        const removed = store.available() ? store.remove(config.env) : false;
         const ctx = createContext({ config, token: null });
-        await render(ctx.io, envelope({ removed, env: config.env }), outputOpts(args));
+        const { removed, revoked, hadLogin } = await logout(store, config, fetchTransport);
+        if (hadLogin && revoked === "unsupported") ctx.io.err("The server does not support revocation; the login was only removed from this machine.\n");
+        else if (hadLogin && !revoked) ctx.io.err("Could not revoke the login on the server; it was removed from this machine.\n");
+        await render(ctx.io, envelope({ removed, env: config.env, revoked }), outputOpts(args));
       },
     }),
   },

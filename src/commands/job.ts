@@ -2,7 +2,7 @@
 // off by 202 responses from mutating operations.
 
 import { defineCommand } from "citty";
-import { resolveToken, requireToken } from "../core/auth.ts";
+import { resolveToken, authFor } from "../core/auth.ts";
 import { createContext } from "../core/context.ts";
 import { envelope, render } from "../core/output.ts";
 import { setLoggingEnabled, setLogBodiesEnabled } from "../core/logging.ts";
@@ -23,7 +23,7 @@ export const jobCommand = defineCommand({
         setLoggingEnabled(args.log !== false);
         setLogBodiesEnabled(args["log-bodies"] === true);
         const config = configFrom(args, cittyCtx.rawArgs);
-        const token = requireToken(resolveToken({ tokenStdin: Boolean(args["token-stdin"]), env: config.env }));
+        const token = authFor(resolveToken({ tokenStdin: Boolean(args["token-stdin"]), config }));
         const ctx = createContext({ config, token });
         const jobIds = String(args.id ?? "").split(",").map((id) => id.trim()).filter(Boolean);
         if (jobIds.length === 0) throw new CliError("usage.job", "Usage: deel job status <id>[,<id>]");
@@ -39,7 +39,7 @@ export const jobCommand = defineCommand({
         setLoggingEnabled(args.log !== false);
         setLogBodiesEnabled(args["log-bodies"] === true);
         const config = configFrom(args, cittyCtx.rawArgs);
-        const token = requireToken(resolveToken({ tokenStdin: Boolean(args["token-stdin"]), env: config.env }));
+        const token = authFor(resolveToken({ tokenStdin: Boolean(args["token-stdin"]), config }));
         const ctx = createContext({ config, token });
         const response = await ctx.http({
           method: "GET",
