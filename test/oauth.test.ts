@@ -229,9 +229,9 @@ test("the listener gives up after the timeout and frees the port", async () => {
 
 // ---------------- scopes and the full flow ----------------
 
-test("scope selection: all by default, narrowed by --scopes, read-only by --read-only", () => {
+test("scope selection: none by default so the server applies its own, narrowed by --scopes, read-only by --read-only", () => {
   const supported = ["people:read", "people:write", "contracts:read"];
-  assert.deepEqual(chooseScopes(supported, undefined, false), supported);
+  assert.deepEqual(chooseScopes(supported, undefined, false), []);
   assert.deepEqual(chooseScopes(supported, "people:read, contracts:read", false), ["people:read", "contracts:read"]);
   assert.deepEqual(chooseScopes(supported, undefined, true), ["people:read", "contracts:read"]);
   assert.deepEqual(chooseScopes(supported, "people:write,people:read", true), ["people:read"]);
@@ -240,9 +240,8 @@ test("scope selection: all by default, narrowed by --scopes, read-only by --read
   assert.deepEqual(chooseScopes([], undefined, false), []);
 });
 
-test("the default and --read-only scopes leave out the OIDC scopes", () => {
+test("--read-only leaves out the OIDC scopes", () => {
   const supported = ["openid", "openid-profile:read", "openid-email:read", "people:read", "people:write", "contracts:read"];
-  assert.deepEqual(chooseScopes(supported, undefined, false), ["people:read", "people:write", "contracts:read"]);
   assert.deepEqual(chooseScopes(supported, undefined, true), ["people:read", "contracts:read"]);
   assert.deepEqual(chooseScopes(supported, "openid,people:read", false), ["openid", "people:read"]);
 });
@@ -309,7 +308,7 @@ test("browserLogin runs the whole flow, stores the login and drops a legacy PAT"
     },
   });
   const challenge = new URL(authorizeUrl).searchParams.get("code_challenge");
-  assert.equal(new URL(authorizeUrl).searchParams.get("scope"), "people:read contracts:read");
+  assert.equal(new URL(authorizeUrl).searchParams.has("scope"), false); // the server applies its default scopes
   assert.equal(forms.length, 1);
   assert.equal(forms[0].get("grant_type"), "authorization_code");
   assert.equal(forms[0].get("code"), "the-code");

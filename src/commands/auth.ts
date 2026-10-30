@@ -64,7 +64,7 @@ export const authCommand = defineCommand({
       args: {
         ...commonArgs,
         browser: { type: "boolean", default: true, description: "Open the browser (--no-browser to only print the sign-in URL)" },
-        scopes: { type: "string", description: "Comma-separated scopes to request (default: all available)" },
+        scopes: { type: "string", description: "Comma-separated scopes to request (default: the server's default set)" },
         "read-only": { type: "boolean", description: "Request read-only (*:read) scopes only" },
       },
       async run(cittyCtx) {

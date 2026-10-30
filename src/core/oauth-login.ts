@@ -133,6 +133,7 @@ export function openBrowser(url: string): void {
 // ---------------- the flow ----------------
 
 export function chooseScopes(supported: string[], requested: string | undefined, readOnly: boolean): string[] {
+  if (requested === undefined && !readOnly) return []; // no scope parameter: the server grants its default set
   let scopes = supported.filter((scope) => scope !== "openid" && !scope.startsWith("openid-")); // OIDC is not used by the CLI
   if (requested !== undefined) {
     scopes = requested.split(/[,\s]+/).filter(Boolean);

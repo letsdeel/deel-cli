@@ -135,7 +135,7 @@ Sign in with your browser; the CLI keeps a short-lived access token and refreshe
 deel auth login                  # opens your browser, asks for consent, stores the login in the OS keychain
 deel auth login --no-browser     # print the sign-in URL without opening a browser (open it in a browser on this machine)
 deel auth login --read-only      # request read-only (*:read) scopes only
-deel auth login --scopes people:read,contracts:read   # request specific scopes (default: all available)
+deel auth login --scopes people:read,contracts:read   # request specific scopes (default: the server's default set)
 deel auth status                 # validates; reports the auth type (oauth / pat), source, scope and expiry
 deel auth logout                 # revokes the login on the server (best effort) and removes it from the keychain
 ```
