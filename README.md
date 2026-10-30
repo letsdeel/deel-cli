@@ -241,7 +241,7 @@ deel tokens get <id>
 deel tokens invalidate <id> --reason "rotated"              # asks to confirm; --yes when non-interactive
 ```
 
-An invalidated token stops working at once and cannot be restored. The CLI cannot create tokens: create them in Developer Center → API tokens.
+An invalidated token stops working at once and cannot be restored.
 
 ## Idempotency
 

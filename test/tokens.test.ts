@@ -5,7 +5,7 @@ import { captureIO } from "../src/core/io.ts";
 import type { HttpRequest, HttpResponse } from "../src/core/http.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
 import { CliError } from "../src/core/errors.ts";
-import { CREATE_HINT, DASH_ID_HINT, buildTokenListQuery, resolveTokenId, validateReason } from "../src/core/api-tokens.ts";
+import { DASH_ID_HINT, buildTokenListQuery, resolveTokenId, validateReason } from "../src/core/api-tokens.ts";
 import { isYes, listFlagsFrom, runGet, runList, runInvalidate, tokensCommand } from "../src/commands/tokens.ts";
 import { staticCommands } from "../src/commands/index.ts";
 
@@ -223,10 +223,4 @@ test("an API error surfaces as a CLI error with the request id", async () => {
   const { ctx } = ctxWith(() => ({ status: 404, headers: {}, text: "", json: { errors: [{ code: "NOT_FOUND", message: "Access token could not be found" }] } }));
 
   await assert.rejects(runGet(ctx, TOKEN_ID, JSON_OUTPUT), (error: unknown) => error instanceof CliError && /Access token could not be found/.test(error.message));
-});
-
-test("tokens create explains that tokens are created in Developer Center", async () => {
-  const create = (tokensCommand.subCommands as Record<string, { run: () => void }>).create;
-
-  assert.throws(() => create.run(), (error: unknown) => error instanceof CliError && error.next === CREATE_HINT);
 });

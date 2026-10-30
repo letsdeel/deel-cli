@@ -1,5 +1,4 @@
 // `deel tokens list | get <id> | invalidate <id>` — manage API tokens.
-// Tokens cannot be created from the CLI; `create` points to Developer Center instead.
 
 import { createInterface } from "node:readline";
 import { defineCommand } from "citty";
@@ -11,7 +10,6 @@ import type { OutputOpts } from "../core/output.ts";
 import { setLoggingEnabled, setLogBodiesEnabled } from "../core/logging.ts";
 import { CliError } from "../core/errors.ts";
 import {
-  CREATE_HINT,
   TOKEN_SIGNALS,
   TOKEN_SORTS,
   TOKEN_TYPES,
@@ -111,7 +109,7 @@ export async function runInvalidate(ctx: Ctx, id: string, opts: InvalidateOpts, 
 }
 
 export const tokensCommand = defineCommand({
-  meta: { name: "tokens", description: "API tokens: list, inspect and invalidate (create them in Developer Center)" },
+  meta: { name: "tokens", description: "API tokens: list, inspect and invalidate" },
   subCommands: {
     list: defineCommand({
       meta: { name: "list", description: "List API tokens, newest first (one page; --all for every page)" },
@@ -156,12 +154,6 @@ export const tokensCommand = defineCommand({
         const reason = validateReason(optionalString(args.reason));
         const opts = { yes: args.yes === true, reason, idempotencyKey: optionalString(args["idempotency-key"]) };
         await runInvalidate(contextFor(cittyCtx), id, opts, outputOpts(args));
-      },
-    }),
-    create: defineCommand({
-      meta: { name: "create", description: "Not available: create tokens in Developer Center" },
-      run() {
-        throw new CliError("tokens.create_unsupported", "The CLI cannot create API tokens", CREATE_HINT);
       },
     }),
   },

@@ -1,6 +1,5 @@
 // API token management (list / get / invalidate) over the injected transport.
-// The API never returns a token's secret value, and the CLI cannot create tokens: create them in
-// Developer Center → API tokens.
+// The API never returns a token's secret value.
 
 import type { Ctx } from "./context.ts";
 import { CliError } from "./errors.ts";
@@ -50,7 +49,6 @@ export const MAX_REASON_LENGTH = 200;
 export const TOKEN_TYPES = ["PERSONAL", "ORGANIZATION"];
 export const TOKEN_SIGNALS = ["ACTIVE", "FULL_ACCESS", "STALE", "EXPIRING", "ORPHANED", "PERSONAL", "INVALIDATED"];
 export const TOKEN_SORTS = ["NEWEST", "NAME", "RECENT", "SCOPES", "RISK"];
-export const CREATE_HINT = "Create tokens in Developer Center → API tokens; the CLI cannot create them.";
 export const DASH_ID_HINT = "An id that starts with '-' must be passed as --id=<id>.";
 
 const USAGE = "usage.tokens";
