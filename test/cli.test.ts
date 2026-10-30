@@ -108,3 +108,99 @@ test("an unknown command reports an error", async () => {
   assert.equal(code, EXIT.ERROR);
   assert.match(err, /Unknown command/);
 });
+
+// ---------------- logs commands (public API request logs) ----------------
+
+type Field = { name: string; in?: string; type: string; required: boolean; enum?: string[]; properties?: Field[] };
+const byName = (fields: Field[]) => Object.fromEntries(fields.map((field) => [field.name, field])) as Record<string, Field>;
+
+test("logs requests list --help --json exposes every filter, --cursor and the request log fields", async () => {
+  const { code, out } = await capture(["logs", "requests", "list", "--help", "--json"]);
+  assert.equal(code, EXIT.OK);
+  const contract = JSON.parse(out);
+  assert.equal(contract.command, "logs requests list");
+  assert.equal(contract.usage, "deel logs requests list [GLOBAL OPTIONS]");
+  assert.equal(contract.body.kind, "none");
+
+  const params = byName(contract.params);
+  for (const name of ["request_id", "token_id", "route", "path", "method", "status", "status_class", "source", "from", "to", "cursor", "limit"]) {
+    assert.ok(name in params, `missing --${name}`);
+    assert.equal(params[name].in, "query");
+    assert.equal(params[name].required, false);
+  }
+  assert.deepEqual(params.status_class.enum, ["2xx", "4xx", "5xx"]);
+  assert.deepEqual(params.source.enum, ["rest", "scim", "mcp"]);
+  assert.equal(params.status.type, "integer");
+  assert.equal(params.limit.type, "integer");
+
+  assert.equal(contract.response.kind, "array");
+  const fields = byName(contract.response.fields);
+  for (const name of ["request_id", "timestamp", "source", "method", "route", "path", "status", "duration_ms", "upstream_duration_ms", "token", "ip", "user_agent", "api_version", "response_bytes", "error"]) {
+    assert.ok(name in fields, `missing response field ${name}`);
+  }
+  assert.deepEqual(fields.token.properties!.map((field) => field.name), ["id", "type", "label", "oauth2_client_id"]);
+  assert.deepEqual(fields.error.properties!.map((field) => field.name), ["code", "message"]);
+  assert.ok(!("gateway_message" in fields)); // only the single-request view explains the outcome
+});
+
+test("logs requests get --help --json requires --request_id and returns gateway_message + hint", async () => {
+  const { code, out } = await capture(["logs", "requests", "get", "--help", "--json"]);
+  assert.equal(code, EXIT.OK);
+  const contract = JSON.parse(out);
+  assert.equal(contract.command, "logs requests get");
+  assert.equal(contract.usage, "deel logs requests get [GLOBAL OPTIONS] --request_id=<string>");
+  assert.deepEqual(contract.params.map((param: Field) => [param.name, param.in, param.required]), [["request_id", "path", true]]);
+  assert.equal(contract.response.kind, "object");
+  const fields = byName(contract.response.fields);
+  for (const name of ["request_id", "status", "route", "token", "error", "gateway_message", "hint"]) assert.ok(name in fields, `missing response field ${name}`);
+});
+
+test("logs requests summary --help --json takes a from/to window and returns the rollup fields", async () => {
+  const { code, out } = await capture(["logs", "requests", "summary", "--help", "--json"]);
+  assert.equal(code, EXIT.OK);
+  const contract = JSON.parse(out);
+  assert.equal(contract.command, "logs requests summary");
+  assert.equal(contract.usage, "deel logs requests summary [GLOBAL OPTIONS]");
+  assert.deepEqual(contract.params.map((param: Field) => [param.name, param.in, param.required]), [["from", "query", false], ["to", "query", false]]);
+  assert.equal(contract.response.kind, "object");
+  assert.deepEqual(contract.response.fields.map((field: Field) => field.name), ["from", "to", "total", "by_status_class", "rate_limited", "p50_ms", "p95_ms", "active_tokens"]);
+});
+
+test("logs tokens list --help --json takes window, search and cursor and returns per-token activity", async () => {
+  const { code, out } = await capture(["logs", "tokens", "list", "--help", "--json"]);
+  assert.equal(code, EXIT.OK);
+  const contract = JSON.parse(out);
+  assert.equal(contract.command, "logs tokens list");
+  assert.equal(contract.usage, "deel logs tokens list [GLOBAL OPTIONS]");
+  assert.deepEqual(contract.params.map((param: Field) => param.name), ["from", "to", "search", "cursor", "limit"]);
+  assert.equal(contract.response.kind, "array");
+  const fields = byName(contract.response.fields);
+  assert.deepEqual(Object.keys(fields), ["token", "calls", "errors", "last_used_at", "last_ip", "daily"]);
+  assert.deepEqual(fields.token.properties!.map((field) => field.name), ["id", "type", "label"]);
+  assert.equal(fields.daily.type, "array");
+  assert.deepEqual(fields.daily.properties!.map((field) => field.name), ["day", "calls", "errors"]);
+});
+
+test("logs requests list --help documents --cursor and the status_class values", async () => {
+  const { code, out } = await capture(["logs", "requests", "list", "--help"]);
+  assert.equal(code, EXIT.OK);
+  assert.match(out, /USAGE\s+deel logs requests list \[GLOBAL OPTIONS\]/);
+  assert.match(out, /--cursor=<string>/);
+  assert.match(out, /--status_class=<string>\s+\[2xx \| 4xx \| 5xx\]/);
+  assert.match(out, /deel logs requests list --help --json/);
+});
+
+test("logs group help routes to the requests and tokens sub-groups", async () => {
+  const group = await capture(["logs", "--help"]);
+  assert.equal(group.code, EXIT.OK);
+  assert.match(group.out, /\brequests\b/);
+  assert.match(group.out, /\btokens\b/);
+
+  const requests = await capture(["logs", "requests", "--help"]);
+  assert.equal(requests.code, EXIT.OK);
+  for (const action of ["list", "get", "summary"]) assert.match(requests.out, new RegExp(`\\b${action}\\b`));
+
+  const tokens = await capture(["logs", "tokens", "--help"]);
+  assert.equal(tokens.code, EXIT.OK);
+  assert.match(tokens.out, /\blist\b/);
+});

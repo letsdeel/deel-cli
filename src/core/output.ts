@@ -26,11 +26,14 @@ async function runJq(data: unknown, filter: string): Promise<unknown[]> {
 
 export type Envelope = {
   data: unknown;
+  page?: Record<string, unknown>; // keyset pagination of a list response: { cursor, has_next_page }
   meta?: Record<string, unknown>;
 };
 
-export function envelope(data: unknown, meta?: Record<string, unknown>): Envelope {
-  return { data, meta };
+// `page` sits next to `data` (only when the response paginates) so a caller can feed
+// `page.cursor` back as --cursor; --jq, --fields and --quiet keep operating on `data`.
+export function envelope(data: unknown, meta?: Record<string, unknown>, page?: Record<string, unknown>): Envelope {
+  return { data, ...(page ? { page } : {}), meta };
 }
 
 function valueAtPath(source: unknown, path: string): unknown {

@@ -6,6 +6,7 @@ A command-line client for selected endpoints from the [Deel Public API](https://
 deel auth status --json                              # verify your token and identity
 deel adjustments create --invoice --generate-input  # explore required fields
 deel jobs list --jq '.[] | {job_id, status}'        # filter recent async jobs
+deel logs requests list --status_class 4xx          # your organization's failed API requests
 ```
 
 ## Contents
@@ -212,6 +213,17 @@ Output is the JSON envelope by default. Use `--no-json` on a TTY to get a human-
 
 ```json
 { "data": { ... }, "meta": { "request_id": "..." } }
+```
+
+List endpoints that paginate return a `page` object next to `data`; pass its `cursor` back as `--cursor` to fetch the next page (`has_next_page` tells you when to stop):
+
+```json
+{ "data": [ ... ], "page": { "cursor": "eyJ0cyI6...", "has_next_page": true }, "meta": { "request_id": "..." } }
+```
+
+```bash
+deel logs requests list --limit 100                        # first page; read page.cursor from the envelope
+deel logs requests list --limit 100 --cursor <page.cursor> # next page, until has_next_page is false
 ```
 
 | Flag              | Effect                                                                 |

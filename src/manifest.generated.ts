@@ -1,4 +1,4 @@
-// GENERATED FILE — DO NOT EDIT. Produced by the deel-cli-extractor skill from ../../Desktop/openapispec.json.
+// GENERATED FILE — DO NOT EDIT. Produced by the deel-cli-extractor skill from ../../Desktop/openapispec.json plus the PA-7886 interim spec for /v2/logs/* (regenerate from the published spec once the logs endpoints are live).
 import type { Manifest } from "./types.ts";
 
 export const manifest: Manifest = {
@@ -642,6 +642,722 @@ export const manifest: Manifest = {
             "FAILED"
           ],
           "description": "Overall status of the operation, derived from all items."
+        }
+      ]
+    },
+    {
+      "command": [
+        "logs",
+        "requests",
+        "get"
+      ],
+      "method": "GET",
+      "path": "/v2/logs/requests/{request_id}",
+      "summary": "Retrieve a request log",
+      "async": false,
+      "bodyKind": "none",
+      "supportsMultipart": false,
+      "bodyWrapper": "none",
+      "params": [
+        {
+          "name": "request_id",
+          "in": "path",
+          "type": "string",
+          "required": true,
+          "description": "The x-request-id of the request"
+        }
+      ],
+      "bodyProps": [],
+      "fileFields": [],
+      "responseKind": "object",
+      "responseFields": [
+        {
+          "name": "request_id",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "The x-request-id of the request; quote it when contacting support"
+        },
+        {
+          "name": "timestamp",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "When the response was sent (UTC)"
+        },
+        {
+          "name": "source",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "rest",
+            "scim",
+            "mcp"
+          ],
+          "description": "Where the request came in: REST API, SCIM or an MCP tool call"
+        },
+        {
+          "name": "method",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "HTTP method"
+        },
+        {
+          "name": "route",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Public route template the request matched; null when no endpoint matched (404)"
+        },
+        {
+          "name": "path",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Request path without the query string"
+        },
+        {
+          "name": "status",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "HTTP status returned to the caller"
+        },
+        {
+          "name": "duration_ms",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Total time from request start to response end, in milliseconds"
+        },
+        {
+          "name": "upstream_duration_ms",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Time spent in the service behind the gateway, in milliseconds; null when the gateway answered itself"
+        },
+        {
+          "name": "token",
+          "in": "body",
+          "type": "object",
+          "required": true,
+          "description": "The token that made the request, as the gateway saw it at request time",
+          "properties": [
+            {
+              "name": "id",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Token id shown in the Developer Center"
+            },
+            {
+              "name": "type",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "enum": [
+                "pat",
+                "oauth2"
+              ],
+              "description": "Personal access token or OAuth2 access token"
+            },
+            {
+              "name": "label",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Token label or OAuth2 client name when the request was made"
+            },
+            {
+              "name": "oauth2_client_id",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "OAuth2 client the token belongs to; null for personal access tokens"
+            }
+          ]
+        },
+        {
+          "name": "ip",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Client IP address the request came from"
+        },
+        {
+          "name": "user_agent",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "User-Agent header, truncated to 512 characters"
+        },
+        {
+          "name": "api_version",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "API version the request resolved to"
+        },
+        {
+          "name": "response_bytes",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Size of the response body in bytes"
+        },
+        {
+          "name": "error",
+          "in": "body",
+          "type": "object",
+          "required": true,
+          "description": "Gateway-generated error of a failed request; null when the request succeeded or the error came from the service",
+          "properties": [
+            {
+              "name": "code",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Machine-readable gateway error code"
+            },
+            {
+              "name": "message",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Human-readable gateway error message"
+            }
+          ]
+        },
+        {
+          "name": "gateway_message",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "What the status and gateway error code mean, in plain language"
+        },
+        {
+          "name": "hint",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "What to do about it"
+        }
+      ]
+    },
+    {
+      "command": [
+        "logs",
+        "requests",
+        "list"
+      ],
+      "method": "GET",
+      "path": "/v2/logs/requests",
+      "summary": "List request logs",
+      "async": false,
+      "bodyKind": "none",
+      "supportsMultipart": false,
+      "bodyWrapper": "none",
+      "params": [
+        {
+          "name": "request_id",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Only the request with this x-request-id"
+        },
+        {
+          "name": "token_id",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Only requests made with this token"
+        },
+        {
+          "name": "route",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Only requests that matched this route template"
+        },
+        {
+          "name": "path",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Only requests with exactly this path"
+        },
+        {
+          "name": "method",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Only requests with this HTTP method"
+        },
+        {
+          "name": "status",
+          "in": "query",
+          "type": "integer",
+          "required": false,
+          "description": "Only requests that returned exactly this status"
+        },
+        {
+          "name": "status_class",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "2xx",
+            "4xx",
+            "5xx"
+          ],
+          "description": "Only requests whose status is in this class"
+        },
+        {
+          "name": "source",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "rest",
+            "scim",
+            "mcp"
+          ],
+          "description": "Only requests that came in through this surface"
+        },
+        {
+          "name": "from",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Start of the window (ISO-8601). Defaults to 24 hours before `to`; a window wider than 15 days is clamped"
+        },
+        {
+          "name": "to",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "End of the window (ISO-8601). Defaults to now"
+        },
+        {
+          "name": "cursor",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Cursor for keyset pagination, taken from a previous response `page.cursor`"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "type": "integer",
+          "required": false,
+          "description": "Page size"
+        }
+      ],
+      "bodyProps": [],
+      "fileFields": [],
+      "responseKind": "array",
+      "responseFields": [
+        {
+          "name": "request_id",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "The x-request-id of the request; quote it when contacting support"
+        },
+        {
+          "name": "timestamp",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "When the response was sent (UTC)"
+        },
+        {
+          "name": "source",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "rest",
+            "scim",
+            "mcp"
+          ],
+          "description": "Where the request came in: REST API, SCIM or an MCP tool call"
+        },
+        {
+          "name": "method",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "HTTP method"
+        },
+        {
+          "name": "route",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Public route template the request matched; null when no endpoint matched (404)"
+        },
+        {
+          "name": "path",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Request path without the query string"
+        },
+        {
+          "name": "status",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "HTTP status returned to the caller"
+        },
+        {
+          "name": "duration_ms",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Total time from request start to response end, in milliseconds"
+        },
+        {
+          "name": "upstream_duration_ms",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Time spent in the service behind the gateway, in milliseconds; null when the gateway answered itself"
+        },
+        {
+          "name": "token",
+          "in": "body",
+          "type": "object",
+          "required": true,
+          "description": "The token that made the request, as the gateway saw it at request time",
+          "properties": [
+            {
+              "name": "id",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Token id shown in the Developer Center"
+            },
+            {
+              "name": "type",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "enum": [
+                "pat",
+                "oauth2"
+              ],
+              "description": "Personal access token or OAuth2 access token"
+            },
+            {
+              "name": "label",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Token label or OAuth2 client name when the request was made"
+            },
+            {
+              "name": "oauth2_client_id",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "OAuth2 client the token belongs to; null for personal access tokens"
+            }
+          ]
+        },
+        {
+          "name": "ip",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Client IP address the request came from"
+        },
+        {
+          "name": "user_agent",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "User-Agent header, truncated to 512 characters"
+        },
+        {
+          "name": "api_version",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "API version the request resolved to"
+        },
+        {
+          "name": "response_bytes",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Size of the response body in bytes"
+        },
+        {
+          "name": "error",
+          "in": "body",
+          "type": "object",
+          "required": true,
+          "description": "Gateway-generated error of a failed request; null when the request succeeded or the error came from the service",
+          "properties": [
+            {
+              "name": "code",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Machine-readable gateway error code"
+            },
+            {
+              "name": "message",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Human-readable gateway error message"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "command": [
+        "logs",
+        "requests",
+        "summary"
+      ],
+      "method": "GET",
+      "path": "/v2/logs/requests/summary",
+      "summary": "Retrieve request logs summary",
+      "async": false,
+      "bodyKind": "none",
+      "supportsMultipart": false,
+      "bodyWrapper": "none",
+      "params": [
+        {
+          "name": "from",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Start of the window (ISO-8601). Defaults to 24 hours before `to`; a window wider than 15 days is clamped"
+        },
+        {
+          "name": "to",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "End of the window (ISO-8601). Defaults to now"
+        }
+      ],
+      "bodyProps": [],
+      "fileFields": [],
+      "responseKind": "object",
+      "responseFields": [
+        {
+          "name": "from",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Start of the window the summary covers (UTC)"
+        },
+        {
+          "name": "to",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "End of the window the summary covers (UTC)"
+        },
+        {
+          "name": "total",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Requests in the window"
+        },
+        {
+          "name": "by_status_class",
+          "in": "body",
+          "type": "object",
+          "required": true,
+          "description": "Requests per status class, keyed by 2xx, 3xx, 4xx, 5xx"
+        },
+        {
+          "name": "rate_limited",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Requests rejected with 429 by the rate limiter"
+        },
+        {
+          "name": "p50_ms",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Median total latency in milliseconds (bucket upper bound)"
+        },
+        {
+          "name": "p95_ms",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "95th percentile total latency in milliseconds (bucket upper bound)"
+        },
+        {
+          "name": "active_tokens",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Distinct tokens that made at least one request on the days of the window"
+        }
+      ]
+    },
+    {
+      "command": [
+        "logs",
+        "tokens",
+        "list"
+      ],
+      "method": "GET",
+      "path": "/v2/logs/tokens",
+      "summary": "List token activity",
+      "async": false,
+      "bodyKind": "none",
+      "supportsMultipart": false,
+      "bodyWrapper": "none",
+      "params": [
+        {
+          "name": "from",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Start of the window (ISO-8601). Defaults to 24 hours before `to`; a window wider than 15 days is clamped"
+        },
+        {
+          "name": "to",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "End of the window (ISO-8601). Defaults to now"
+        },
+        {
+          "name": "search",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Only tokens whose label or id contains this text (case-insensitive)"
+        },
+        {
+          "name": "cursor",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Cursor for keyset pagination, taken from a previous response `page.cursor`"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "type": "integer",
+          "required": false,
+          "description": "Page size"
+        }
+      ],
+      "bodyProps": [],
+      "fileFields": [],
+      "responseKind": "array",
+      "responseFields": [
+        {
+          "name": "token",
+          "in": "body",
+          "type": "object",
+          "required": true,
+          "description": "The token",
+          "properties": [
+            {
+              "name": "id",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Token id shown in the Developer Center"
+            },
+            {
+              "name": "type",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "enum": [
+                "pat",
+                "oauth2"
+              ],
+              "description": "Personal access token or OAuth2 access token"
+            },
+            {
+              "name": "label",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Token label or OAuth2 client name at its latest use"
+            }
+          ]
+        },
+        {
+          "name": "calls",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Requests made with the token in the window"
+        },
+        {
+          "name": "errors",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Requests that ended in a 4xx or 5xx status"
+        },
+        {
+          "name": "last_used_at",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Latest request made with the token (UTC)"
+        },
+        {
+          "name": "last_ip",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Client IP of that latest request"
+        },
+        {
+          "name": "daily",
+          "in": "body",
+          "type": "array",
+          "required": true,
+          "description": "Per-day series over the window, oldest first",
+          "properties": [
+            {
+              "name": "day",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "UTC day"
+            },
+            {
+              "name": "calls",
+              "in": "body",
+              "type": "integer",
+              "required": true,
+              "description": "Requests that day"
+            },
+            {
+              "name": "errors",
+              "in": "body",
+              "type": "integer",
+              "required": true,
+              "description": "Requests that day ending in a 4xx or 5xx status"
+            }
+          ]
         }
       ]
     }
