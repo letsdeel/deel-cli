@@ -58,7 +58,7 @@
   "src/core/webhooks.ts": "8aa2b376d36da08afa52fef3b8005280deb9bbb9391db9b133a110d49cdd936b",
   "src/help.ts": "39d96d86569a73686f8bd133369646420e5de32497b6d8d2d557d707918b0e2a",
   "src/main.ts": "825c3581a935b3c83e104e905b2dbb99b17ab208659847ae5f9c6f0572364e47",
-  "src/manifest.generated.ts": "d3c7fe3d05c46ba174059526a6f9ced742577673c7b63612b1cfabb9b8a69020",
+  "src/manifest.generated.ts": "a7b8f23a4b595aeefedec7dea39eff51754962672c9f6e1065bb9d9a522ae63d",
   "src/types.ts": "f18f56cdb821c39469e21d59208e1e3948761ba609090f23fd3f5e4bd9f4d567",
   "src/version.ts": "267ee6a2645e078e6b8f9bbd19e34fed75be7917d79af0cf116eaa8619159f81",
   "test/apps.test.ts": "b11d058336abd86ce9b68a2c1e4eeb43084247bea655f02f5df843eafcff5d6d",
