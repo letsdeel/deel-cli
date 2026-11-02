@@ -3,6 +3,7 @@
 import type { CliParam, Descriptor, GeneratedManifest } from "../types.ts";
 import { flagOf } from "../core/flags.ts";
 import generated from "./manifest.json" with { type: "json" };
+import { manifest as handPicked } from "../manifest.generated.ts";
 
 export const generatedManifest = generated as GeneratedManifest;
 
@@ -14,6 +15,11 @@ export function generatedDescriptors(): Descriptor[] {
 
 export function setGeneratedDescriptorsForTests(next: Descriptor[] | undefined): void {
   descriptors = next ?? generatedManifest.descriptors;
+}
+
+// The generator guarantees hand-picked and generated commands never share a name.
+export function allDescriptors(): Descriptor[] {
+  return [...handPicked.descriptors, ...descriptors];
 }
 
 function pathParamsOf(descriptor: Descriptor): CliParam[] {
