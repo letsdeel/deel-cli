@@ -76,7 +76,7 @@ function buildQuery(descriptor: Descriptor, flags: ParsedCall["flags"]): Record<
   for (const param of descriptor.params) {
     if (param.in !== "query") continue;
     if (flags[param.name] != null) query[param.name] = flags[param.name];
-    else if (param.required) throw new CliError("usage.query_param", `Missing required --${param.name}`);
+    else if (param.required) throw new CliError("usage.query_param", `Missing required --${param.flag ?? param.name}`);
   }
   return query;
 }

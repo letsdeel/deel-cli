@@ -1,0 +1,22 @@
+{
+  "openapi": "3.0.3",
+  "info": { "title": "Made-up API" },
+  "paths": {
+    "/rest/widgets/{widget_id}": {
+      "parameters": [{ "$ref": "#/components/parameters/WidgetId" }],
+      "get": {
+        "operationId": "getWidget-v2026-01-01",
+        "summary": "Retrieve a widget",
+        "x-internal-note": "must not leak",
+        "responses": { "200": { "content": { "application/json": { "schema": { "$ref": "#/components/schemas/WidgetResponse" } } } } }
+      }
+    }
+  },
+  "components": {
+    "parameters": { "WidgetId": { "name": "widget_id", "in": "path", "required": true, "schema": { "type": "string" } } },
+    "schemas": {
+      "WidgetResponse": { "type": "object", "properties": { "data": { "$ref": "#/components/schemas/Widget" } } },
+      "Widget": { "type": "object", "properties": { "id": { "type": "string" }, "parent": { "$ref": "#/components/schemas/Widget" } } }
+    }
+  }
+}
