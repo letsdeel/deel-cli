@@ -884,6 +884,7 @@ export const manifest: Manifest = {
           "in": "body",
           "type": "object",
           "required": true,
+          "nullable": true,
           "description": "Who created the app, or null when unknown.",
           "properties": [
             {
@@ -891,6 +892,7 @@ export const manifest: Manifest = {
               "in": "body",
               "type": "string",
               "required": true,
+              "nullable": true,
               "description": "Name of the person who created the app."
             },
             {
@@ -1055,6 +1057,7 @@ export const manifest: Manifest = {
           "in": "body",
           "type": "object",
           "required": true,
+          "nullable": true,
           "description": "Who created the app, or null when unknown.",
           "properties": [
             {
@@ -1062,6 +1065,7 @@ export const manifest: Manifest = {
               "in": "body",
               "type": "string",
               "required": true,
+              "nullable": true,
               "description": "Name of the person who created the app."
             },
             {
