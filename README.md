@@ -167,7 +167,15 @@ deel adjustments create --invoice --generate-input      # JSON body skeleton to 
 
 `--help` for an action shows what generic `--help` cannot: the request-body fields (which arrive via `--input`, not as flags) and the response fields. A field the API may send as `null` is marked `nullable` in both views (a `required` field is always present, but its value can still be `null`).
 
-A command can ask for confirmation before it sends anything: an entry in `src/commands.map.ts` may set `confirm` to the question (`{param}` placeholders are filled from the command's flags). Such a command gets a `--yes` flag. In a terminal it asks `[y/N]`; `--yes` skips the prompt; without a terminal and without `--yes` it refuses to run. `deel apps disable` is one.
+A command can ask for confirmation before it sends anything: an entry in `src/commands.map.ts` may set `confirm` to the question (`{param}` placeholders are filled from the command's flags). Such a command gets a `--yes` flag, and the confirmation follows these rules:
+
+- In a terminal it asks `[y/N]` on stderr. Only `y` or `yes` goes ahead; anything else, an empty answer, end of input or Ctrl-C aborts and sends nothing (exit code 1, error `<group>.aborted`).
+- `--yes` skips the prompt.
+- Without a terminal (no TTY, or `CI` / an agent environment is detected) and without `--yes`, it refuses to run with `usage.confirm`, which names `--yes`. It never goes ahead silently.
+- When stdin carries the token or the body (`--token-stdin`, `--input -`), the prompt could not read an answer, so `--yes` is required there too.
+- `--help --json` lists the confirmation under `confirm`, so a script or an agent can see it before running the command.
+
+`deel apps disable` is one.
 
 ## Request input
 
