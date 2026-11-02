@@ -106,3 +106,36 @@ test("responseFrom expands a response field that is an array of objects into ite
   );
   assert.equal(items!.properties!.find((field) => field.name === "status")!.required, true);
 });
+
+test("responseFrom carries nullable fields, including nested ones, and only those", () => {
+  const { responseFields } = responseFrom({
+    responses: {
+      "200": {
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                data: {
+                  type: "object",
+                  required: ["id", "owner"],
+                  properties: {
+                    id: { type: "string" },
+                    owner: { type: "object", nullable: true, required: ["name"], properties: { name: { type: "string", nullable: true } } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const id = responseFields.find((field) => field.name === "id");
+  const owner = responseFields.find((field) => field.name === "owner");
+  assert.equal("nullable" in id!, false);
+  assert.equal(owner!.nullable, true);
+  assert.equal(owner!.required, true);
+  assert.equal(owner!.properties![0].nullable, true);
+});

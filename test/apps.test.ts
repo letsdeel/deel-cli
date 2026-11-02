@@ -119,6 +119,23 @@ test("apps list --help --json describes the filters and the app fields", async (
   for (const name of ["api_access", "limit", "cursor", "redirect_uris", "client_type"]) assert.match(contract, new RegExp(name));
 });
 
+test("apps get --help --json marks created_by and its name as required and nullable", async () => {
+  const { out } = await capture(["apps", "get", "--help", "--json"]);
+  const createdBy = JSON.parse(out).response.fields.find((field: { name: string }) => field.name === "created_by");
+  assert.equal(createdBy.required, true);
+  assert.equal(createdBy.nullable, true);
+  const name = createdBy.properties.find((field: { name: string }) => field.name === "name");
+  assert.equal(name.required, true);
+  assert.equal(name.nullable, true);
+  const status = createdBy.properties.find((field: { name: string }) => field.name === "status");
+  assert.equal("nullable" in status, false);
+});
+
+test("apps get --help prints nullable next to the created_by fields", async () => {
+  const { out } = await capture(["apps", "get", "--help"]);
+  assert.match(out, /created_by\s+object\s+nullable/);
+});
+
 test("apps get --help lists the --app_id flag", async () => {
   const { code, out } = await capture(["apps", "get", "--help"]);
   assert.equal(code, 0);

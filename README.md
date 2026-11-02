@@ -165,7 +165,7 @@ deel adjustments create --help --json                   # machine-readable contr
 deel adjustments create --invoice --generate-input      # JSON body skeleton to fill in
 ```
 
-`--help` for an action shows what generic `--help` cannot: the request-body fields (which arrive via `--input`, not as flags) and the response fields.
+`--help` for an action shows what generic `--help` cannot: the request-body fields (which arrive via `--input`, not as flags) and the response fields. A field the API may send as `null` is marked `nullable` in both views (a `required` field is always present, but its value can still be `null`).
 
 ## Request input
 
