@@ -13,11 +13,14 @@ import { resolveToken, requireToken } from "./core/auth.ts";
 import { parseInput } from "./core/input.ts";
 import { createContext } from "./core/context.ts";
 import { execute } from "./core/executor.ts";
+import { realIO } from "./core/io.ts";
+import { render } from "./core/output.ts";
+import { versionListing, versionTable } from "./core/versions.ts";
 import { setLoggingEnabled, setLogBodiesEnabled } from "./core/logging.ts";
 import { EXIT } from "./core/errors.ts";
 import { CliError } from "./core/errors.ts";
 import { CLI_VERSION } from "./version.ts";
-import { commonArgs, configFrom, gatherFiles, gatherFlagValues, outputOpts } from "./commands/shared.ts";
+import { commonArgs, configFrom, gatherFiles, gatherFlagValues, outputOpts, readHidden } from "./commands/shared.ts";
 import type { Args } from "./commands/shared.ts";
 import { staticCommands } from "./commands/index.ts";
 import {
@@ -74,10 +77,16 @@ async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<st
     files: gatherFiles(cittyCtx.rawArgs),
     idempotencyKey: args["idempotency-key"] as string | undefined,
   };
-  const config = configFrom(args, cittyCtx.rawArgs);
+  // execute() sends X-Beta itself so it can drop the header on a retry; the transport must not add it back.
+  const config = configFrom({ ...args, beta: false }, cittyCtx.rawArgs);
   const token = requireToken(resolveToken({ tokenStdin: Boolean(args["token-stdin"]), env: config.env }));
   const ctx = createContext({ config, token });
-  await execute(descriptor, call, ctx, { output: outputOpts(args), debug: Boolean(args.debug), form: Boolean(args.form) });
+  await execute(descriptor, call, ctx, {
+    output: outputOpts(args),
+    debug: Boolean(args.debug),
+    form: Boolean(args.form),
+    version: { apiVersion: args.version as string | undefined, beta: args.beta === true },
+  });
 }
 
 function actionCommand(descriptor: Descriptor): CommandDef {
@@ -243,6 +252,17 @@ function descriptorsFor(positionals: string[], matched: number): Descriptor[] {
   );
 }
 
+// `--versions`: offline, like --generate-input.
+async function printVersions(descriptor: Descriptor, argv: string[]): Promise<void> {
+  const listing = versionListing(descriptor, Date.now());
+  const io = realIO();
+  if (argv.includes("--no-json")) {
+    io.out(versionTable(listing));
+    return;
+  }
+  await render(io, { data: listing }, { json: true, fields: readHidden(argv, "fields"), jq: readHidden(argv, "jq"), raw: argv.includes("--raw"), quiet: false });
+}
+
 // Single descriptor for a resolved path. For variant groups, selects by the variant
 // flag present in argv; returns undefined if no unique match (triggers group help).
 function descriptorFor(positionals: string[], matched: number, argv: string[]): Descriptor | undefined {
@@ -270,8 +290,14 @@ function groupTitle(path: string[], cmd: CommandDef): string {
   return `deel ${path.join(" ")}`;
 }
 
+// `--version <date>` after a command picks the API version, so only a bare `--version` (or -v) prints the CLI's.
+function wantsCliVersion(argv: string[]): boolean {
+  const at = argv.indexOf("--version");
+  return argv.includes("-v") || (at !== -1 && argv.slice(0, at).every((token) => token.startsWith("-")));
+}
+
 export async function run(argv: string[]): Promise<number> {
-  if (argv.includes("--version") || argv.includes("-v")) {
+  if (wantsCliVersion(argv)) {
     printVersion();
     return EXIT.OK;
   }
@@ -309,7 +335,17 @@ export async function run(argv: string[]): Promise<number> {
     return EXIT.ERROR;
   }
 
+  // --versions on a merged command or a variant group needs the form picked first.
+  if (variantCandidates.length > 1 && !descriptor && argv.includes("--versions") && !wantsHelp) {
+    const hint = isMerged ? "its path-param flags" : variantCandidates.map((c) => `--${c.variant}`).join(", ");
+    throw new CliError("usage.versions", `'deel ${variantCandidates[0].command.join(" ")}' has several forms; pick one with ${hint} to list its versions.`);
+  }
+
   // Offline discovery — handled here so citty's required-arg enforcement is bypassed.
+  if (descriptor && argvEnables(argv, "versions") && !wantsHelp) {
+    await printVersions(descriptor, argv);
+    return EXIT.OK;
+  }
   if (descriptor && argvEnables(argv, "generate-input")) {
     printSkeleton(descriptor);
     return EXIT.OK;

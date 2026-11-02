@@ -266,6 +266,26 @@ A webhook id can start with `-`, which the argument parser reads as a flag. Pass
 
 `simulate` runs the delivery from Deel's servers, so the receiver URL must be publicly reachable; it is limited to 10 simulations per hour per event type, is never retried and gets no auto-derived `Idempotency-Key`, and exits 1 when the receiver does not answer 2xx.
 
+## API versions
+
+Each command calls one version of its endpoint (sent as `X-Version`): the newest stable version, or the newest beta when nothing is stable yet (then `X-Beta: true` is sent too). `deel <command> --help` shows it.
+
+| Flag                     | Sends                                                                          |
+| ------------------------ | ------------------------------------------------------------------------------ |
+| (none)                   | the command's version; plus `X-Beta: true` when that version is beta-only      |
+| `--version <YYYY-MM-DD>` | that version (warns on stderr if the command doesn't list it, sends it anyway) |
+| `--version none`         | no `X-Version`: the API picks its oldest stable version                        |
+| `--beta`                 | the newest beta version, with `X-Beta: true`                                   |
+| `--versions`             | nothing: lists the versions with their beta and sunset dates, and exits        |
+
+```bash
+deel <command> --versions             # JSON; --no-json for a table
+deel <command> --beta
+deel <command> --version 2026-01-01
+```
+
+If a beta graduates (or ends) after this CLI was released, the API rejects `X-Beta` before running anything; the CLI then retries once, without `X-Beta` (with the same version, or with the newest stable one when nothing is in beta any more) and with the same idempotency key. `--debug` shows the retry.
+
 ## Environments
 
 | `--env`          | Base URL                                       |
