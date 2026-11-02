@@ -90,7 +90,7 @@ test("tokens list fetches one page and prints the next cursor, has_more and tota
   await runList(ctx, buildTokenListQuery({ type: "organization" }), false, JSON_OUTPUT);
 
   assert.equal(seen[0].method, "GET");
-  assert.equal(seen[0].url, "https://example.test/rest/v2/api-tokens?token_type=ORGANIZATION");
+  assert.equal(seen[0].url, "https://example.test/rest/api-tokens?token_type=ORGANIZATION");
   assert.deepEqual(stdoutJson(io), { data: [apiToken("a")], meta: { next_cursor: "NEXT", has_more: true, total_count: 7 } });
   assert.equal(io.stderr.join(""), "next page: --cursor NEXT\n");
 });
@@ -106,7 +106,7 @@ test("tokens list --all walks every page with the largest page size, keeping the
 
   assert.deepEqual(
     seen.map((req) => req.url),
-    ["https://example.test/rest/v2/api-tokens?signal=STALE&limit=100", "https://example.test/rest/v2/api-tokens?signal=STALE&limit=100&cursor=P2"]
+    ["https://example.test/rest/api-tokens?signal=STALE&limit=100", "https://example.test/rest/api-tokens?signal=STALE&limit=100&cursor=P2"]
   );
   assert.deepEqual(stdoutJson(io).data, [apiToken("a"), apiToken("b")]);
 });
@@ -160,7 +160,7 @@ test("tokens get calls its endpoint with the id encoded and prints data", async 
   assert.deepEqual(
     seen.map((req) => `${req.method} ${req.url}`),
     [
-      "GET https://example.test/rest/v2/api-tokens/id%2Fwith%20slash",
+      "GET https://example.test/rest/api-tokens/id%2Fwith%20slash",
     ]
   );
   assert.equal(io.stdout.length, 1);
@@ -173,7 +173,7 @@ test("tokens invalidate --yes sends POST with the reason and an idempotency key,
 
   assert.equal(seen.length, 1);
   assert.equal(seen[0].method, "POST");
-  assert.equal(seen[0].url, `https://example.test/rest/v2/api-tokens/${TOKEN_ID}/invalidate`);
+  assert.equal(seen[0].url, `https://example.test/rest/api-tokens/${TOKEN_ID}/invalidate`);
   assert.equal(seen[0].body, JSON.stringify({ data: { reason: "rotated" } }));
   assert.equal(typeof seen[0].headers["idempotency-key"], "string");
   assert.deepEqual(stdoutJson(io).data, { id: TOKEN_ID, status: "INVALIDATED" });

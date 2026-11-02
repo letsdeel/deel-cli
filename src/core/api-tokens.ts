@@ -9,7 +9,7 @@ import { deriveIdempotencyKey } from "./idempotency.ts";
 
 export type TokenPerson = { profile_id: string; name: string | null; email: string | null; status: "ACTIVE" | "LEFT" };
 
-// Shape of GET /v2/api-tokens items and GET /v2/api-tokens/{id} `data`.
+// Shape of GET /api-tokens items and GET /api-tokens/{id} `data`.
 export type ApiToken = {
   id: string;
   label: string;
@@ -52,7 +52,7 @@ export const TOKEN_SORTS = ["NEWEST", "NAME", "RECENT", "SCOPES", "RISK"];
 export const DASH_ID_HINT = "An id that starts with '-' must be passed as --id=<id>.";
 
 const USAGE = "usage.tokens";
-const BASE_PATH = "/v2/api-tokens";
+const BASE_PATH = "/api-tokens";
 const DIGITS = /^\d+$/;
 
 // The API's enum values are UPPER_SNAKE_CASE; a flag value is matched without regard to case and sent in the API's spelling.
