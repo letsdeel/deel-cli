@@ -165,10 +165,11 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   if (response.status >= 400) throw errorFromResponse(response.status, response.json, requestId);
 
   const payload = response.json as any;
-  const data = payload?.data ?? payload ?? null;
+  const hasDataEnvelope = isPlainObject(payload) && "data" in payload;
+  const data = hasDataEnvelope ? (payload.data ?? null) : (payload ?? null);
   // Paginated list responses carry `page: { cursor, has_next_page }` next to `data`. Surface it in
   // the envelope (only when `data` was unwrapped from one) so the caller can page with --cursor.
-  const page = data !== payload && isPlainObject(payload?.page) ? (payload.page as Record<string, unknown>) : undefined;
+  const page = hasDataEnvelope && isPlainObject(payload.page) ? (payload.page as Record<string, unknown>) : undefined;
   await render(ctx.io, envelope(data, { request_id: requestId }, page), opts.output);
 }
 

@@ -1,4 +1,4 @@
-// GENERATED FILE — DO NOT EDIT. Produced by the deel-cli-extractor skill from ../../Desktop/openapispec.json plus the PA-7886 interim spec for /v2/logs/* (regenerate from the published spec once the logs endpoints are live).
+// GENERATED FILE — DO NOT EDIT. Produced by the deel-cli-extractor skill: adjustments/jobs from the internal Deel REST API spec, logs from https://api.letsdeel.com/openapi/rest/definitions.
 import type { Manifest } from "./types.ts";
 
 export const manifest: Manifest = {
@@ -652,7 +652,7 @@ export const manifest: Manifest = {
         "get"
       ],
       "method": "GET",
-      "path": "/v2/logs/requests/{request_id}",
+      "path": "/logs/requests/{request_id}",
       "summary": "Retrieve a request log",
       "async": false,
       "bodyKind": "none",
@@ -672,44 +672,18 @@ export const manifest: Manifest = {
       "responseKind": "object",
       "responseFields": [
         {
-          "name": "request_id",
+          "name": "ip",
           "in": "body",
           "type": "string",
           "required": true,
-          "description": "The x-request-id of the request; quote it when contacting support"
+          "description": "Client IP address the request came from"
         },
         {
-          "name": "timestamp",
+          "name": "hint",
           "in": "body",
           "type": "string",
           "required": true,
-          "description": "When the response was sent (UTC)"
-        },
-        {
-          "name": "source",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "enum": [
-            "rest",
-            "scim",
-            "mcp"
-          ],
-          "description": "Where the request came in: REST API, SCIM or an MCP tool call"
-        },
-        {
-          "name": "method",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "description": "HTTP method"
-        },
-        {
-          "name": "route",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "description": "Public route template the request matched; null when no endpoint matched (404)"
+          "description": "What to do about it"
         },
         {
           "name": "path",
@@ -719,25 +693,34 @@ export const manifest: Manifest = {
           "description": "Request path without the query string"
         },
         {
-          "name": "status",
+          "name": "error",
           "in": "body",
-          "type": "integer",
+          "type": "object",
           "required": true,
-          "description": "HTTP status returned to the caller"
+          "description": "Gateway-generated error of a failed request; null when the request succeeded or the error came from the service",
+          "properties": [
+            {
+              "name": "code",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Machine-readable gateway error code"
+            },
+            {
+              "name": "message",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Human-readable gateway error message"
+            }
+          ]
         },
         {
-          "name": "duration_ms",
+          "name": "route",
           "in": "body",
-          "type": "integer",
+          "type": "string",
           "required": true,
-          "description": "Total time from request start to response end, in milliseconds"
-        },
-        {
-          "name": "upstream_duration_ms",
-          "in": "body",
-          "type": "integer",
-          "required": true,
-          "description": "Time spent in the service behind the gateway, in milliseconds; null when the gateway answered itself"
+          "description": "Public route template the request matched; null when no endpoint matched (404)"
         },
         {
           "name": "token",
@@ -781,11 +764,44 @@ export const manifest: Manifest = {
           ]
         },
         {
-          "name": "ip",
+          "name": "method",
           "in": "body",
           "type": "string",
           "required": true,
-          "description": "Client IP address the request came from"
+          "description": "HTTP method"
+        },
+        {
+          "name": "source",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "rest",
+            "scim",
+            "mcp"
+          ],
+          "description": "Where the request came in: REST API, SCIM or an MCP tool call"
+        },
+        {
+          "name": "status",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "HTTP status returned to the caller"
+        },
+        {
+          "name": "timestamp",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "When the response was sent (UTC)"
+        },
+        {
+          "name": "request_id",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "The x-request-id of the request; quote it when contacting support"
         },
         {
           "name": "user_agent",
@@ -802,34 +818,18 @@ export const manifest: Manifest = {
           "description": "API version the request resolved to"
         },
         {
+          "name": "duration_ms",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Total time from request start to response end, in milliseconds"
+        },
+        {
           "name": "response_bytes",
           "in": "body",
           "type": "integer",
           "required": true,
           "description": "Size of the response body in bytes"
-        },
-        {
-          "name": "error",
-          "in": "body",
-          "type": "object",
-          "required": true,
-          "description": "Gateway-generated error of a failed request; null when the request succeeded or the error came from the service",
-          "properties": [
-            {
-              "name": "code",
-              "in": "body",
-              "type": "string",
-              "required": true,
-              "description": "Machine-readable gateway error code"
-            },
-            {
-              "name": "message",
-              "in": "body",
-              "type": "string",
-              "required": true,
-              "description": "Human-readable gateway error message"
-            }
-          ]
         },
         {
           "name": "gateway_message",
@@ -839,11 +839,11 @@ export const manifest: Manifest = {
           "description": "What the status and gateway error code mean, in plain language"
         },
         {
-          "name": "hint",
+          "name": "upstream_duration_ms",
           "in": "body",
-          "type": "string",
+          "type": "integer",
           "required": true,
-          "description": "What to do about it"
+          "description": "Time spent in the service behind the gateway, in milliseconds; null when the gateway answered itself"
         }
       ]
     },
@@ -854,13 +854,20 @@ export const manifest: Manifest = {
         "list"
       ],
       "method": "GET",
-      "path": "/v2/logs/requests",
+      "path": "/logs/requests",
       "summary": "List request logs",
       "async": false,
       "bodyKind": "none",
       "supportsMultipart": false,
       "bodyWrapper": "none",
       "params": [
+        {
+          "name": "search",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Only requests whose request id, token label, token id, route or path contains this text (case-insensitive)"
+        },
         {
           "name": "request_id",
           "in": "query",
@@ -961,44 +968,11 @@ export const manifest: Manifest = {
       "responseKind": "array",
       "responseFields": [
         {
-          "name": "request_id",
+          "name": "ip",
           "in": "body",
           "type": "string",
           "required": true,
-          "description": "The x-request-id of the request; quote it when contacting support"
-        },
-        {
-          "name": "timestamp",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "description": "When the response was sent (UTC)"
-        },
-        {
-          "name": "source",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "enum": [
-            "rest",
-            "scim",
-            "mcp"
-          ],
-          "description": "Where the request came in: REST API, SCIM or an MCP tool call"
-        },
-        {
-          "name": "method",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "description": "HTTP method"
-        },
-        {
-          "name": "route",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "description": "Public route template the request matched; null when no endpoint matched (404)"
+          "description": "Client IP address the request came from"
         },
         {
           "name": "path",
@@ -1008,25 +982,34 @@ export const manifest: Manifest = {
           "description": "Request path without the query string"
         },
         {
-          "name": "status",
+          "name": "error",
           "in": "body",
-          "type": "integer",
+          "type": "object",
           "required": true,
-          "description": "HTTP status returned to the caller"
+          "description": "Gateway-generated error of a failed request; null when the request succeeded or the error came from the service",
+          "properties": [
+            {
+              "name": "code",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Machine-readable gateway error code"
+            },
+            {
+              "name": "message",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Human-readable gateway error message"
+            }
+          ]
         },
         {
-          "name": "duration_ms",
+          "name": "route",
           "in": "body",
-          "type": "integer",
+          "type": "string",
           "required": true,
-          "description": "Total time from request start to response end, in milliseconds"
-        },
-        {
-          "name": "upstream_duration_ms",
-          "in": "body",
-          "type": "integer",
-          "required": true,
-          "description": "Time spent in the service behind the gateway, in milliseconds; null when the gateway answered itself"
+          "description": "Public route template the request matched; null when no endpoint matched (404)"
         },
         {
           "name": "token",
@@ -1070,11 +1053,44 @@ export const manifest: Manifest = {
           ]
         },
         {
-          "name": "ip",
+          "name": "method",
           "in": "body",
           "type": "string",
           "required": true,
-          "description": "Client IP address the request came from"
+          "description": "HTTP method"
+        },
+        {
+          "name": "source",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "rest",
+            "scim",
+            "mcp"
+          ],
+          "description": "Where the request came in: REST API, SCIM or an MCP tool call"
+        },
+        {
+          "name": "status",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "HTTP status returned to the caller"
+        },
+        {
+          "name": "timestamp",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "When the response was sent (UTC)"
+        },
+        {
+          "name": "request_id",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "The x-request-id of the request; quote it when contacting support"
         },
         {
           "name": "user_agent",
@@ -1091,6 +1107,13 @@ export const manifest: Manifest = {
           "description": "API version the request resolved to"
         },
         {
+          "name": "duration_ms",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Total time from request start to response end, in milliseconds"
+        },
+        {
           "name": "response_bytes",
           "in": "body",
           "type": "integer",
@@ -1098,27 +1121,11 @@ export const manifest: Manifest = {
           "description": "Size of the response body in bytes"
         },
         {
-          "name": "error",
+          "name": "upstream_duration_ms",
           "in": "body",
-          "type": "object",
+          "type": "integer",
           "required": true,
-          "description": "Gateway-generated error of a failed request; null when the request succeeded or the error came from the service",
-          "properties": [
-            {
-              "name": "code",
-              "in": "body",
-              "type": "string",
-              "required": true,
-              "description": "Machine-readable gateway error code"
-            },
-            {
-              "name": "message",
-              "in": "body",
-              "type": "string",
-              "required": true,
-              "description": "Human-readable gateway error message"
-            }
-          ]
+          "description": "Time spent in the service behind the gateway, in milliseconds; null when the gateway answered itself"
         }
       ]
     },
@@ -1129,7 +1136,7 @@ export const manifest: Manifest = {
         "summary"
       ],
       "method": "GET",
-      "path": "/v2/logs/requests/summary",
+      "path": "/logs/requests/summary",
       "summary": "Retrieve request logs summary",
       "async": false,
       "bodyKind": "none",
@@ -1156,13 +1163,6 @@ export const manifest: Manifest = {
       "responseKind": "object",
       "responseFields": [
         {
-          "name": "from",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "description": "Start of the window the summary covers (UTC)"
-        },
-        {
           "name": "to",
           "in": "body",
           "type": "string",
@@ -1170,25 +1170,18 @@ export const manifest: Manifest = {
           "description": "End of the window the summary covers (UTC)"
         },
         {
+          "name": "from",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Start of the window the summary covers (UTC)"
+        },
+        {
           "name": "total",
           "in": "body",
           "type": "integer",
           "required": true,
           "description": "Requests in the window"
-        },
-        {
-          "name": "by_status_class",
-          "in": "body",
-          "type": "object",
-          "required": true,
-          "description": "Requests per status class, keyed by 2xx, 3xx, 4xx, 5xx"
-        },
-        {
-          "name": "rate_limited",
-          "in": "body",
-          "type": "integer",
-          "required": true,
-          "description": "Requests rejected with 429 by the rate limiter"
         },
         {
           "name": "p50_ms",
@@ -1205,11 +1198,25 @@ export const manifest: Manifest = {
           "description": "95th percentile total latency in milliseconds (bucket upper bound)"
         },
         {
+          "name": "rate_limited",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Requests rejected with 429 by the rate limiter"
+        },
+        {
           "name": "active_tokens",
           "in": "body",
           "type": "integer",
           "required": true,
           "description": "Distinct tokens that made at least one request on the days of the window"
+        },
+        {
+          "name": "by_status_class",
+          "in": "body",
+          "type": "object",
+          "required": true,
+          "description": "Requests per status class, keyed by 2xx, 3xx, 4xx, 5xx"
         }
       ]
     },
@@ -1220,7 +1227,7 @@ export const manifest: Manifest = {
         "list"
       ],
       "method": "GET",
-      "path": "/v2/logs/tokens",
+      "path": "/logs/tokens",
       "summary": "List token activity",
       "async": false,
       "bodyKind": "none",
@@ -1268,6 +1275,43 @@ export const manifest: Manifest = {
       "responseKind": "array",
       "responseFields": [
         {
+          "name": "calls",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Requests made with the token in the window"
+        },
+        {
+          "name": "daily",
+          "in": "body",
+          "type": "array",
+          "required": true,
+          "description": "Per-day series over the window, oldest first",
+          "properties": [
+            {
+              "name": "day",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "UTC day"
+            },
+            {
+              "name": "calls",
+              "in": "body",
+              "type": "integer",
+              "required": true,
+              "description": "Requests that day"
+            },
+            {
+              "name": "errors",
+              "in": "body",
+              "type": "integer",
+              "required": true,
+              "description": "Requests that day ending in a 4xx or 5xx status"
+            }
+          ]
+        },
+        {
           "name": "token",
           "in": "body",
           "type": "object",
@@ -1302,25 +1346,11 @@ export const manifest: Manifest = {
           ]
         },
         {
-          "name": "calls",
-          "in": "body",
-          "type": "integer",
-          "required": true,
-          "description": "Requests made with the token in the window"
-        },
-        {
           "name": "errors",
           "in": "body",
           "type": "integer",
           "required": true,
           "description": "Requests that ended in a 4xx or 5xx status"
-        },
-        {
-          "name": "last_used_at",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "description": "Latest request made with the token (UTC)"
         },
         {
           "name": "last_ip",
@@ -1330,34 +1360,11 @@ export const manifest: Manifest = {
           "description": "Client IP of that latest request"
         },
         {
-          "name": "daily",
+          "name": "last_used_at",
           "in": "body",
-          "type": "array",
+          "type": "string",
           "required": true,
-          "description": "Per-day series over the window, oldest first",
-          "properties": [
-            {
-              "name": "day",
-              "in": "body",
-              "type": "string",
-              "required": true,
-              "description": "UTC day"
-            },
-            {
-              "name": "calls",
-              "in": "body",
-              "type": "integer",
-              "required": true,
-              "description": "Requests that day"
-            },
-            {
-              "name": "errors",
-              "in": "body",
-              "type": "integer",
-              "required": true,
-              "description": "Requests that day ending in a 4xx or 5xx status"
-            }
-          ]
+          "description": "Latest request made with the token (UTC)"
         }
       ]
     }

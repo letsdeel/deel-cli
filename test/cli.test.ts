@@ -163,7 +163,7 @@ test("logs requests summary --help --json takes a from/to window and returns the
   assert.equal(contract.usage, "deel logs requests summary [GLOBAL OPTIONS]");
   assert.deepEqual(contract.params.map((param: Field) => [param.name, param.in, param.required]), [["from", "query", false], ["to", "query", false]]);
   assert.equal(contract.response.kind, "object");
-  assert.deepEqual(contract.response.fields.map((field: Field) => field.name), ["from", "to", "total", "by_status_class", "rate_limited", "p50_ms", "p95_ms", "active_tokens"]);
+  assert.deepEqual(contract.response.fields.map((field: Field) => field.name).sort(), ["from", "to", "total", "by_status_class", "rate_limited", "p50_ms", "p95_ms", "active_tokens"].sort());
 });
 
 test("logs tokens list --help --json takes window, search and cursor and returns per-token activity", async () => {
@@ -175,7 +175,7 @@ test("logs tokens list --help --json takes window, search and cursor and returns
   assert.deepEqual(contract.params.map((param: Field) => param.name), ["from", "to", "search", "cursor", "limit"]);
   assert.equal(contract.response.kind, "array");
   const fields = byName(contract.response.fields);
-  assert.deepEqual(Object.keys(fields), ["token", "calls", "errors", "last_used_at", "last_ip", "daily"]);
+  assert.deepEqual(Object.keys(fields).sort(), ["token", "calls", "errors", "last_used_at", "last_ip", "daily"].sort());
   assert.deepEqual(fields.token.properties!.map((field) => field.name), ["id", "type", "label"]);
   assert.equal(fields.daily.type, "array");
   assert.deepEqual(fields.daily.properties!.map((field) => field.name), ["day", "calls", "errors"]);

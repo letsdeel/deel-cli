@@ -226,6 +226,8 @@ deel logs requests list --limit 100                        # first page; read pa
 deel logs requests list --limit 100 --cursor <page.cursor> # next page, until has_next_page is false
 ```
 
+`--jq` and `--quiet` see only `data`, so to page read `page.cursor` from the full JSON envelope (or with `--fields`, which keeps `page`).
+
 | Flag              | Effect                                                                 |
 | ----------------- | ---------------------------------------------------------------------- |
 | `--no-json`       | Human-readable view on a TTY (default is always JSON)                  |
