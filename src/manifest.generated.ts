@@ -870,7 +870,7 @@ export const manifest: Manifest = {
             "enabled",
             "disabled"
           ],
-          "description": "Whether the app can currently obtain tokens and call the API."
+          "description": "Whether API access is switched on for the app: `disabled` after the app is disabled, by you or by Deel, until it is enabled again."
         },
         {
           "name": "created_at",
@@ -1041,7 +1041,7 @@ export const manifest: Manifest = {
             "enabled",
             "disabled"
           ],
-          "description": "Whether the app can currently obtain tokens and call the API."
+          "description": "Whether API access is switched on for the app: `disabled` after the app is disabled, by you or by Deel, until it is enabled again."
         },
         {
           "name": "created_at",
