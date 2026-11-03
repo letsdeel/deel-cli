@@ -192,3 +192,26 @@ test("apps disable --help documents --yes; enable --help does not", async () => 
   assert.match((await capture(["apps", "disable", "--help"])).out, /--yes/);
   assert.doesNotMatch((await capture(["apps", "enable", "--help"])).out, /--yes/);
 });
+
+test("apps listing get puts the app id in the path and prints the listing with its nullable fields", async () => {
+  const listing = { app_id: APP_ID, status: "published", latest_revision: { status: "rejected", review_notes: "Add a demo video." }, logo_url: null };
+  const { ctx, seen, out } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: listing } }));
+  await execute(descriptor(["apps", "listing", "get"]), { flags: { app_id: APP_ID }, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
+  assert.equal(seen[0].method, "GET");
+  assert.equal(new URL(seen[0].url).pathname, `/rest/apps/${APP_ID}/listing`);
+  assert.deepEqual(out().data, listing);
+});
+
+test("app-store categories lists the categories", async () => {
+  const { ctx, seen, out } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: [{ id: 182, name: "Collaboration" }] } }));
+  await execute(descriptor(["app-store", "categories"]), { flags: {}, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
+  assert.equal(new URL(seen[0].url).pathname, "/rest/app-store/categories");
+  assert.equal(out().data[0].id, 182);
+});
+
+test("apps listing get --help shows the response fields and marks the nullable ones", async () => {
+  const { code, out } = await capture(["apps", "listing", "get", "--help"]);
+  assert.equal(code, 0);
+  assert.match(out, /latest_revision\s+object\s+nullable/);
+  assert.match(out, /logo_url\s+string\s+nullable/);
+});

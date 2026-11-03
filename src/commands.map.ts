@@ -27,4 +27,7 @@ export const commandMap: CommandEntry[] = [
     confirm: "Disable app {app_id}? This revokes all consents and tokens; enable does not restore them.",
   },
   { command: "apps enable", method: "POST", path: "/apps/{app_id}/enable" },
+
+  { command: "apps listing get", method: "GET", path: "/apps/{app_id}/listing" },
+  { command: "app-store categories", method: "GET", path: "/app-store/categories" },
 ];

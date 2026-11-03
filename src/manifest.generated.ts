@@ -1462,6 +1462,388 @@ export const manifest: Manifest = {
           "description": "Overall status of the operation, derived from all items."
         }
       ]
+    },
+    {
+      "command": [
+        "app-store",
+        "categories"
+      ],
+      "method": "GET",
+      "path": "/app-store/categories",
+      "summary": "List App Store categories",
+      "async": false,
+      "bodyKind": "none",
+      "supportsMultipart": false,
+      "bodyWrapper": "none",
+      "params": [],
+      "bodyProps": [],
+      "fileFields": [],
+      "responseKind": "array",
+      "responseFields": [
+        {
+          "name": "id",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Unique identifier of the category."
+        },
+        {
+          "name": "name",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Name of the category."
+        }
+      ]
+    },
+    {
+      "command": [
+        "apps",
+        "listing",
+        "get"
+      ],
+      "method": "GET",
+      "path": "/apps/{app_id}/listing",
+      "summary": "Retrieve the listing of an app",
+      "async": false,
+      "bodyKind": "none",
+      "supportsMultipart": false,
+      "bodyWrapper": "none",
+      "params": [
+        {
+          "name": "app_id",
+          "in": "path",
+          "type": "string",
+          "required": true,
+          "description": "Unique identifier of the app."
+        }
+      ],
+      "bodyProps": [],
+      "fileFields": [],
+      "responseKind": "object",
+      "responseFields": [
+        {
+          "name": "app_id",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Unique identifier of the app the listing belongs to."
+        },
+        {
+          "name": "name",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "description": "Name of the listing in the App Store."
+        },
+        {
+          "name": "status",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "published",
+            "unpublished"
+          ],
+          "description": "Whether the listing is live in the App Store. It stays `published` while a newer revision is reviewed."
+        },
+        {
+          "name": "latest_revision",
+          "in": "body",
+          "type": "object",
+          "required": true,
+          "nullable": true,
+          "description": "The version of the listing you are working on or that is under review. Null until the listing has content.",
+          "properties": [
+            {
+              "name": "status",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "enum": [
+                "draft",
+                "in_review",
+                "published",
+                "rejected"
+              ],
+              "description": "Where the revision stands. Only a draft can be edited and submitted."
+            },
+            {
+              "name": "review_notes",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "nullable": true,
+              "description": "The reviewer’s notes when the revision was rejected."
+            }
+          ]
+        },
+        {
+          "name": "first_published_at",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "nullable": true,
+          "description": "When the listing was first approved. Null until then."
+        },
+        {
+          "name": "short_description",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "Tagline shown on the listing card."
+        },
+        {
+          "name": "product_description",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "What the app does."
+        },
+        {
+          "name": "feature_description",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "Features of the app."
+        },
+        {
+          "name": "setup_description",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "How to set the app up."
+        },
+        {
+          "name": "pricing_description",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "What the app costs."
+        },
+        {
+          "name": "main_description_title",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "Title of the main description on the store page."
+        },
+        {
+          "name": "main_description_body",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "Body of the main description on the store page."
+        },
+        {
+          "name": "how_it_works",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "How the app works."
+        },
+        {
+          "name": "landing_page_url",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "Landing page of the app."
+        },
+        {
+          "name": "help_url",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "Help center of the app."
+        },
+        {
+          "name": "faq_url",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "FAQ of the app."
+        },
+        {
+          "name": "demo_video_url",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "Demo video of the app."
+        },
+        {
+          "name": "support_email",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "Where customers reach your support."
+        },
+        {
+          "name": "escalation_email",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "Where Deel escalates urgent issues."
+        },
+        {
+          "name": "highlights",
+          "in": "body",
+          "type": "array",
+          "required": false,
+          "description": "Highlights shown on the store page.",
+          "properties": [
+            {
+              "name": "title",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "nullable": true,
+              "description": "Title of the highlight."
+            },
+            {
+              "name": "text",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "description": "Text of the highlight."
+            }
+          ]
+        },
+        {
+          "name": "support_resources",
+          "in": "body",
+          "type": "array",
+          "required": false,
+          "description": "Support links shown on the store page.",
+          "properties": [
+            {
+              "name": "name",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "description": "Name of the link."
+            },
+            {
+              "name": "url",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "nullable": true,
+              "description": "Address of the link."
+            }
+          ]
+        },
+        {
+          "name": "works_with",
+          "in": "body",
+          "type": "array",
+          "required": false,
+          "description": "Deel products the app works with.",
+          "properties": [
+            {
+              "name": "name",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "description": "Name of the link."
+            },
+            {
+              "name": "url",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "nullable": true,
+              "description": "Address of the link."
+            }
+          ]
+        },
+        {
+          "name": "what_it_syncs",
+          "in": "body",
+          "type": "array",
+          "required": false,
+          "description": "What the app syncs."
+        },
+        {
+          "name": "categories",
+          "in": "body",
+          "type": "array",
+          "required": true,
+          "description": "App Store categories of the revision.",
+          "properties": [
+            {
+              "name": "id",
+              "in": "body",
+              "type": "integer",
+              "required": false,
+              "description": "Unique identifier of the category."
+            },
+            {
+              "name": "name",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "description": "Name of the category."
+            }
+          ]
+        },
+        {
+          "name": "logo_url",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "nullable": true,
+          "description": "Public URL of the logo of the revision in `latest_revision`, as saved. Null only when no logo has been set."
+        },
+        {
+          "name": "media_gallery",
+          "in": "body",
+          "type": "array",
+          "required": true,
+          "description": "Images and videos of the revision in `latest_revision`, as saved. Empty when none has been set.",
+          "properties": [
+            {
+              "name": "url",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "description": "Public URL of the item."
+            },
+            {
+              "name": "type",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "enum": [
+                "image",
+                "video"
+              ],
+              "description": "Whether the item is an image or a video."
+            },
+            {
+              "name": "caption",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "nullable": true,
+              "description": "Caption of the item."
+            }
+          ]
+        }
+      ]
     }
   ]
 } as const;

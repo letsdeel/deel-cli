@@ -277,6 +277,17 @@ deel apps enable --app_id <id>
 
 `apps list` returns one page at a time. When more results exist, the next-page cursor is printed as `meta.cursor`; pass it back with `--cursor` to get the next page.
 
+### App listing
+
+An app's page in the App Store is its listing. `deel apps listing get --app_id <id>` reads it: whether it is live (`status`), the revision you are working on or that is under review (`latest_revision.status` is `draft`, `in_review`, `published` or `rejected`, with the reviewer's notes when rejected), its content, categories and the logo. `deel app-store categories` lists the category ids a listing can use. Both need `--beta`.
+
+```bash
+deel apps listing get --app_id <id> --beta
+deel app-store categories --beta
+```
+
+An app with no listing, and an app of another organization, both answer 404.
+
 ## Environments
 
 | `--env`          | Base URL                                       |
