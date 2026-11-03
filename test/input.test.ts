@@ -50,6 +50,14 @@ test("a string field with spaces stays one string", () => {
   assert.deepEqual(parseInput("reason=Payroll sync,amount=5", props), { reason: "Payroll sync", amount: 5 });
 });
 
+test("a string field keeps its numbers as written", () => {
+  assert.deepEqual(parseInput("reason=Order 007 rev 1.50", props), { reason: "Order 007 rev 1.50" });
+});
+
+test("a JSON array sent to a string field is not joined into one string", () => {
+  assert.deepEqual(parseInput('{"reason":["a","b"]}', props), { reason: ["a", "b"] });
+});
+
 test("a list shorthand is still a list for an array field", () => {
   const arrayProps: CliParam[] = [{ name: "tags", in: "body", type: "array", required: false }];
   assert.deepEqual(parseInput("tags=a b c", arrayProps), { tags: ["a", "b", "c"] });
