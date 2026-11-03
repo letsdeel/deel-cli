@@ -127,6 +127,12 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   const requestId = ctx.newRequestId();
   const headers: Record<string, string> = { [HEADER.accept]: "application/json", [HEADER.requestId]: requestId };
   if (descriptor.version) headers[HEADER.apiVersion] = descriptor.version;
+  for (const param of descriptor.params) {
+    if (param.in !== "header" || !param.header) continue;
+    const value = call.flags[param.name];
+    if (value != null) headers[param.header] = String(value);
+    else if (param.required) throw new CliError("usage.header_param", `Missing required --${param.name}`);
+  }
 
   let body: BodyInit | null = null;
   if (effectiveKind === "multipart") {

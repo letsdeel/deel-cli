@@ -29,9 +29,9 @@ function mapType(schema: AnyObj | undefined): ScalarType {
   return "string";
 }
 
-function paramsFrom(op: AnyObj): CliParam[] {
+function paramsFrom(op: AnyObj, headers: Record<string, string> = {}): CliParam[] {
   const raw: AnyObj[] = op.parameters ?? [];
-  return raw
+  const fromPathAndQuery = raw
     .filter((p) => p.in === "path" || p.in === "query")
     .map((p) => ({
       name: p.name,
@@ -41,6 +41,21 @@ function paramsFrom(op: AnyObj): CliParam[] {
       ...(p.schema?.enum ? { enum: (p.schema.enum as unknown[]).filter((v): v is string => v !== null) } : {}),
       ...(p.description ? { description: p.description } : {}),
     }));
+  // Only the headers the command map names become flags; the CLI manages every other header itself.
+  const fromHeaders = Object.entries(headers).flatMap(([flag, headerName]) => {
+    const p = raw.find((candidate) => candidate.in === "header" && String(candidate.name).toLowerCase() === headerName.toLowerCase());
+    if (!p) return [];
+    return [{
+      name: flag,
+      in: "header" as const,
+      header: headerName,
+      type: mapType(p.schema),
+      required: Boolean(p.required),
+      ...(p.schema?.enum ? { enum: (p.schema.enum as unknown[]).filter((v): v is string => v !== null) } : {}),
+      ...(p.description ? { description: p.description } : {}),
+    }];
+  });
+  return [...fromPathAndQuery, ...fromHeaders];
 }
 
 function unwrapDataSchema(schema: AnyObj | undefined): { root: AnyObj | undefined; wrapped: boolean } {
@@ -167,6 +182,7 @@ type CommandEntry = {
   method: string;
   path: string;
   confirm?: string;
+  headers?: Record<string, string>;
 };
 
 // ---------------------------------------------------------------------------
@@ -192,7 +208,7 @@ export function extract(spec: AnyObj, entries: CommandEntry[]): ExtractionResult
       continue;
     }
 
-    const params = paramsFrom(operation);
+    const params = paramsFrom(operation, entry.headers);
     const { bodyKind, bodyProps, maxItems, fileFields, supportsMultipart, bodyWrapper } = bodyFrom(operation);
     const { responseKind, responseFields } = responseFrom(operation);
 

@@ -298,6 +298,19 @@ deel apps listing submit --app_id <id> --beta                                   
 
 `update` saves a draft and changes only the fields you send; each list you send (`highlights`, `support_resources`, `works_with`, `what_it_syncs`, `categories`) replaces the current one. `deel apps listing update --help` lists every field. Test account details are accepted and never printed back. A listing in review cannot be changed (409) until the review ends; read `latest_revision.review_notes` after a rejection, edit, and submit again. A draft shows the logo you saved, but the listing goes live in the App Store only once Deel approves it.
 
+## Files
+
+`deel files create`, `status` and `complete` register a file upload and follow it, so you can attach a file to something that accepts a file handle, such as the logo of an app listing. They are generated from the API spec; the secret of a file is sent as the `x-one-time-secret` header through `--one_time_secret`.
+
+```bash
+deel files create --input '{"filename":"logo.png","size":2048}'      # prints file_id, one_time_secret and the upload target
+# send the bytes to the upload target yourself: a presigned form POST (url + fields, with the file as the last field)
+deel files status --file_id <file_id> --one_time_secret <secret>     # wait for "ready" (the virus scan is done)
+deel apps listing update --app_id <id> --beta --input '{"logo":{"file_id":"<file_id>","one_time_secret":"<secret>"}}'
+```
+
+Files larger than the server's multipart threshold are uploaded in parts: pass `--upload_method multipart` to `files create`, upload each part with an HTTP PUT, then call `deel files complete --file_id <id> --one_time_secret <secret> --input ...` with the part numbers and ETags. The secret is a single-purpose handle for that one file, but it still appears in your shell history and process list when typed as a flag, so use a variable or a throwaway shell for it.
+
 ## Environments
 
 | `--env`          | Base URL                                       |

@@ -151,3 +151,30 @@ test("responseFrom carries nullable fields, including nested ones, and only thos
   assert.equal(owner!.required, true);
   assert.equal(owner!.properties![0].nullable, true);
 });
+
+test("extract turns only the headers a map entry names into flags", () => {
+  const spec = {
+    paths: {
+      "/files/{file_id}/status": {
+        get: {
+          parameters: [
+            { in: "path", name: "file_id", required: true, schema: { type: "string" } },
+            { in: "header", name: "x-one-time-secret", required: true, schema: { type: "string" }, description: "The secret." },
+            { in: "header", name: "x-api-version", required: false, schema: { type: "string" } },
+          ],
+        },
+      },
+    },
+  };
+  const { manifest, hardErrors } = extract(spec, [
+    { command: "files status", method: "GET", path: "/files/{file_id}/status", headers: { one_time_secret: "x-one-time-secret" } },
+  ]);
+  assert.deepEqual(hardErrors, []);
+  assert.deepEqual(
+    manifest.descriptors[0].params.map((p) => [p.name, p.in, p.header, p.required]),
+    [["file_id", "path", undefined, true], ["one_time_secret", "header", "x-one-time-secret", true]],
+  );
+
+  const without = extract(spec, [{ command: "files status", method: "GET", path: "/files/{file_id}/status" }]);
+  assert.deepEqual(without.manifest.descriptors[0].params.map((p) => p.name), ["file_id"]);
+});

@@ -3072,6 +3072,222 @@ export const manifest: Manifest = {
           ]
         }
       ]
+    },
+    {
+      "command": [
+        "files",
+        "complete"
+      ],
+      "method": "POST",
+      "path": "/files/{file_id}/complete",
+      "summary": "Complete a multipart upload",
+      "async": false,
+      "bodyKind": "json",
+      "supportsMultipart": false,
+      "bodyWrapper": "data",
+      "params": [
+        {
+          "name": "file_id",
+          "in": "path",
+          "type": "string",
+          "required": true,
+          "description": "File UUID from the register response."
+        },
+        {
+          "name": "one_time_secret",
+          "in": "header",
+          "header": "x-one-time-secret",
+          "type": "string",
+          "required": true,
+          "description": "One-time secret from the register response."
+        }
+      ],
+      "bodyProps": [
+        {
+          "name": "upload_id",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "S3 multipart upload ID from the register response."
+        },
+        {
+          "name": "parts",
+          "in": "body",
+          "type": "array",
+          "required": true,
+          "description": "Uploaded parts, in any order."
+        }
+      ],
+      "fileFields": [],
+      "responseKind": "none",
+      "responseFields": []
+    },
+    {
+      "command": [
+        "files",
+        "create"
+      ],
+      "method": "POST",
+      "path": "/files",
+      "summary": "Create a file upload",
+      "async": false,
+      "bodyKind": "json",
+      "supportsMultipart": false,
+      "bodyWrapper": "data",
+      "params": [
+        {
+          "name": "upload_method",
+          "in": "header",
+          "header": "x-upload-method",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "multipart"
+          ],
+          "description": "Declares the client is multipart-capable."
+        }
+      ],
+      "bodyProps": [
+        {
+          "name": "size",
+          "in": "body",
+          "type": "number",
+          "required": false,
+          "description": "Actual file size in bytes (max 1GB). Drives the server-side multipart decision when x-upload-method: multipart is set."
+        },
+        {
+          "name": "expiry",
+          "in": "body",
+          "type": "number",
+          "required": false,
+          "description": "Presigned URL expiry in seconds."
+        },
+        {
+          "name": "filename",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Original filename with extension; used to detect the content type."
+        },
+        {
+          "name": "is_attachment",
+          "in": "body",
+          "type": "boolean",
+          "required": false,
+          "description": "Whether the file should be served as an attachment (download) rather than inline."
+        }
+      ],
+      "fileFields": [],
+      "responseKind": "object",
+      "responseFields": [
+        {
+          "name": "file_id",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Unique file identifier."
+        },
+        {
+          "name": "upload_id",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "description": "S3 multipart upload ID. Present only when the server selected multipart."
+        },
+        {
+          "name": "one_time_secret",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "One-time secret for claiming ownership. Pass to domain endpoints when ready to claim the file."
+        },
+        {
+          "name": "upload_parts",
+          "in": "body",
+          "type": "array",
+          "required": true,
+          "description": "Presigned upload targets (always present). Single-part: one presigned POST form with fields. Multipart: multiple presigned PUT URLs without fields.",
+          "properties": [
+            {
+              "name": "url",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "description": "Presigned upload URL for this part."
+            },
+            {
+              "name": "size",
+              "in": "body",
+              "type": "number",
+              "required": false,
+              "description": "Maximum bytes for this part."
+            },
+            {
+              "name": "fields",
+              "in": "body",
+              "type": "object",
+              "required": false,
+              "description": "Form fields to submit with the presigned POST form."
+            },
+            {
+              "name": "number",
+              "in": "body",
+              "type": "number",
+              "required": false,
+              "description": "Part number (1-indexed)."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "command": [
+        "files",
+        "status"
+      ],
+      "method": "GET",
+      "path": "/files/{file_id}/status",
+      "summary": "Check file upload status",
+      "async": false,
+      "bodyKind": "none",
+      "supportsMultipart": false,
+      "bodyWrapper": "none",
+      "params": [
+        {
+          "name": "file_id",
+          "in": "path",
+          "type": "string",
+          "required": true,
+          "description": "File UUID from the register response."
+        },
+        {
+          "name": "one_time_secret",
+          "in": "header",
+          "header": "x-one-time-secret",
+          "type": "string",
+          "required": true,
+          "description": "One-time secret from the register response."
+        }
+      ],
+      "bodyProps": [],
+      "fileFields": [],
+      "responseKind": "object",
+      "responseFields": [
+        {
+          "name": "status",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Upload status: pending, ready or failed."
+        },
+        {
+          "name": "file_id",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Unique file identifier."
+        }
+      ]
     }
   ]
 } as const;

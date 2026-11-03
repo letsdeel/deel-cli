@@ -48,6 +48,18 @@ function check(): string[] {
     }
   }
 
+  // 3b. The header flags a map entry names are on its descriptor, and no descriptor has others.
+  const mapHeaders = new Map(commandMap.map((e) => [entryKey(e.command, e.method, e.path, e.variant), e.headers ?? {}]));
+  for (const d of manifest.descriptors) {
+    const k = entryKey(d.command.join(" "), d.method, d.path, d.variant);
+    if (!mapHeaders.has(k)) continue; // orphan, reported above
+    const want = Object.keys(mapHeaders.get(k)!).sort();
+    const have = d.params.filter((p) => p.in === "header").map((p) => p.name).sort();
+    if (want.join() !== have.join()) {
+      errors.push(`[headers] ${d.command.join(" ")} ${d.method} ${d.path}: manifest header flags [${have}] differ from map [${want}]`);
+    }
+  }
+
   // 4. Variant groups: distinct variants; variant name must not collide with a param flag.
   const groups = new Map<string, AnyDescriptor[]>();
   for (const d of manifest.descriptors) {
