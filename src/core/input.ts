@@ -145,7 +145,9 @@ function coerceTopLevel(value: unknown, bodyProps: CliParam[]): unknown {
   return record;
 }
 
-function coerceScalar(value: unknown, param: CliParam): unknown {
+function coerceScalar(raw: unknown, param: CliParam): unknown {
+  // A string field written with spaces (reason=a b c) was read as a space-separated list, so put the words back.
+  const value = param.type === "string" && Array.isArray(raw) && raw.every((item) => typeof item !== "object") ? raw.join(" ") : raw;
   if (typeof value !== "string") return value;
   let coerced: unknown = value;
   if (param.type === "number" || param.type === "integer") {

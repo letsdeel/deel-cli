@@ -45,3 +45,12 @@ test("non-number for a number field errors", () => {
 test("unrecognized input errors", () => {
   assert.throws(() => parseInput("just-a-word", props), /Unrecognized/);
 });
+
+test("a string field with spaces stays one string", () => {
+  assert.deepEqual(parseInput("reason=Payroll sync,amount=5", props), { reason: "Payroll sync", amount: 5 });
+});
+
+test("a list shorthand is still a list for an array field", () => {
+  const arrayProps: CliParam[] = [{ name: "tags", in: "body", type: "array", required: false }];
+  assert.deepEqual(parseInput("tags=a b c", arrayProps), { tags: ["a", "b", "c"] });
+});
