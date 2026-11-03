@@ -29,5 +29,8 @@ export const commandMap: CommandEntry[] = [
   { command: "apps enable", method: "POST", path: "/apps/{app_id}/enable" },
 
   { command: "apps listing get", method: "GET", path: "/apps/{app_id}/listing" },
+  { command: "apps listing create", method: "POST", path: "/apps/{app_id}/listing" },
+  { command: "apps listing update", method: "PATCH", path: "/apps/{app_id}/listing" },
+  { command: "apps listing submit", method: "POST", path: "/apps/{app_id}/listing/submit" },
   { command: "app-store categories", method: "GET", path: "/app-store/categories" },
 ];

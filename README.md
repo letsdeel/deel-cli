@@ -288,6 +288,16 @@ deel app-store categories --beta
 
 An app with no listing, and an app of another organization, both answer 404.
 
+`deel apps listing create`, `update` and `submit` write it. A listing goes through `draft`, `in_review` and then `published` or `rejected`:
+
+```bash
+deel apps listing create --app_id <id> --beta --input '{"name":"Payroll sync"}'    # once per app
+deel apps listing update --app_id <id> --beta --input '{"short_description":"Sync timesheets to payroll","categories":[182]}'
+deel apps listing submit --app_id <id> --beta                                   # sends the draft to review
+```
+
+`update` saves a draft and changes only the fields you send; each list you send (`highlights`, `support_resources`, `works_with`, `what_it_syncs`, `categories`) replaces the current one. `deel apps listing update --help` lists every field. Test account details are accepted and never printed back. A listing in review cannot be changed (409) until the review ends; read `latest_revision.review_notes` after a rejection, edit, and submit again. A draft shows the logo you saved, but the listing goes live in the App Store only once Deel approves it.
+
 ## Environments
 
 | `--env`          | Base URL                                       |
