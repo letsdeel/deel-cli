@@ -127,12 +127,15 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   const requestId = ctx.newRequestId();
   const headers: Record<string, string> = { [HEADER.accept]: "application/json", [HEADER.requestId]: requestId };
   if (descriptor.version) headers[HEADER.apiVersion] = descriptor.version;
+  const paramHeaders: Record<string, string> = {};
   for (const param of descriptor.params) {
     if (param.in !== "header" || !param.header) continue;
     const value = call.flags[param.name];
-    if (value != null) headers[param.header] = String(value);
+    const given = value != null && String(value) !== "";
+    if (given) paramHeaders[param.header] = String(value);
     else if (param.required) throw new CliError("usage.header_param", `Missing required --${param.name}`);
   }
+  Object.assign(headers, paramHeaders);
 
   let body: BodyInit | null = null;
   if (effectiveKind === "multipart") {
@@ -152,7 +155,7 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   if (mutating) {
     idempotencyKey =
       call.idempotencyKey ??
-      deriveIdempotencyKey({ method: descriptor.method, path, query, body: effectiveKind === "multipart" ? await multipartFingerprint(descriptor, call) : wrapBody(descriptor, call.body) });
+      deriveIdempotencyKey({ method: descriptor.method, path, query, headers: paramHeaders, body: effectiveKind === "multipart" ? await multipartFingerprint(descriptor, call) : wrapBody(descriptor, call.body) });
     headers[HEADER.idempotencyKey] = idempotencyKey;
     if (opts.debug) ctx.io.err(`[debug] idempotency-key: ${idempotencyKey}${call.idempotencyKey ? " (override)" : " (derived)"}\n`);
   }

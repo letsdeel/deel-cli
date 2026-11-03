@@ -82,3 +82,24 @@ test("a descriptor's header flags never reach the request path or query", () => 
   const d = descriptor(["files", "status"]);
   assert.deepEqual(d.params.map((p) => [p.name, p.in]), [["file_id", "path"], ["one_time_secret", "header"]]);
 });
+
+test("files create derives a different idempotency key when --upload_method changes", async () => {
+  const { ctx, seen } = ctxWith(() => ({ status: 201, headers: {}, text: "", json: { data: { file_id: FILE_ID } } }));
+  const body = { filename: "logo.png", size: 2048 };
+  await execute(descriptor(["files", "create"]), { flags: {}, body, files: {} }, ctx, RUN);
+  await execute(descriptor(["files", "create"]), { flags: { upload_method: "multipart" }, body, files: {} }, ctx, RUN);
+  await execute(descriptor(["files", "create"]), { flags: {}, body, files: {} }, ctx, RUN);
+
+  const keys = seen.map((request) => request.headers["idempotency-key"]);
+  assert.notEqual(keys[0], keys[1]);
+  assert.equal(keys[0], keys[2]);
+});
+
+test("files status refuses an empty --one_time_secret as a missing one", async () => {
+  const { ctx, seen } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: {} } }));
+  await assert.rejects(
+    () => execute(descriptor(["files", "status"]), { flags: { file_id: FILE_ID, one_time_secret: "" }, files: {} }, ctx, RUN),
+    /Missing required --one_time_secret/,
+  );
+  assert.equal(seen.length, 0);
+});

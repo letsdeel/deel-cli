@@ -50,3 +50,14 @@ test("the default sink redacts sensitive keys by substring (access_token, email,
   assert.equal(parsed.response.nested.refresh_token, "***");
   delete process.env.DEEL_LOG_DIR;
 });
+
+test("the request log writes the one-time secret header as ***", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "deel-log-"));
+  process.env.DEEL_LOG_DIR = dir;
+  setLoggingEnabled(true);
+  const next: Transport = async () => res({ ok: true });
+  await withLogging(log, () => 0)(next)(req({ headers: { "x-one-time-secret": "s3cr3t-value" } }));
+  const written = readFileSync(join(dir, "deel.log"), "utf8");
+  assert.equal(written.includes("s3cr3t-value"), false);
+  assert.equal(JSON.parse(written.trim().split("\n").pop()!).headers["x-one-time-secret"], "***");
+});

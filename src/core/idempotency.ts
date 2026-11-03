@@ -40,8 +40,12 @@ export type CanonicalRequest = {
   path: string;
   query: Record<string, unknown>;
   body: unknown;
+  // Values of the header params a command sends (not the standard headers); left out when there are none so older keys stay the same.
+  headers?: Record<string, string>;
 };
 
 export function deriveIdempotencyKey(request: CanonicalRequest): string {
-  return uuidv5(canonicalize({ method: request.method.toUpperCase(), path: request.path, query: request.query, body: request.body }));
+  const canonical = { method: request.method.toUpperCase(), path: request.path, query: request.query, body: request.body };
+  const hasHeaders = request.headers !== undefined && Object.keys(request.headers).length > 0;
+  return uuidv5(canonicalize(hasHeaders ? { ...canonical, headers: request.headers } : canonical));
 }
