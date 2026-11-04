@@ -44,6 +44,7 @@ export type TokenListFlags = {
 };
 
 export const TOKENS_PAGE_SIZE = 100;
+export const TOKENS_MAX_PAGES = 1000;
 export const TOKENS_MIN_PAGE_SIZE = 4;
 export const MAX_REASON_LENGTH = 200;
 export const TOKEN_TYPES = ["PERSONAL", "ORGANIZATION"];
@@ -135,20 +136,29 @@ export async function listApiTokens(ctx: Ctx, params: URLSearchParams): Promise<
   return { data: Array.isArray(json?.data) ? json.data : [], next_cursor: nextCursor, has_more: json?.has_more === true, total_count: totalCount };
 }
 
-// --all: pages of TOKENS_PAGE_SIZE following `next_cursor` until the API returns null.
+// --all: pages of TOKENS_PAGE_SIZE following `next_cursor` until the API returns null. A cursor the API already
+// returned (an A -> B -> A cycle, or the same one twice) or more than TOKENS_MAX_PAGES pages is an error rather
+// than a loop that grows without bound or a silently truncated list.
 export async function listAllApiTokens(ctx: Ctx, params: URLSearchParams): Promise<ApiToken[]> {
   const tokens: ApiToken[] = [];
+  const seen = new Set<string>();
   let cursor: string | null = null;
-  do {
+  for (let pages = 0; ; pages++) {
+    if (pages >= TOKENS_MAX_PAGES) {
+      throw new CliError("tokens.paging_limit", `Stopped after ${TOKENS_MAX_PAGES} pages of tokens`, "Narrow the list with --type, --signal or --search, or page manually with --limit and --cursor.");
+    }
     const pageParams = new URLSearchParams(params);
     pageParams.set("limit", String(TOKENS_PAGE_SIZE));
     if (cursor !== null) pageParams.set("cursor", cursor);
     const page: ApiTokenPage = await listApiTokens(ctx, pageParams);
     tokens.push(...page.data);
-    // Guard against a cursor that does not advance, which would loop forever.
-    cursor = page.next_cursor === cursor ? null : page.next_cursor;
-  } while (cursor !== null);
-  return tokens;
+    if (page.next_cursor === null) return tokens;
+    if (seen.has(page.next_cursor)) {
+      throw new CliError("tokens.paging_stuck", "The API returned the same cursor twice, so the list cannot be completed", "Retry, or page manually with --limit and --cursor.");
+    }
+    seen.add(page.next_cursor);
+    cursor = page.next_cursor;
+  }
 }
 
 export async function getApiToken(ctx: Ctx, id: string): Promise<ApiToken | null> {

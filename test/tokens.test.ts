@@ -1,12 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { PassThrough } from "node:stream";
 import { createContext } from "../src/core/context.ts";
 import { captureIO } from "../src/core/io.ts";
 import type { HttpRequest, HttpResponse } from "../src/core/http.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
 import { CliError } from "../src/core/errors.ts";
 import { DASH_ID_HINT, buildTokenListQuery, resolveTokenId, validateReason } from "../src/core/api-tokens.ts";
-import { isYes, listFlagsFrom, runGet, runList, runInvalidate, tokensCommand } from "../src/commands/tokens.ts";
+import { isYes, listFlagsFrom, promptConfirm, runGet, runList, runInvalidate, tokensCommand } from "../src/commands/tokens.ts";
 import { staticCommands } from "../src/commands/index.ts";
 
 const CONFIG = { env: "demo", baseUrl: "https://example.test/rest" };
@@ -109,6 +110,41 @@ test("tokens list --all walks every page with the largest page size, keeping the
     ["https://example.test/rest/api-tokens?signal=STALE&limit=100", "https://example.test/rest/api-tokens?signal=STALE&limit=100&cursor=P2"]
   );
   assert.deepEqual(stdoutJson(io).data, [apiToken("a"), apiToken("b")]);
+});
+
+test("tokens list --all fails instead of looping when the API returns the same cursor again", async () => {
+  const { ctx, seen } = ctxWith((req) => {
+    const cursor = new URL(req.url).searchParams.get("cursor");
+    return ok({ data: [apiToken(cursor === null ? "a" : "b")], next_cursor: "stuck", has_more: true });
+  });
+  await assert.rejects(() => runList(ctx, buildTokenListQuery({ all: true }), true, JSON_OUTPUT), (err: any) => err.code === "tokens.paging_stuck");
+  assert.equal(seen.length, 2);
+});
+
+test("tokens list --all fails on a cursor cycle that is not adjacent (A -> B -> A)", async () => {
+  const next: Record<string, string> = { A: "B", B: "A" };
+  const { ctx, seen } = ctxWith((req) => {
+    const cursor = new URL(req.url).searchParams.get("cursor");
+    return ok({ data: [apiToken(`t${seen.length}`)], next_cursor: next[cursor ?? "B"] ?? "A", has_more: true });
+  });
+  await assert.rejects(() => runList(ctx, buildTokenListQuery({ all: true }), true, JSON_OUTPUT), (err: any) => err.code === "tokens.paging_stuck");
+  assert.equal(seen.length, 3);
+});
+
+test("promptConfirm answers yes and no from one line of input", async () => {
+  for (const [line, expected] of [["y\n", true], ["yes\n", true], ["n\n", false], ["\n", false]] as const) {
+    const input = new PassThrough();
+    const answer = promptConfirm("Invalidate? ", input, new PassThrough());
+    input.write(line);
+    assert.equal(await answer, expected, JSON.stringify(line));
+  }
+});
+
+test("promptConfirm settles as no when the input closes without an answer (EOF)", async () => {
+  const input = new PassThrough();
+  const answer = promptConfirm("Invalidate? ", input, new PassThrough());
+  input.end();
+  assert.equal(await answer, false);
 });
 
 test("tokens list and invalidate send X-Beta only when --beta is set", async () => {
