@@ -3,18 +3,20 @@ import assert from "node:assert/strict";
 import { writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { execute } from "../src/core/executor.ts";
+import { errorFromResponse, execute } from "../src/core/executor.ts";
 import { createContext } from "../src/core/context.ts";
 import { captureIO } from "../src/core/io.ts";
 import type { Descriptor } from "../src/types.ts";
 import type { HttpRequest, HttpResponse } from "../src/core/http.ts";
+import type { Config } from "../src/core/config.ts";
+import { HEADER } from "../src/core/constants.ts";
 
-const CONFIG = { env: "demo", baseUrl: "https://example.test/rest" };
+const CONFIG: Config = { env: "demo", baseUrl: "https://example.test/rest" };
 
-function ctxWith(handler: (req: HttpRequest) => HttpResponse, io = captureIO({})) {
+function ctxWith(handler: (req: HttpRequest) => HttpResponse, io = captureIO({}), config: Config = CONFIG) {
   const seen: HttpRequest[] = [];
   const ctx = createContext({
-    config: CONFIG,
+    config,
     token: "tok_SECRET",
     io,
     clock: () => 1000,
@@ -412,4 +414,23 @@ test("execute() maps the public API error envelope of the logs endpoints unchang
     },
   );
   assert.equal(io.stdout.length, 0); // nothing rendered on error
+});
+
+test("--beta sends X-Beta: true on the logs request, and its absence sends no header", async () => {
+  const page = { data: [], page: { cursor: null, has_next_page: false } };
+  const beta = ctxWith(() => ({ status: 200, headers: {}, text: "", json: page }), captureIO({}), { ...CONFIG, beta: true });
+  await execute(logsListDescriptor, { flags: {}, files: {} }, beta.ctx, JSON_OUT);
+  assert.equal(beta.seen[0].headers[HEADER.beta], "true");
+
+  const plain = ctxWith(() => ({ status: 200, headers: {}, text: "", json: page }));
+  await execute(logsListDescriptor, { flags: {}, files: {} }, plain.ctx, JSON_OUT);
+  assert.equal(plain.seen[0].headers[HEADER.beta], undefined);
+});
+
+test("errorFromResponse falls back to error_code when code is absent, and to http.<status> when neither is a string", () => {
+  assert.equal(errorFromResponse(404, { errors: [{ error_code: "NOT_FOUND", message: "Webhook not found" }] }, "r1").code, "NOT_FOUND");
+  assert.equal(errorFromResponse(404, { error_code: "NOT_FOUND", message: "Webhook not found" }, "r1").code, "NOT_FOUND");
+  assert.equal(errorFromResponse(404, { errors: [{ code: "WEBHOOK_NOT_FOUND", error_code: "OTHER", message: "m" }] }, "r1").code, "WEBHOOK_NOT_FOUND");
+  assert.equal(errorFromResponse(404, { errors: [{ message: "Webhook not found" }] }, "r1").code, "http.404");
+  assert.equal(errorFromResponse(500, { errors: [{ error_code: 42, message: "m" }] }, "r1").code, "http.500");
 });

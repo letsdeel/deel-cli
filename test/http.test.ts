@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { withAuth, withVersion, withRequestId, withRetry } from "../src/core/http.ts";
+import { withAuth, withVersion, withRequestId, withRetry, withBeta } from "../src/core/http.ts";
 import type { HttpRequest, HttpResponse, Transport } from "../src/core/http.ts";
 
 const req = (over: Partial<HttpRequest> = {}): HttpRequest => ({ method: "GET", url: "https://x", headers: {}, ...over });
@@ -67,4 +67,14 @@ test("withRetry does not retry a non-retryable request", async () => {
   const response = await withRetry(3)(next)(req({ retryable: false }));
   assert.equal(response.status, 503);
   assert.equal(call, 1);
+});
+
+test("withBeta sends X-Beta: true only when enabled", async () => {
+  const on = capturing();
+  await withBeta(true)(on.next)(req());
+  assert.equal(on.seen[0].headers["x-beta"], "true");
+
+  const off = capturing();
+  await withBeta(undefined)(off.next)(req());
+  assert.equal(off.seen[0].headers["x-beta"], undefined);
 });
