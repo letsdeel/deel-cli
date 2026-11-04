@@ -29,19 +29,13 @@ import {
   updateWebhook,
 } from "../core/webhooks.ts";
 import type { CreateWebhookBody, ListFlags, UpdateWebhookBody, WriteFlags } from "../core/webhooks.ts";
-import { commonArgs, configFrom, gatherFlagValues, outputOpts, readHidden } from "./shared.ts";
+import { commonArgs, configFrom, gatherFlagValues, nullableBoolean, nullableString, outputOpts, readHidden } from "./shared.ts";
 import type { Args } from "./shared.ts";
 
 type CittyCtx = { args: unknown; rawArgs: string[] };
 
 function optionalString(value: unknown): string | undefined {
   return value === undefined ? undefined : String(value);
-}
-
-// The literal `null` clears a nullable field (sent as JSON null); any other text is the value.
-function nullableString(value: unknown): string | null | undefined {
-  const text = optionalString(value);
-  return text === "null" ? null : text;
 }
 
 export function listFlagsFrom(args: Args): ListFlags {
@@ -63,9 +57,7 @@ export function readBooleanFlag(rawArgs: string[], name: string): boolean | null
     if (token === `--${name}`) value = true;
     else if (token === `--no-${name}`) value = false;
     else if (token.startsWith(`--${name}=`)) {
-      const raw = token.slice(name.length + 3);
-      if (raw !== "true" && raw !== "false" && raw !== "null") throw new CliError("usage.webhooks", `--${name} must be true, false or null, got "${raw}"`);
-      value = raw === "null" ? null : raw === "true";
+      value = nullableBoolean(token.slice(name.length + 3), `--${name}`);
     }
   }
   return value;
@@ -76,7 +68,7 @@ export function writeFlagsFrom(args: Args, rawArgs: string[]): WriteFlags {
   return {
     name: optionalString(args.name),
     url: optionalString(args.url),
-    description: nullableString(args.description),
+    description: nullableString(optionalString(args.description)),
     status: optionalString(args.status),
     events: gatherFlagValues(rawArgs, "event"),
     includeChildOrgs: readBooleanFlag(rawArgs, "include-child-orgs"),

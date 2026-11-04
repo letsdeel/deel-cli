@@ -76,7 +76,7 @@ test("readBooleanFlag: absent -> undefined, --flag -> true, --no-flag -> false, 
   assert.equal(readBooleanFlag(["--include-child-orgs", "--no-include-child-orgs"], "include-child-orgs"), false);
   assert.equal(readBooleanFlag(["--include-child-orgs=false"], "include-child-orgs"), false);
   assert.equal(readBooleanFlag(["--include-child-orgs=true"], "include-child-orgs"), true);
-  assert.throws(() => readBooleanFlag(["--include-child-orgs=maybe"], "include-child-orgs"), usage);
+  assert.throws(() => readBooleanFlag(["--include-child-orgs=maybe"], "include-child-orgs"), (err: any) => err.code === "usage.flag_value" && /--include-child-orgs must be true, false or null/.test(err.message));
   assert.equal(readBooleanFlag(["--include-child-orgs=null"], "include-child-orgs"), null);
 });
 

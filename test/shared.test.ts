@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { gatherFlagValues, gatherFiles } from "../src/commands/shared.ts";
+import { gatherFlagValues, gatherFiles, nullableBoolean, nullableNumber, nullableObject, nullableString } from "../src/commands/shared.ts";
 
 test("gatherFlagValues collects every occurrence of a repeatable flag", () => {
   assert.deepEqual(gatherFlagValues(["--job_ids", "a", "--job_ids=b", "x", "--job_ids", "c"], "job_ids"), ["a", "b", "c"]);
@@ -15,4 +15,24 @@ test("gatherFiles groups multiple files under one field and keeps distinct field
     cv: ["a.pdf", "b.pdf"],
     photo: ["p.png"],
   });
+});
+
+test("nullable helpers send null for the literal null, the typed value otherwise, and undefined when absent", () => {
+  const usage = (err: any) => err.code === "usage.flag_value";
+  assert.equal(nullableString(undefined), undefined);
+  assert.equal(nullableString("null"), null);
+  assert.equal(nullableString("hello"), "hello");
+  assert.equal(nullableString(""), "");
+  assert.equal(nullableNumber("null", "--n"), null);
+  assert.equal(nullableNumber("42.5", "--n"), 42.5);
+  assert.equal(nullableNumber("0", "--n"), 0);
+  assert.throws(() => nullableNumber("abc", "--n"), (err: any) => usage(err) && /--n must be a number or null/.test(err.message));
+  assert.throws(() => nullableNumber("", "--n"), usage);
+  assert.equal(nullableBoolean("null", "--b"), null);
+  assert.equal(nullableBoolean("false", "--b"), false);
+  assert.throws(() => nullableBoolean("maybe", "--b"), usage);
+  assert.equal(nullableObject("null", "--o"), null);
+  assert.deepEqual(nullableObject('{"a":1}', "--o"), { a: 1 });
+  assert.throws(() => nullableObject("[1]", "--o"), usage);
+  assert.throws(() => nullableObject("{bad", "--o"), usage);
 });
