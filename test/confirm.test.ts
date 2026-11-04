@@ -99,27 +99,27 @@ async function runWithFetch(argv: string[]): Promise<{ requests: { method: strin
   }
 }
 
-test("deel apps disable without --yes and without a terminal sends nothing", async () => {
-  const { requests, error } = await runWithFetch(["apps", "disable", "--app_id", APP_ID]);
+test("deel oauth2-apps disable without --yes and without a terminal sends nothing", async () => {
+  const { requests, error } = await runWithFetch(["oauth2-apps", "disable", "--app_id", APP_ID]);
   assert.equal(error?.code, "usage.confirm");
   assert.equal(requests.length, 0);
 });
 
-test("deel apps disable --yes sends the request without prompting", async () => {
-  const { requests, error, out } = await runWithFetch(["apps", "disable", "--app_id", APP_ID, "--yes"]);
+test("deel oauth2-apps disable --yes sends the request without prompting", async () => {
+  const { requests, error, out } = await runWithFetch(["oauth2-apps", "disable", "--app_id", APP_ID, "--yes"]);
   assert.equal(error, undefined);
-  assert.deepEqual(requests.map((r) => `${r.method} ${new URL(r.url).pathname}`), [`POST /rest/apps/${APP_ID}/disable`]);
+  assert.deepEqual(requests.map((r) => `${r.method} ${new URL(r.url).pathname}`), [`POST /rest/oauth2-apps/${APP_ID}/disable`]);
   assert.match(out, /api_access/);
 });
 
-test("deel apps enable needs no confirmation", async () => {
-  const { requests, error } = await runWithFetch(["apps", "enable", "--app_id", APP_ID]);
+test("deel oauth2-apps enable needs no confirmation", async () => {
+  const { requests, error } = await runWithFetch(["oauth2-apps", "enable", "--app_id", APP_ID]);
   assert.equal(error, undefined);
   assert.equal(requests.length, 1);
 });
 
-test("the apps disable confirm text names the app and warns about revoked consents and tokens", () => {
-  const disable = manifest.descriptors.find((d) => d.command.join(" ") === "apps disable");
+test("the oauth2-apps disable confirm text names the app and warns about revoked consents and tokens", () => {
+  const disable = manifest.descriptors.find((d) => d.command.join(" ") === "oauth2-apps disable");
   assert.equal(disable?.confirm, "Disable app {app_id}? This revokes all consents and tokens; enable does not restore them.");
 });
 
@@ -131,13 +131,13 @@ test("a variant group takes --yes when any variant confirms and not otherwise", 
   assert.equal("yes" in (plain.args as object), false);
 });
 
-test("apps disable with --token-stdin and no --yes refuses before reading the token or sending anything", async () => {
+test("oauth2-apps disable with --token-stdin and no --yes refuses before reading the token or sending anything", async () => {
   const originalFetch = globalThis.fetch;
   let sent = 0;
   globalThis.fetch = (async () => (sent++, new Response("{}"))) as typeof fetch;
   try {
     await assert.rejects(
-      () => run(["apps", "disable", "--app_id", APP_ID, "--token-stdin"]),
+      () => run(["oauth2-apps", "disable", "--app_id", APP_ID, "--token-stdin"]),
       (err: CliError) => err.code === "usage.confirm" && /stdin carries the token or the input/.test(err.next ?? ""),
     );
   } finally {

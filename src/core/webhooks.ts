@@ -52,14 +52,15 @@ export type ListFlags = {
   order?: string;
 };
 
-// `deel webhooks create` / `update` flags. `events` holds every --event occurrence.
+// `deel webhooks create` / `update` flags. `events` holds every --event occurrence. A nullable field (description,
+// include_child_orgs) given as `null` is sent as JSON null, which clears it.
 export type WriteFlags = {
   name?: string;
   url?: string;
-  description?: string;
+  description?: string | null;
   status?: string;
   events: string[];
-  includeChildOrgs?: boolean;
+  includeChildOrgs?: boolean | null;
 };
 
 // POST /webhooks body. api_version is always "v2" (the only version the API accepts).
@@ -69,18 +70,18 @@ export type CreateWebhookBody = {
   events: string[];
   status: "enabled" | "disabled";
   api_version: "v2";
-  description?: string;
-  include_child_orgs?: boolean;
+  description?: string | null;
+  include_child_orgs?: boolean | null;
 };
 
 // PATCH /webhooks/{id} body: only the fields the user passed.
 export type UpdateWebhookBody = {
   name?: string;
   url?: string;
-  description?: string;
+  description?: string | null;
   events?: string[];
   status?: "enabled" | "disabled";
-  include_child_orgs?: boolean;
+  include_child_orgs?: boolean | null;
 };
 
 // POST /webhooks/{id}/simulate body and its 200 `data`; `delivery` is null when no delivery was made.
@@ -98,9 +99,10 @@ export type WebhookSimulation = {
 
 export const SIGNING_KEY_HINT = "reveal the signing key in Developer Center → Webhooks";
 export const SIMULATE_USAGE = "deel webhooks simulate <id> --event <type>";
-export const SIMULATE_RATE_LIMIT_HINT = "Simulations are limited to 10 simulations per hour per event type; wait before trying again.";
-export const SIMULATE_NOT_FOUND_HINT =
-  "No webhook with this id in your organization, or the event type has no sample payload; check `deel webhooks list` and `deel webhooks event-types`.";
+export const SIMULATE_RATE_LIMIT_HINT = "Limit: 10 simulations per hour per event type; try again later.";
+export const SIMULATE_NOT_FOUND_HINT = "No webhook with this id in your organization; check `deel webhooks list`.";
+export const SIMULATE_BAD_REQUEST_HINT =
+  "The webhook must be enabled and subscribed to this event; see `deel webhooks get <id>` and `deel webhooks event-types`.";
 export const WEBHOOKS_PAGE_SIZE = 100;
 export const WEBHOOKS_MAX_PAGES = 1000;
 const WEBHOOK_STATUSES = ["enabled", "disabled"];
@@ -246,6 +248,8 @@ export function simulateErrorFromResponse(status: number, json: unknown, request
   }
   if (status === 429) appendNext(error, SIMULATE_RATE_LIMIT_HINT);
   if (status === 404) appendNext(error, SIMULATE_NOT_FOUND_HINT);
+  // The gateway answers a missing X-Beta header with a 400 of its own; its hint already says what to do.
+  if (status === 400 && error.code !== "BETA_ACCESS_REQUIRED") appendNext(error, SIMULATE_BAD_REQUEST_HINT);
   return error;
 }
 
