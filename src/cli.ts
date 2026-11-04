@@ -19,8 +19,8 @@ import { CLI_VERSION } from "./version.ts";
 import { commonArgs, configFrom, gatherFiles, gatherFlagValues, outputOpts } from "./commands/shared.ts";
 import type { Args } from "./commands/shared.ts";
 import { staticCommands } from "./commands/index.ts";
-import { promptConfirm } from "./commands/webhooks.ts";
-import type { Confirm } from "./commands/webhooks.ts";
+import { promptConfirm } from "./core/prompt.ts";
+import type { Confirm } from "./core/prompt.ts";
 import { realIO } from "./core/io.ts";
 import type { IOStreams } from "./core/io.ts";
 import { printActionHelp, printContractJson, printGlobalOptions, printSkeleton, printVariantGroupHelp, printVersion } from "./help.ts";
@@ -109,7 +109,7 @@ function actionCommand(descriptor: Descriptor): CommandDef {
 // Variant group: registers one boolean selector per variant. Exactly one must be
 // set; zero or multiple throws usage.variant. Params are the union of all variants'
 // params (all optional at parse time; enforcement happens inside runDescriptor).
-function variantCommand(descriptors: Descriptor[]): CommandDef {
+export function variantCommand(descriptors: Descriptor[]): CommandDef {
   const name = descriptors[0].command[descriptors[0].command.length - 1];
   const variants = descriptors.map((d) => d.variant!);
   const args: ArgsDef = { ...commonArgs };
