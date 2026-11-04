@@ -6,7 +6,7 @@ import { CliError } from "./errors.ts";
 import { HEADER } from "./constants.ts";
 import { credentialStore } from "./keychain.ts";
 import type { CredentialStore } from "./keychain.ts";
-import { ENVIRONMENTS, assertIssuerOverride, ownsLegacyPat, resolveConfig } from "./config.ts";
+import { ENVIRONMENTS, assertIssuerOverride, ownsLegacyPat } from "./config.ts";
 import type { Config } from "./config.ts";
 import { fetchTransport } from "./http.ts";
 import type { TokenProvider, Transport } from "./http.ts";
@@ -24,8 +24,8 @@ export type ResolvedToken = {
 
 export type ResolveOpts = {
   tokenStdin?: boolean;
-  env?: string;
-  config?: Config;
+  // Required: a stored login is only sent to the server of this config's environment.
+  config: Config;
   store?: CredentialStore;
   transport?: Transport; // for OAuth refresh; tests inject a fake
   now?: () => number;
@@ -38,25 +38,21 @@ export function resolveToken(opts: ResolveOpts): ResolvedToken {
   }
   const envToken = process.env.DEEL_TOKEN;
   if (envToken) return { token: envToken.trim() || null, source: "env" };
-  const env = opts.config?.env ?? opts.env;
-  if (env) {
-    const store = opts.store ?? credentialStore();
-    if (store.available()) {
-      const config = opts.config ?? resolveConfig({ env });
-      assertIssuerOverride(config);
-      const entry = config.issuer ? readOAuthEntry(store, config.issuer) : null;
-      if (entry && config.issuer) {
-        // OAuth tokens only travel to the environment that issued them.
-        if (!config.oauthBaseUrlOk) throw baseUrlRefused(config);
-        const oauth = createOAuthSource({ store, issuer: config.issuer, clientId: config.clientId, entry, transport: opts.transport ?? fetchTransport, now: opts.now });
-        return { token: entry.access_token, source: "oauth", oauth };
-      }
-      const token = ENVIRONMENTS[env] ? store.get(env) : null; // a PAT saved by an earlier release
-      if (token) {
-        if (!ownsLegacyPat(config)) throw baseUrlRefused(config);
-        return { token, source: "keychain" };
-      }
-    }
+  const { config } = opts;
+  const store = opts.store ?? credentialStore();
+  if (!store.available()) return { token: null, source: "none" };
+  assertIssuerOverride(config);
+  const entry = config.issuer ? readOAuthEntry(store, config.issuer) : null;
+  if (entry && config.issuer) {
+    // OAuth tokens only travel to the environment that issued them.
+    if (!config.oauthBaseUrlOk) throw baseUrlRefused(config);
+    const oauth = createOAuthSource({ store, issuer: config.issuer, clientId: config.clientId, entry, transport: opts.transport ?? fetchTransport, now: opts.now });
+    return { token: entry.access_token, source: "oauth", oauth };
+  }
+  const token = ENVIRONMENTS[config.env] ? store.get(config.env) : null; // a PAT saved by an earlier release
+  if (token) {
+    if (!ownsLegacyPat(config)) throw baseUrlRefused(config);
+    return { token, source: "keychain" };
   }
   return { token: null, source: "none" };
 }

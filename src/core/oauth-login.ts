@@ -6,7 +6,7 @@ import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { platform } from "node:os";
 import { CliError } from "./errors.ts";
-import { discover, entryFromTokenResponse, lockPath, postForm, readOAuthEntry, removeOAuthEntry, withLock, writeOAuthEntry } from "./oauth.ts";
+import { discover, entryFromTokenResponse, lockPath, postForm, printable, readOAuthEntry, removeOAuthEntry, withLock, writeOAuthEntry } from "./oauth.ts";
 import type { OAuthEntry, ServerMetadata } from "./oauth.ts";
 import { assertIssuerOverride, ownsLegacyPat, requireIssuer } from "./config.ts";
 import type { Config } from "./config.ts";
@@ -30,11 +30,6 @@ const PAGE = (title: string, line: string) =>
 const OK_PAGE = PAGE("Signed in", "You can close this window and return to the terminal.");
 const FAILED_PAGE = PAGE("Sign-in failed", "You can close this window and check the terminal.");
 const STALE_PAGE = PAGE("Sign-in not recognised", "This response does not belong to the sign-in in progress. Use the link from the latest 'deel auth login'.");
-
-// Server-supplied text is shown in the terminal, so strip control characters and cap the length.
-function printable(value: string | null): string {
-  return (value ?? "").replace(/[^\x20-\x7e]/g, "").slice(0, 200);
-}
 
 export type Loopback = {
   redirectUri: string;
@@ -237,7 +232,9 @@ export function removeStoredLogin(store: CredentialStore, config: Config): boole
   return oauthRemoved || legacyRemoved;
 }
 
-export type LogoutResult = { removed: boolean; revoked: boolean | "unsupported"; hadLogin: boolean };
+// `reason` says why a revocation failed (an HTTP status or an error code), never token material.
+export type RevokeOutcome = { revoked: boolean | "unsupported"; reason?: string };
+export type LogoutResult = RevokeOutcome & { removed: boolean; hadLogin: boolean };
 
 // Revoke and remove under the refresh lock, re-reading the login inside it, so a refresh in another process can
 // neither rotate the token being revoked nor store a replacement after the removal.
@@ -248,23 +245,24 @@ export async function logout(store: CredentialStore, config: Config, transport: 
   if (!issuer) return { removed: removeStoredLogin(store, config), revoked: false, hadLogin: false };
   return withLock(lockPath(issuer), async () => {
     const entry = readOAuthEntry(store, issuer);
-    const revoked = entry ? await revokeLogin(entry, { issuer, clientId: config.clientId }, transport) : false;
-    return { removed: removeStoredLogin(store, config), revoked, hadLogin: entry !== null };
+    const outcome: RevokeOutcome = entry ? await revokeLogin(entry, { issuer, clientId: config.clientId }, transport) : { revoked: false };
+    return { ...outcome, removed: removeStoredLogin(store, config), hadLogin: entry !== null };
   });
 }
 
 // Best-effort RFC 7009 revocation of the refresh token (which also ends the access token's grant).
-export async function revokeLogin(entry: OAuthEntry, server: { issuer: string; clientId: string }, transport: Transport): Promise<boolean | "unsupported"> {
+export async function revokeLogin(entry: OAuthEntry, server: { issuer: string; clientId: string }, transport: Transport): Promise<RevokeOutcome> {
   try {
     const metadata = await discover(server.issuer, transport);
-    if (!metadata.revocation_endpoint) return "unsupported";
+    if (!metadata.revocation_endpoint) return { revoked: "unsupported" };
     const response = await postForm(transport, metadata.revocation_endpoint, {
       token: entry.refresh_token,
       token_type_hint: "refresh_token",
       client_id: server.clientId,
     });
-    return response.status >= 200 && response.status < 300;
-  } catch {
-    return false;
+    if (response.status >= 200 && response.status < 300) return { revoked: true };
+    return { revoked: false, reason: `HTTP ${response.status}` };
+  } catch (error) {
+    return { revoked: false, reason: error instanceof CliError ? error.code : printable(`network error: ${(error as Error).message}`) };
   }
 }

@@ -355,21 +355,22 @@ test("revokeLogin posts the refresh token to the revocation endpoint", async () 
     forms.push(new URLSearchParams(String(request.body)));
     return { status: 200, headers: {}, text: "", json: undefined };
   };
-  assert.equal(await revokeLogin(sample, SERVER, transport), true);
+  assert.deepEqual(await revokeLogin(sample, SERVER, transport), { revoked: true });
   assert.equal(forms[0].get("token"), "rt");
   assert.equal(forms[0].get("token_type_hint"), "refresh_token");
   assert.equal(forms[0].get("client_id"), "c");
 });
 
-test("revokeLogin reports unsupported, failed and unreachable servers", async () => {
+test("revokeLogin reports unsupported, failed and unreachable servers, with the reason a revocation failed", async () => {
   const { revocation_endpoint: _omit, ...without } = METADATA;
-  assert.equal(await revokeLogin(sample, SERVER, serving(without)), "unsupported");
+  assert.deepEqual(await revokeLogin(sample, SERVER, serving(without)), { revoked: "unsupported" });
   const failing: Transport = async (request) =>
     request.url.endsWith("/.well-known/oauth-authorization-server")
       ? { status: 200, headers: {}, text: "", json: METADATA }
       : { status: 500, headers: {}, text: "", json: {} };
-  assert.equal(await revokeLogin(sample, SERVER, failing), false);
-  assert.equal(await revokeLogin(sample, SERVER, async () => Promise.reject(new Error("offline"))), false);
+  assert.deepEqual(await revokeLogin(sample, SERVER, failing), { revoked: false, reason: "HTTP 500" });
+  assert.deepEqual(await revokeLogin(sample, SERVER, async () => Promise.reject(new Error("offline\u001b[31m"))), { revoked: false, reason: "network error: offline[31m" });
+  assert.deepEqual(await revokeLogin(sample, SERVER, serving({ ...METADATA, issuer: "https://evil.example.test" })), { revoked: false, reason: "oauth.issuer" });
 });
 
 const deferred = () => {

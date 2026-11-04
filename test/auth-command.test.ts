@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { TestContext } from "node:test";
 import { authLogin, authLogout, authStatus } from "../src/commands/auth.ts";
+import { commandToken } from "../src/commands/shared.ts";
 import type { AuthDeps } from "../src/commands/auth.ts";
 import { resolveConfig } from "../src/core/config.ts";
 import type { CliError } from "../src/core/errors.ts";
@@ -55,7 +56,7 @@ function captureIO() {
 }
 
 // The Deel API and OAuth server: discovery, the token and revocation endpoints and /people/me.
-function server(over: { metadata?: object; revoke?: number } = {}) {
+function server(over: { metadata?: object; revoke?: number; me?: number } = {}) {
   const requests: HttpRequest[] = [];
   const respond = (status: number, json: unknown): HttpResponse => ({ status, headers: {}, text: "", json });
   const transport: Transport = async (request) => {
@@ -63,7 +64,7 @@ function server(over: { metadata?: object; revoke?: number } = {}) {
     if (request.url.endsWith("/.well-known/oauth-authorization-server")) return respond(200, over.metadata ?? METADATA);
     if (request.url === METADATA.token_endpoint) return respond(200, { access_token: "at_from_login", refresh_token: "rt", expires_in: 3600 });
     if (request.url === METADATA.revocation_endpoint) return respond(over.revoke ?? 200, undefined);
-    if (request.url.endsWith("/people/me")) return respond(200, ME);
+    if (request.url.endsWith("/people/me")) return respond(over.me ?? 200, over.me ? { errors: ["Unauthorized"] } : ME);
     return respond(404, {});
   };
   return { transport, requests };
@@ -95,6 +96,16 @@ test("auth login signs in, stores the login and reports the identity", async (t)
     scope: null,
     expires_at: readOAuthEntry(store, ISSUER)?.expires_at,
   });
+});
+
+test("auth login reports a sign-in whose token the API rejects, instead of a successful login", async (t) => {
+  isolated(t);
+  const { store } = memoryStore();
+  const { io } = captureIO();
+  await assert.rejects(
+    () => authLogin(ARGS, resolveConfig({ env: "prod" }), { store, transport: server({ me: 401 }).transport, io, openUrl: browser }),
+    (error: CliError) => error.code === "auth.invalid" && /identity check failed \(401\)/.test(error.message),
+  );
 });
 
 test("auth login refuses --token-stdin before reading stdin or opening anything", async (t) => {
@@ -147,6 +158,17 @@ test("auth status reports a stored OAuth login with its expiry", async (t) => {
   assert.equal((result.identity as { email: string }).email, ME.email);
 });
 
+test("auth status reports a token the API rejects as invalid, not valid", async (t) => {
+  isolated(t);
+  const { store } = memoryStore();
+  writeOAuthEntry(store, ISSUER, stored);
+  const { io } = captureIO();
+  await assert.rejects(
+    () => authStatus(ARGS, resolveConfig({ env: "prod" }), { store, transport: server({ me: 401 }).transport, io }),
+    (error: CliError) => error.code === "auth.invalid" && error.message === "Token check failed (401)",
+  );
+});
+
 test("auth status with DEEL_TOKEN reports a PAT and leaves the stored login alone", async (t) => {
   isolated(t);
   process.env.DEEL_TOKEN = "pat_from_env";
@@ -190,8 +212,8 @@ test("auth logout says when the server could not revoke the login, and still rem
   writeOAuthEntry(store, ISSUER, stored);
   const { io, data, err } = captureIO();
   await authLogout(ARGS, resolveConfig({ env: "prod" }), { store, transport: server({ revoke: 500 }).transport, io });
-  assert.deepEqual(data(), { removed: true, env: "prod", revoked: false });
-  assert.match(err(), /Could not revoke the login on the server/);
+  assert.deepEqual(data(), { removed: true, env: "prod", revoked: false, revoke_error: "HTTP 500" });
+  assert.equal(err(), "Could not revoke the login on the server (HTTP 500). It was removed from this machine, but its refresh token may stay valid until it expires.\n");
   assert.equal(items.size, 0);
 });
 
@@ -204,4 +226,27 @@ test("auth logout says when the server has no revocation endpoint", async (t) =>
   await authLogout(ARGS, resolveConfig({ env: "prod" }), { store, transport: server({ metadata: withoutRevocation }).transport, io });
   assert.deepEqual(data(), { removed: true, env: "prod", revoked: "unsupported" });
   assert.match(err(), /does not support revocation/);
+});
+
+// ---------------- the credential every API command sends ----------------
+
+test("API commands refuse to send a stored login to a --base-url outside its environment", (t) => {
+  isolated(t);
+  const { store } = memoryStore();
+  writeOAuthEntry(store, ISSUER, stored);
+  assert.throws(
+    () => commandToken({}, resolveConfig({ env: "prod", baseUrl: "https://other.example.test/rest" }), store),
+    (error: CliError) => error.code === "auth.base_url",
+  );
+});
+
+test("API commands send a stored login to its own environment, and DEEL_TOKEN as given", async (t) => {
+  isolated(t);
+  const { store } = memoryStore();
+  writeOAuthEntry(store, ISSUER, stored);
+  const provider = commandToken({}, resolveConfig({ env: "prod" }), store);
+  assert.equal(typeof provider, "function");
+  assert.equal(await (provider as () => Promise<string>)(), "at_stored");
+  process.env.DEEL_TOKEN = "pat_from_env";
+  assert.equal(commandToken({}, resolveConfig({ env: "prod", baseUrl: "https://other.example.test/rest" }), store), "pat_from_env");
 });

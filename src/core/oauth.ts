@@ -136,6 +136,11 @@ export function isFresh(entry: OAuthEntry, now: number): boolean {
 
 // ---------------- HTTP helpers ----------------
 
+// Server-supplied text is shown in the terminal, so strip control characters and cap the length.
+export function printable(value: string | null): string {
+  return (value ?? "").replace(/[^\x20-\x7e]/g, "").slice(0, 200);
+}
+
 export function postForm(transport: Transport, url: string, params: Record<string, string>): Promise<HttpResponse> {
   return transport({
     method: "POST",
@@ -353,7 +358,8 @@ export function createOAuthSource(opts: OAuthSourceOpts): OAuthSource {
           client_id: opts.clientId,
         });
         if (response.status >= 400) {
-          const error = (response.json as { error?: string } | undefined)?.error;
+          const raw = (response.json as { error?: unknown } | undefined)?.error;
+          const error = typeof raw === "string" ? printable(raw) : "";
           if (error === "invalid_grant") {
             removeOAuthEntry(opts.store, opts.issuer);
             throw expired();

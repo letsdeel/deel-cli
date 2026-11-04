@@ -17,6 +17,8 @@ const fakeStore = (token: string | null): CredentialStore => ({
   remove: () => true,
 });
 
+const PROD = resolveConfig({ env: "prod" });
+
 function withEnv(vars: Record<string, string | undefined>, body: () => void) {
   const keys = ["DEEL_TOKEN", "DEEL_OAUTH_ISSUER", "DEEL_ENV"];
   const saved: Record<string, string | undefined> = {};
@@ -47,31 +49,31 @@ test("redactHeaders masks Authorization case-insensitively", () => {
 
 test("resolveToken reads DEEL_TOKEN from the environment", () => {
   withEnv({ DEEL_TOKEN: "tok_env" }, () => {
-    assert.deepEqual(resolveToken({}), { token: "tok_env", source: "env" });
+    assert.deepEqual(resolveToken({ config: PROD }), { token: "tok_env", source: "env" });
   });
 });
 
 test("resolveToken trims the environment token", () => {
   withEnv({ DEEL_TOKEN: "  tok_env  " }, () => {
-    assert.equal(resolveToken({}).token, "tok_env");
+    assert.equal(resolveToken({ config: PROD }).token, "tok_env");
   });
 });
 
 test("resolveToken falls back to the keychain when stdin/env are absent", () => {
   withEnv({}, () => {
-    assert.deepEqual(resolveToken({ env: "prod", store: fakeStore("tok_kc") }), { token: "tok_kc", source: "keychain" });
+    assert.deepEqual(resolveToken({ config: PROD, store: fakeStore("tok_kc") }), { token: "tok_kc", source: "keychain" });
   });
 });
 
 test("DEEL_TOKEN takes precedence over the keychain", () => {
   withEnv({ DEEL_TOKEN: "tok_env" }, () => {
-    assert.equal(resolveToken({ env: "prod", store: fakeStore("tok_kc") }).source, "env");
+    assert.equal(resolveToken({ config: PROD, store: fakeStore("tok_kc") }).source, "env");
   });
 });
 
 test("resolveToken reports none when nothing is stored", () => {
   withEnv({}, () => {
-    assert.deepEqual(resolveToken({ env: "prod", store: fakeStore(null) }), { token: null, source: "none" });
+    assert.deepEqual(resolveToken({ config: PROD, store: fakeStore(null) }), { token: null, source: "none" });
   });
 });
 
@@ -306,6 +308,17 @@ test("a transient refresh failure keeps the login", async (t) => {
   const resolved = resolveToken({ config: CONFIG, store, transport, now: () => NOW });
   await assert.rejects(() => (authFor(resolved) as () => Promise<string>)(), (error: CliError) => error.code === "auth.refresh");
   assert.notEqual(readOAuthEntry(store, ISSUER), null);
+});
+
+test("a refresh error from the server reaches the terminal without control characters", async (t) => {
+  isolated(t);
+  const { store } = memoryStore({ oauth: entryAt(0) });
+  const { transport } = oauthTransport(() => tokenResponse({ error: "server_error\u001b]0;pwned\u0007" }, 500));
+  const resolved = resolveToken({ config: CONFIG, store, transport, now: () => NOW });
+  await assert.rejects(
+    () => (authFor(resolved) as () => Promise<string>)(),
+    (error: CliError) => error.code === "auth.refresh" && error.message === "Refreshing the login failed (500: server_error]0;pwned).",
+  );
 });
 
 test("a login removed by another process while waiting is reported as expired", async (t) => {

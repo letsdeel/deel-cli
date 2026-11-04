@@ -104,10 +104,14 @@ export async function authLogin(args: Args, config: Config, deps: AuthDeps): Pro
 
 export async function authLogout(args: Args, config: Config, deps: AuthDeps): Promise<void> {
   const ctx = createContext({ config, token: null, io: deps.io, baseTransport: deps.transport });
-  const { removed, revoked, hadLogin } = await logout(deps.store, config, deps.transport);
+  const { removed, revoked, hadLogin, reason } = await logout(deps.store, config, deps.transport);
   if (hadLogin && revoked === "unsupported") ctx.io.err("The server does not support revocation; the login was only removed from this machine.\n");
-  else if (hadLogin && !revoked) ctx.io.err("Could not revoke the login on the server; it was removed from this machine.\n");
-  await render(ctx.io, envelope({ removed, env: config.env, revoked }), outputOpts(args));
+  else if (hadLogin && !revoked) {
+    ctx.io.err(
+      `Could not revoke the login on the server (${reason ?? "unknown error"}). It was removed from this machine, but its refresh token may stay valid until it expires.\n`,
+    );
+  }
+  await render(ctx.io, envelope({ removed, env: config.env, revoked, ...(hadLogin && revoked === false ? { revoke_error: reason ?? "unknown error" } : {}) }), outputOpts(args));
 }
 
 export const authCommand = defineCommand({
