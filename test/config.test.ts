@@ -96,10 +96,26 @@ test("an overridden issuer makes its own host an allowed API host", () => {
   });
 });
 
-test("an unknown environment reached through --base-url has no issuer", () => {
+test("an unknown environment reached through --base-url takes its issuer from the base URL's origin", () => {
   withEnvVars({ DEEL_OAUTH_ISSUER: undefined }, () => {
     const config = resolveConfig({ env: "nope", baseUrl: "https://x.example.test/rest" });
-    assert.equal(config.issuer, null);
+    assert.equal(config.issuer, "https://x.example.test");
+    assert.equal(config.oauthBaseUrlOk, true);
+  });
+});
+
+test("DEEL_OAUTH_ISSUER takes priority over the issuer derived from --base-url", () => {
+  withEnvVars({ DEEL_OAUTH_ISSUER: "https://idp.example.test" }, () => {
+    const config = resolveConfig({ env: "nope", baseUrl: "https://x.example.test/rest" });
+    assert.equal(config.issuer, "https://idp.example.test");
+    assert.equal(config.oauthBaseUrlOk, false);
+  });
+});
+
+test("a known environment keeps its issuer whatever --base-url says", () => {
+  withEnvVars({ DEEL_OAUTH_ISSUER: undefined }, () => {
+    const config = resolveConfig({ env: "prod", baseUrl: "https://other.example.test/rest" });
+    assert.equal(config.issuer, "https://api.letsdeel.com");
     assert.equal(config.oauthBaseUrlOk, false);
   });
 });

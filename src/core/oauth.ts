@@ -180,7 +180,14 @@ export async function discover(issuer: string, transport: Transport): Promise<Se
   }
   const metadata = response.json as Record<string, unknown>;
   if (metadata.issuer !== issuer) {
-    throw new CliError("oauth.issuer", `The OAuth server reported issuer "${String(metadata.issuer)}", expected "${issuer}".`, "Refusing to continue.");
+    // Only an https URL is echoed back: the value is server-supplied and printed to the terminal.
+    const parsed = httpsUrl(metadata.issuer) ? new URL(metadata.issuer as string) : null;
+    const reported = parsed ? (parsed.pathname === "/" ? parsed.origin : parsed.href) : null;
+    throw new CliError(
+      "oauth.issuer",
+      `The OAuth server at ${issuer} reports ${reported ? `issuer "${reported}"` : "an unexpected issuer"}.`,
+      reported ? `Use a --base-url on ${reported}, or set DEEL_OAUTH_ISSUER to it.` : "Refusing to continue.",
+    );
   }
   const authorization = httpsUrl(metadata.authorization_endpoint);
   const token = httpsUrl(metadata.token_endpoint);

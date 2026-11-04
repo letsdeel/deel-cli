@@ -16,7 +16,7 @@ export const ENVIRONMENTS: Record<string, Environment> = {
 export type Config = {
   env: string;
   baseUrl: string;
-  issuer: string | null; // OAuth issuer; null when the environment is unknown (only reachable with --base-url)
+  issuer: string | null; // OAuth issuer; null only when DEEL_OAUTH_ISSUER is invalid (see issuerError)
   clientId: string;
   // True when baseUrl is the API of the environment that issues OAuth tokens, so they may be sent to it.
   oauthBaseUrlOk: boolean;
@@ -72,7 +72,8 @@ export function resolveConfig(opts: { env?: string; baseUrl?: string }): Config 
     throw new CliError("config.baseurl", `--base-url must use https (got "${baseUrl}").`, "The API token is only sent over https.");
   }
   const override = httpsOverride("DEEL_OAUTH_ISSUER");
-  const issuer = override.error ? null : (override.value ?? known?.issuer ?? null);
+  // An unknown environment is only reachable with --base-url; its origin is the issuer, which discovery verifies.
+  const issuer = override.error ? null : (override.value ?? known?.issuer ?? parsed.origin);
   const clientId = process.env.DEEL_OAUTH_CLIENT_ID?.trim() || known?.clientId || CLI_OAUTH_CLIENT_ID;
   const trustedOrigins = [known ? originOf(known.baseUrl) : null, issuer ? originOf(issuer) : null];
   return {

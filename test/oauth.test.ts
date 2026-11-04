@@ -7,6 +7,7 @@ import { join } from "node:path";
 import { discover, entryFromTokenResponse, isFresh, lockPath, readOAuthEntry, withLock, writeOAuthEntry } from "../src/core/oauth.ts";
 import type { HttpResponse, Transport } from "../src/core/http.ts";
 import { tempDir } from "./stubs.ts";
+import type { CliError } from "../src/core/errors.ts";
 import { authorizationUrl, browserLogin, logout, ownsLegacyPat, removeStoredLogin, challengeFor, chooseScopes, newState, newVerifier, revokeLogin, startLoopback } from "../src/core/oauth-login.ts";
 import { resolveConfig } from "../src/core/config.ts";
 import type { CredentialStore } from "../src/core/keychain.ts";
@@ -42,6 +43,17 @@ test("discovery rejects metadata whose issuer differs from the configured one", 
   await assert.rejects(
     () => discover(ISSUER, serving({ ...METADATA, issuer: "https://evil.example.test" })),
     (error: Error & { code?: string }) => error.code === "oauth.issuer",
+  );
+});
+
+test("an issuer mismatch names the reported issuer only when it is an https URL", async () => {
+  await assert.rejects(
+    () => discover(ISSUER, serving({ ...METADATA, issuer: "https://idp.example.test" })),
+    (error: CliError) => /reports issuer "https:\/\/idp\.example\.test"/.test(error.message) && /--base-url on https:\/\/idp\.example\.test/.test(error.next ?? ""),
+  );
+  await assert.rejects(
+    () => discover(ISSUER, serving({ ...METADATA, issuer: "\u001b[31mevil" })),
+    (error: CliError) => /an unexpected issuer/.test(error.message) && !error.message.includes("\u001b") && error.next === "Refusing to continue.",
   );
 });
 
