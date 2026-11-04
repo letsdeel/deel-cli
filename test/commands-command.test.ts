@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { run } from "../src/cli.ts";
-import { EXIT } from "../src/core/errors.ts";
+import { CliError, EXIT } from "../src/core/errors.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
 import { staticCommands } from "../src/commands/index.ts";
 import { manifest as handPicked } from "../src/manifest.generated.ts";
@@ -77,12 +77,27 @@ test("--json prints {command, method, path, summary} for every match", async () 
   assert.deepEqual(statics.map((row: { command: string; method: null }) => [row.command, row.method]), [["auth login", null], ["auth logout", null]]);
 });
 
-test("no match: an empty JSON array, or a note on stderr", async () => {
-  assert.deepEqual(JSON.parse((await capture(["commands", "--json", "--filter", "no-such-thing"])).out), []);
-  const { code, out, err } = await capture(["commands", "--filter", "no-such-thing"]);
+test("no match: an empty JSON array, or an error for the human list", async () => {
+  const json = await capture(["commands", "--json", "--filter", "no-such-thing"]);
+  assert.equal(json.code, EXIT.OK);
+  assert.deepEqual(JSON.parse(json.out), []);
+  await assert.rejects(capture(["commands", "--filter", "no-such-thing"]), (error: CliError) => {
+    assert.equal(error.code, "commands.no_match");
+    assert.match(error.message, /No commands match 'no-such-thing'/);
+    return true;
+  });
+});
+
+test("a --filter without text is a usage error", async () => {
+  for (const argv of [["commands", "--filter"], ["commands", "--filter", "  "], ["commands", "--json", "--filter="]]) {
+    await assert.rejects(capture(argv), (error: CliError) => error.code === "usage.filter");
+  }
+});
+
+test("a global flag before the command still runs it", async () => {
+  const { code, out } = await capture(["--env", "demo", "commands", "--filter", "gizmo"]);
   assert.equal(code, EXIT.OK);
-  assert.equal(out, "");
-  assert.match(err, /No commands match 'no-such-thing'/);
+  assert.match(out, /^gizmos get /m);
 });
 
 test("deel commands --help shows its flags", async () => {

@@ -179,9 +179,11 @@ function countCommands(cmd: CommandDef): number {
 
 const ACTION_ORDER = ["list", "get", "create", "update", "replace", "delete"];
 
+export const byName = (a: string, b: string): number => a.localeCompare(b, "en");
+
 function byAction(a: HelpRow, b: HelpRow): number {
   const rank = (row: HelpRow) => (ACTION_ORDER.includes(row.name) ? ACTION_ORDER.indexOf(row.name) : ACTION_ORDER.length);
-  return rank(a) - rank(b) || a.name.localeCompare(b.name);
+  return rank(a) - rank(b) || byName(a.name, b.name);
 }
 
 function groupRows(cmd: CommandDef): HelpRow[] {
@@ -204,7 +206,7 @@ function groupRows(cmd: CommandDef): HelpRow[] {
     }
   }
   const of = (kind: HelpRow["kind"]) => rows.filter((row) => row.kind === kind);
-  return [...of("leaf").sort(byAction), ...of("chain").sort((a, b) => a.name.localeCompare(b.name)), ...of("group").sort((a, b) => a.name.localeCompare(b.name))];
+  return [...of("leaf").sort(byAction), ...of("chain").sort((a, b) => byName(a.name, b.name)), ...of("group").sort((a, b) => byName(a.name, b.name))];
 }
 
 // Names longer than this overflow the column instead of pushing every description right.
@@ -228,7 +230,7 @@ export function sectionOf(word: string, descriptors: Descriptor[]): string | und
   const counts = new Map<string, number>();
   for (const descriptor of descriptors) if (descriptor.group) counts.set(descriptor.group, (counts.get(descriptor.group) ?? 0) + 1);
   const tags = [...counts.keys()];
-  return tags.find((tag) => sectionKey(tag) === word) ?? tags.sort((a, b) => counts.get(b)! - counts.get(a)! || a.localeCompare(b))[0];
+  return tags.find((tag) => sectionKey(tag) === word) ?? tags.sort((a, b) => counts.get(b)! - counts.get(a)! || byName(a, b))[0];
 }
 
 // The section a top-level group's help is titled with: only when it names the group or
@@ -259,8 +261,6 @@ export function sectionsByWord(descriptors: Descriptor[]): Map<string, string> {
 const CLI_SECTION = "CLI";
 const OTHER_SECTION = "Other";
 
-// `deel --help`: one line per top-level group, under its documentation section. The
-// static commands come first (CLI), commands without a section last (Other).
 export function printRootHelp(root: CommandDef, sections: Map<string, string>, staticNames: Set<string>): void {
   const out = process.stdout.write.bind(process.stdout);
   const sectionFor = (row: HelpRow) => {
@@ -283,7 +283,7 @@ export function printRootHelp(root: CommandDef, sections: Map<string, string>, s
   out(`USAGE  deel <command> [<subcommand> ...] [OPTIONS]\n\n`);
   out(`Commands:\n`);
   for (const section of ordered) {
-    const rows = grouped.get(section)!.sort((a, b) => a.name.localeCompare(b.name));
+    const rows = grouped.get(section)!.sort((a, b) => byName(a.name, b.name));
     rows.forEach((row, index) => {
       const label = index === 0 ? section : "";
       out(`  ${label.padEnd(sectionWidth)}   ${row.name.padEnd(width)}   ${row.description}`.trimEnd() + "\n");
@@ -317,11 +317,12 @@ function editDistance(a: string, b: string): number {
 // that start with it or are within a small edit distance of it.
 export function suggestions(word: string, candidates: string[], limit = 5): string[] {
   const target = word.toLowerCase();
+  if (!target) return [];
   const allowed = Math.max(1, Math.floor(target.length / 3));
   return candidates
     .map((candidate) => ({ candidate, distance: candidate.startsWith(target) ? 0 : editDistance(target, candidate) }))
     .filter((entry) => entry.distance <= allowed)
-    .sort((a, b) => a.distance - b.distance || a.candidate.localeCompare(b.candidate))
+    .sort((a, b) => a.distance - b.distance || byName(a.candidate, b.candidate))
     .slice(0, limit)
     .map((entry) => entry.candidate);
 }

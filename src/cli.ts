@@ -111,8 +111,10 @@ function variantCommand(descriptors: Descriptor[]): CommandDef {
       } as ArgsDef[string];
     }
   }
+  const summaries = descriptors.map((d) => d.summary).filter(Boolean).join(" / ");
+  const flags = variants.map((v) => `--${v}`).join(", ");
   return defineCommand({
-    meta: { name, description: `(variants: ${variants.map((v) => `--${v}`).join(", ")})` },
+    meta: { name, description: summaries ? `${summaries} (${flags})` : `(${flags})` },
     args,
     async run(cittyCtx) {
       const args = cittyCtx.args as Args;
@@ -195,9 +197,23 @@ function buildRoot(): CommandDef {
   });
 }
 
+// A value-taking global flag (`--env demo`) consumes the next token, so that token is not a command word.
+function takesValue(token: string): boolean {
+  if (!token.startsWith("--") || token.includes("=")) return false;
+  return (commonArgs[token.slice(2)] as { type?: string } | undefined)?.type === "string";
+}
+
+function wordIndexes(argv: string[]): number[] {
+  const indexes: number[] = [];
+  for (let i = 0; i < argv.length; i++) {
+    if (!argv[i].startsWith("-")) indexes.push(i);
+    else if (takesValue(argv[i])) i++;
+  }
+  return indexes;
+}
+
 // Walk the tree by the leading positional tokens to find the target command.
-function resolve(root: CommandDef, argv: string[]): { cmd: CommandDef; parent?: CommandDef; matched: number } {
-  const positionals = argv.filter((token) => !token.startsWith("-"));
+function resolve(root: CommandDef, positionals: string[]): { cmd: CommandDef; parent?: CommandDef; matched: number } {
   let cmd = root;
   let parent: CommandDef | undefined;
   let matched = 0;
@@ -236,16 +252,6 @@ function descriptorFor(positionals: string[], matched: number, argv: string[]): 
   return undefined;
 }
 
-// True when the n-th positional token follows a value-taking global flag (`--env demo`),
-// so it is that flag's value, not a command word.
-function isGlobalFlagValue(argv: string[], n: number): boolean {
-  const index = argv.map((token, i) => (token.startsWith("-") ? -1 : i)).filter((i) => i >= 0)[n];
-  const previous = index > 0 ? argv[index - 1] : "";
-  if (!previous.startsWith("--") || previous.includes("=")) return false;
-  const arg = commonArgs[previous.slice(2)] as { type?: string } | undefined;
-  return arg?.type === "string";
-}
-
 function groupTitle(path: string[], cmd: CommandDef): string {
   const description = (cmd.meta as { description?: string } | undefined)?.description;
   if (description) return description;
@@ -263,20 +269,18 @@ export async function run(argv: string[]): Promise<number> {
   }
 
   const root = buildRoot();
-  const { cmd, parent, matched } = resolve(root, argv);
+  const words = wordIndexes(argv);
+  const positionals = words.map((i) => argv[i]);
+  const { cmd, parent, matched } = resolve(root, positionals);
   const wantsHelp = argv.includes("--help") || argv.includes("-h");
-  const hasPositional = argv.some((token) => !token.startsWith("-"));
   const isGroup = isGroupCommand(cmd) || cmd === root;
 
-  const positionals = argv.filter((token) => !token.startsWith("-"));
-
-  if (hasPositional && matched === 0) {
+  if (positionals.length > 0 && matched === 0) {
     printUnknownCommand(positionals[0], [], root);
     return EXIT.ERROR;
   }
 
-  // A word under a group that names none of its commands (not a flag's value).
-  if (isGroup && positionals.length > matched && !isGlobalFlagValue(argv, matched)) {
+  if (isGroup && positionals.length > matched) {
     printUnknownCommand(positionals[matched], positionals.slice(0, matched), cmd);
     return EXIT.ERROR;
   }
@@ -327,7 +331,7 @@ export async function run(argv: string[]): Promise<number> {
   }
   if (isGroup) {
     const path = positionals.slice(0, matched);
-    printGroupHelp(cmd, path, groupTitle(path, cmd), !(path[0] in staticCommands));
+    printGroupHelp(cmd, path, groupTitle(path, cmd), !Object.hasOwn(staticCommands, path[0]));
     return EXIT.OK;
   }
   // A static command's own help (auth login, job status, commands, ...): citty's usage.
@@ -336,6 +340,9 @@ export async function run(argv: string[]): Promise<number> {
     return EXIT.OK;
   }
 
-  await runCommand(root, { rawArgs: argv });
+  // citty takes the first non-flag token as the command, so a flag value before the command words moves after them.
+  const leading = new Set(words.slice(0, matched));
+  const rawArgs = [...argv.filter((_, i) => leading.has(i)), ...argv.filter((_, i) => !leading.has(i))];
+  await runCommand(root, { rawArgs });
   return EXIT.OK;
 }

@@ -123,8 +123,8 @@ test("a group mixing hand-picked and generated commands lists both", async () =>
   assert.match(out, /^Adjustments$/m);
   assert.match(out, /^ {2}list +List adjustments$/m);
   assert.match(out, /^ {2}get +Retrieve an adjustment$/m);
-  assert.match(out, /^ {2}create +\(variants: --invoice, --payroll\)$/m);
-  assert.match(out, /^ {2}create-bulk +\(variants: --invoice, --payroll\)$/m);
+  assert.match(out, /^ {2}create +Create a single invoice adjustment \/ Create a payroll adjustment \(--invoice, --payroll\)$/m);
+  assert.match(out, /^ {2}create-bulk +Create invoice adjustments in bulk \/ Process bulk payroll adjustments \(--invoice, --payroll\)$/m);
 });
 
 test("a hand-picked group without a section is titled with its path", async () => {
@@ -171,6 +171,27 @@ test("a global flag's value after a group is not an unknown command", async () =
   const { code, out } = await capture(["widgets", "--env", "demo"]);
   assert.equal(code, EXIT.OK);
   assert.match(out, /^Widgets$/m);
+});
+
+test("a global flag's value before the command is not a command word", async () => {
+  const group = await capture(["--env", "demo", "widgets", "--help"]);
+  assert.equal(group.code, EXIT.OK);
+  assert.match(group.out, /^Widgets$/m);
+  const leaf = await capture(["--env", "demo", "widgets", "parts", "get", "--help"]);
+  assert.equal(leaf.code, EXIT.OK);
+  assert.match(leaf.out, /USAGE {2}deel widgets parts get/);
+  const root = await capture(["--env", "demo"]);
+  assert.equal(root.code, EXIT.OK);
+  assert.match(root.out, /^Commands:$/m);
+  const unknown = await capture(["--env", "demo", "widgts"]);
+  assert.match(unknown.err, /^Unknown command 'widgts'\. Did you mean: widgets\?$/m);
+});
+
+test("an empty command word suggests nothing", async () => {
+  assert.deepEqual(suggestions("", ["list", "get"]), []);
+  const { code, err } = await capture([""]);
+  assert.equal(code, EXIT.ERROR);
+  assert.match(err, /^Unknown command ''\.$/m);
 });
 
 test("suggestions: prefixes first, then small edit distances, at most five", () => {

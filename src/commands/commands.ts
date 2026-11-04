@@ -3,6 +3,8 @@
 import { defineCommand } from "citty";
 import type { ArgsDef, CommandDef } from "citty";
 import type { Descriptor } from "../types.ts";
+import { CliError } from "../core/errors.ts";
+import { byName } from "../help.ts";
 import { allDescriptors } from "../public-api/commands.ts";
 
 export type CommandRow = { command: string; method: string | null; path: string | null; summary: string | null };
@@ -34,7 +36,7 @@ export function commandRows(descriptors: Descriptor[], statics: Record<string, C
       const text = [row.command, row.method, row.path, row.summary].filter(Boolean).join(" ").toLowerCase();
       return terms.every((term) => text.includes(term));
     })
-    .sort((a, b) => a.command.localeCompare(b.command) || (a.path ?? "").localeCompare(b.path ?? ""));
+    .sort((a, b) => byName(a.command, b.command) || byName(a.path ?? "", b.path ?? ""));
 }
 
 export function renderCommandRows(rows: CommandRow[]): string {
@@ -59,16 +61,16 @@ export function createCommandsCommand(statics: () => Record<string, CommandDef>)
     meta: { name: "commands", description: "List every command with its method, path and summary" },
     args,
     run(cittyCtx) {
-      const filter = cittyCtx.args.filter as string | undefined;
+      const filter = cittyCtx.args.filter as string | boolean | undefined;
+      if (filter !== undefined && (typeof filter !== "string" || !filter.trim())) {
+        throw new CliError("usage.filter", "--filter needs the text to look for.", "Example: deel commands --filter invoice");
+      }
       const rows = commandRows(allDescriptors(), statics(), filter);
       if (cittyCtx.args.json) {
         process.stdout.write(JSON.stringify(rows, null, 2) + "\n");
         return;
       }
-      if (rows.length === 0) {
-        process.stderr.write(`No commands match '${filter}'.\n`);
-        return;
-      }
+      if (rows.length === 0) throw new CliError("commands.no_match", `No commands match '${filter}'.`, "Run deel commands to list every command.");
       process.stdout.write(renderCommandRows(rows));
     },
   });
