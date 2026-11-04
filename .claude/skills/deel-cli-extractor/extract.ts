@@ -77,8 +77,9 @@ export function splitFields(objSchema: AnyObj | undefined): { textProps: CliPara
       fileFields.push(name);
     } else {
       const type = mapType(schema);
-      // Recurse into nested objects so every field is visible in --help / --generate-input, not just the top level.
-      const properties = type === "object" && schema.properties ? splitFields(schema).textProps : undefined;
+      // Recurse into nested objects and array-of-object items so every field is visible in --help / --generate-input, not just the top level.
+      const itemShape = type === "array" ? schema.items : schema;
+      const properties = (type === "object" || type === "array") && itemShape?.properties ? splitFields(itemShape).textProps : undefined;
       textProps.push({
         name,
         in: "body",

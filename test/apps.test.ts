@@ -72,6 +72,14 @@ test("apps list leaves cursor out of meta on the last page", async () => {
   assert.ok(!("cursor" in out().meta));
 });
 
+test("apps list leaves an empty or non-string cursor out of meta", async () => {
+  for (const cursor of ["", 7, true]) {
+    const { ctx, out } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: [], cursor } }));
+    await execute(descriptor(["apps", "list"]), { flags: {}, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
+    assert.ok(!("cursor" in out().meta), `cursor ${JSON.stringify(cursor)} stays out of meta`);
+  }
+});
+
 test("apps get puts the app id in the path and prints the unwrapped app", async () => {
   const { ctx, seen, out } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { id: APP_ID, api_access: "enabled" } } }));
   await execute(descriptor(["apps", "get"]), { flags: { app_id: APP_ID }, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
@@ -128,6 +136,19 @@ test("apps disable --help --json exposes the confirmation and apps enable does n
   });
   const enable = JSON.parse((await capture(["apps", "enable", "--help", "--json"])).out);
   assert.equal("confirm" in enable, false);
+});
+
+test("apps disable --help --json lists --yes among its params and apps enable does not", async () => {
+  const disable = JSON.parse((await capture(["apps", "disable", "--help", "--json"])).out);
+  assert.deepEqual(disable.params.find((param: { name: string }) => param.name === "yes"), {
+    name: "yes",
+    in: "flag",
+    type: "boolean",
+    required: false,
+    description: "Skip the confirmation prompt (required when not running in a terminal)",
+  });
+  const enable = JSON.parse((await capture(["apps", "enable", "--help", "--json"])).out);
+  assert.equal(enable.params.some((param: { name: string }) => param.name === "yes"), false);
 });
 
 test("apps get --help --json marks created_by and its name as required and nullable", async () => {
