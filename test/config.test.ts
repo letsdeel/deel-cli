@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resolveConfig, ENVIRONMENTS } from "../src/core/config.ts";
+import { resolveConfig, requireIssuer, ENVIRONMENTS } from "../src/core/config.ts";
+import type { CliError } from "../src/core/errors.ts";
 
 test("defaults to prod", () => {
   const config = resolveConfig({});
@@ -71,9 +72,13 @@ test("DEEL_OAUTH_ISSUER and DEEL_OAUTH_CLIENT_ID override the defaults", () => {
   });
 });
 
-test("DEEL_OAUTH_ISSUER must be https", () => {
+test("a non-https DEEL_OAUTH_ISSUER fails only when an OAuth issuer is needed", () => {
   withEnvVars({ DEEL_OAUTH_ISSUER: "http://idp.example.test" }, () => {
-    assert.throws(() => resolveConfig({}), /must be an https URL/);
+    const config = resolveConfig({});
+    assert.equal(config.issuer, null);
+    assert.match(config.issuerError ?? "", /must be an https URL/);
+    assert.equal(config.oauthBaseUrlOk, true);
+    assert.throws(() => requireIssuer(config), (error: CliError) => error.code === "config.oauth");
   });
 });
 

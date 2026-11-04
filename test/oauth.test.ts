@@ -63,6 +63,18 @@ test("entryFromTokenResponse computes the expiry and keeps the old refresh token
   assert.throws(() => entryFromTokenResponse({ access_token: "a" }, 0), /missing/);
 });
 
+test("entryFromTokenResponse without expires_in keeps the rotated refresh token", () => {
+  const part = (value: unknown) => Buffer.from(JSON.stringify(value)).toString("base64url");
+  const jwt = `${part({ alg: "RS256" })}.${part({ exp: 5000 })}.sig`;
+  const fromExp = entryFromTokenResponse({ access_token: jwt, refresh_token: "r2" }, 1000);
+  assert.equal(fromExp.refresh_token, "r2");
+  assert.equal(fromExp.expires_at, new Date(5_000_000).toISOString());
+  // An opaque token with no lifetime is stored as already expired, so the next use refreshes it.
+  const opaque = entryFromTokenResponse({ access_token: "opaque", refresh_token: "r3" }, 1000);
+  assert.equal(opaque.refresh_token, "r3");
+  assert.equal(isFresh(opaque, 1000), false);
+});
+
 test("isFresh uses a 60 second skew", () => {
   const entry = entryFromTokenResponse({ access_token: "a", refresh_token: "r", expires_in: 100 }, 0);
   assert.equal(isFresh(entry, 39_000), true);
@@ -181,17 +193,20 @@ test("a request with a foreign Host header is refused", async () => {
   await loopback.result;
 });
 
-test("a state mismatch is rejected", async () => {
-  const loopback = await startLoopback({ state: "expected", issuer: ISSUER });
-  const outcome = assert.rejects(loopback.result, (error: Error & { code?: string }) => error.code === "oauth.state");
-  assert.equal((await get(`${loopback.redirectUri}?code=abc&state=forged`)).status, 400);
-  await outcome;
+test("a wrong or missing state is ignored and the real callback still completes the login", async () => {
+  let ignored = 0;
+  const loopback = await startLoopback({ state: "expected", issuer: ISSUER, onIgnored: () => ignored++ });
+  assert.equal((await get(`${loopback.redirectUri}?code=forged&state=forged`)).status, 400);
+  assert.equal((await get(`${loopback.redirectUri}?code=forged`)).status, 400);
+  assert.equal(ignored, 2);
+  assert.equal((await get(`${loopback.redirectUri}?code=real&state=expected`)).status, 200);
+  assert.deepEqual(await loopback.result, { code: "real" });
 });
 
-test("a missing state is rejected", async () => {
-  const loopback = await startLoopback({ state: "expected", issuer: ISSUER });
-  const outcome = assert.rejects(loopback.result, (error: Error & { code?: string }) => error.code === "oauth.state");
-  await get(`${loopback.redirectUri}?code=abc`);
+test("only wrong-state callbacks end in the timeout", async () => {
+  const loopback = await startLoopback({ state: "expected", issuer: ISSUER, timeoutMs: 200 });
+  const outcome = assert.rejects(loopback.result, (error: Error & { code?: string }) => error.code === "oauth.timeout");
+  assert.equal((await get(`${loopback.redirectUri}?code=abc&state=forged`)).status, 400);
   await outcome;
 });
 
@@ -536,5 +551,17 @@ test(
     });
     assert.equal(items.get("prod"), "pat_legacy");
     assert.equal(readOAuthEntry(store, "https://idp.example.test")?.access_token, "at");
+  }),
+);
+
+test(
+  "an invalid issuer override fails login and logout without touching the keychain",
+  withEnvVar("DEEL_OAUTH_ISSUER", "http://idp.example.test", async () => {
+    const { store, items } = memoryStore({ prod: "pat_legacy" });
+    const config = resolveConfig({ env: "prod" });
+    const invalid = (error: Error & { code?: string }) => error.code === "config.oauth" && /must be an https URL/.test(error.message);
+    await assert.rejects(() => browserLogin({ config, store, transport: serving(METADATA), say: () => {} }), invalid);
+    await assert.rejects(() => logout(store, config, serving(METADATA)), invalid);
+    assert.equal(items.get("prod"), "pat_legacy");
   }),
 );

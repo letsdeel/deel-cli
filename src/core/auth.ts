@@ -6,7 +6,7 @@ import { CliError } from "./errors.ts";
 import { HEADER } from "./constants.ts";
 import { credentialStore } from "./keychain.ts";
 import type { CredentialStore } from "./keychain.ts";
-import { resolveConfig } from "./config.ts";
+import { assertIssuerOverride, resolveConfig } from "./config.ts";
 import type { Config } from "./config.ts";
 import { fetchTransport } from "./http.ts";
 import type { TokenProvider, Transport } from "./http.ts";
@@ -43,6 +43,7 @@ export function resolveToken(opts: ResolveOpts): ResolvedToken {
     const store = opts.store ?? credentialStore();
     if (store.available()) {
       const config = opts.config ?? resolveConfig({ env });
+      assertIssuerOverride(config);
       const entry = config.issuer ? readOAuthEntry(store, config.issuer) : null;
       if (entry && config.issuer) {
         // OAuth tokens only travel to the environment that issued them.

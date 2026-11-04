@@ -198,11 +198,23 @@ export function entryFromTokenResponse(json: unknown, now: number, previous?: OA
   const body = (json ?? {}) as Record<string, unknown>;
   const accessToken = body.access_token;
   const refreshToken = typeof body.refresh_token === "string" && body.refresh_token ? body.refresh_token : previous?.refresh_token;
-  const expiresIn = Number(body.expires_in);
-  if (typeof accessToken !== "string" || !accessToken || !refreshToken || !Number.isFinite(expiresIn)) {
-    throw new CliError("oauth.token", "The token response is missing an access token, refresh token or lifetime.");
+  if (typeof accessToken !== "string" || !accessToken || !refreshToken) {
+    throw new CliError("oauth.token", "The token response is missing an access token or refresh token.");
   }
-  return { v: 2, access_token: accessToken, refresh_token: refreshToken, expires_at: new Date(now + expiresIn * 1000).toISOString() };
+  const expiresIn = typeof body.expires_in === "number" || typeof body.expires_in === "string" ? Number(body.expires_in) : NaN;
+  // Without a lifetime, fall back to the token's exp or refresh on next use: throwing would drop a rotated refresh token.
+  const expiresAt = Number.isFinite(expiresIn) ? now + expiresIn * 1000 : (jwtExpiry(accessToken) ?? now);
+  return { v: 2, access_token: accessToken, refresh_token: refreshToken, expires_at: new Date(expiresAt).toISOString() };
+}
+
+// The exp claim in ms, decoded without verification: it only schedules the next refresh.
+function jwtExpiry(token: string): number | null {
+  try {
+    const { exp } = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8")) as { exp?: unknown };
+    return typeof exp === "number" && Number.isFinite(exp) ? exp * 1000 : null;
+  } catch {
+    return null;
+  }
 }
 
 // ---------------- cross-process lock ----------------

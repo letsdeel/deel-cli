@@ -20,6 +20,8 @@ export type Config = {
   clientId: string;
   // True when baseUrl is the API of the environment that issues OAuth tokens, so they may be sent to it.
   oauthBaseUrlOk: boolean;
+  // Set when DEEL_OAUTH_ISSUER is invalid; only the OAuth paths fail on it (requireIssuer), so PATs keep working.
+  issuerError?: string;
 };
 
 function originOf(url: string): string | null {
@@ -30,13 +32,23 @@ function originOf(url: string): string | null {
   }
 }
 
-function httpsOverride(name: string): string | undefined {
+// The override, undefined when unset, or an error message when it is not an https URL.
+function httpsOverride(name: string): { value?: string; error?: string } {
   const value = process.env[name]?.trim().replace(/\/$/, "");
-  if (!value) return undefined;
-  if (originOf(value) === null || !value.startsWith("https://")) {
-    throw new CliError("config.oauth", `${name} must be an https URL (got "${value}").`);
-  }
-  return value;
+  if (!value) return {};
+  if (originOf(value) === null || !value.startsWith("https://")) return { error: `${name} must be an https URL (got "${value}").` };
+  return { value };
+}
+
+// Called on the OAuth paths only, so an invalid DEEL_OAUTH_ISSUER never blocks a PAT.
+export function assertIssuerOverride(config: Config): void {
+  if (config.issuerError) throw new CliError("config.oauth", config.issuerError);
+}
+
+export function requireIssuer(config: Config): string {
+  assertIssuerOverride(config);
+  if (!config.issuer) throw new CliError("config.oauth", `No OAuth issuer is configured for "${config.env}".`, "Use --env prod or --env demo.");
+  return config.issuer;
 }
 
 export function resolveConfig(opts: { env?: string; baseUrl?: string }): Config {
@@ -59,7 +71,8 @@ export function resolveConfig(opts: { env?: string; baseUrl?: string }): Config 
   if (parsed.protocol !== "https:") {
     throw new CliError("config.baseurl", `--base-url must use https (got "${baseUrl}").`, "The API token is only sent over https.");
   }
-  const issuer = httpsOverride("DEEL_OAUTH_ISSUER") ?? known?.issuer ?? null;
+  const override = httpsOverride("DEEL_OAUTH_ISSUER");
+  const issuer = override.error ? null : (override.value ?? known?.issuer ?? null);
   const clientId = process.env.DEEL_OAUTH_CLIENT_ID?.trim() || known?.clientId || CLI_OAUTH_CLIENT_ID;
   const trustedOrigins = [known ? originOf(known.baseUrl) : null, issuer ? originOf(issuer) : null];
   return {
@@ -68,5 +81,6 @@ export function resolveConfig(opts: { env?: string; baseUrl?: string }): Config 
     issuer,
     clientId,
     oauthBaseUrlOk: trustedOrigins.includes(parsed.origin),
+    ...(override.error ? { issuerError: override.error } : {}),
   };
 }

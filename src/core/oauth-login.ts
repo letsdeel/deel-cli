@@ -8,7 +8,7 @@ import { platform } from "node:os";
 import { CliError } from "./errors.ts";
 import { discover, entryFromTokenResponse, lockPath, postForm, readOAuthEntry, removeOAuthEntry, withLock, writeOAuthEntry } from "./oauth.ts";
 import type { OAuthEntry, ServerMetadata } from "./oauth.ts";
-import { ENVIRONMENTS } from "./config.ts";
+import { ENVIRONMENTS, assertIssuerOverride, requireIssuer } from "./config.ts";
 import type { Config } from "./config.ts";
 import type { Transport } from "./http.ts";
 import type { CredentialStore } from "./keychain.ts";
@@ -29,6 +29,7 @@ const PAGE = (title: string, line: string) =>
   `<body style="font-family:system-ui,sans-serif;margin:4rem auto;max-width:28rem;text-align:center"><h1>${title}</h1><p>${line}</p></body></html>`;
 const OK_PAGE = PAGE("Signed in", "You can close this window and return to the terminal.");
 const FAILED_PAGE = PAGE("Sign-in failed", "You can close this window and check the terminal.");
+const STALE_PAGE = PAGE("Sign-in not recognised", "This response does not belong to the sign-in in progress. Use the link from the latest 'deel auth login'.");
 
 // Server-supplied text is shown in the terminal, so strip control characters and cap the length.
 function printable(value: string | null): string {
@@ -42,7 +43,7 @@ export type Loopback = {
 };
 
 // Listens on 127.0.0.1 (never "localhost") for exactly one GET /callback, then closes.
-export async function startLoopback(opts: { state: string; issuer: string; timeoutMs?: number }): Promise<Loopback> {
+export async function startLoopback(opts: { state: string; issuer: string; timeoutMs?: number; onIgnored?: () => void }): Promise<Loopback> {
   let settle: { resolve: (value: { code: string }) => void; reject: (error: CliError) => void };
   const result = new Promise<{ code: string }>((resolve, reject) => {
     settle = { resolve, reject };
@@ -73,12 +74,16 @@ export async function startLoopback(opts: { state: string; issuer: string; timeo
       reply(405, PAGE("Not allowed", "Nothing here."));
       return;
     }
-    finished = true; // the first callback is the only one honoured
     const params = url.searchParams;
-    let outcome: { code: string } | CliError;
+    // Any local page or process can reach the listener, so a wrong state is ignored rather than ending the login.
     if (params.get("state") !== opts.state) {
-      outcome = new CliError("oauth.state", "The sign-in response did not match this login attempt (state mismatch).", "Run 'deel auth login' again.");
-    } else if (params.has("iss") && params.get("iss") !== opts.issuer) {
+      reply(400, STALE_PAGE);
+      opts.onIgnored?.();
+      return;
+    }
+    finished = true; // the first callback with this attempt's state is the only one honoured
+    let outcome: { code: string } | CliError;
+    if (params.has("iss") && params.get("iss") !== opts.issuer) {
       outcome = new CliError("oauth.issuer", "The sign-in response came from an unexpected issuer.", "Refusing to continue.");
     } else if (params.has("error")) {
       const description = printable(params.get("error_description"));
@@ -179,14 +184,17 @@ export type BrowserLoginOpts = {
 
 export async function browserLogin(opts: BrowserLoginOpts): Promise<OAuthEntry> {
   const { config } = opts;
-  if (!config.issuer) {
-    throw new CliError("config.oauth", `No OAuth issuer is configured for "${config.env}".`, "Use --env prod or --env demo.");
-  }
-  const metadata = await discover(config.issuer, opts.transport);
+  const issuer = requireIssuer(config);
+  const metadata = await discover(issuer, opts.transport);
   const scopes = chooseScopes(metadata.scopes_supported, opts.scopes, Boolean(opts.readOnly));
   const verifier = newVerifier();
   const state = newState();
-  const loopback = await startLoopback({ state, issuer: config.issuer, timeoutMs: opts.timeoutMs });
+  const loopback = await startLoopback({
+    state,
+    issuer,
+    timeoutMs: opts.timeoutMs,
+    onIgnored: () => opts.say("Ignored a sign-in response that does not match this login attempt.\n"),
+  });
   try {
     const url = authorizationUrl(metadata, { clientId: config.clientId, redirectUri: loopback.redirectUri, scopes, state, challenge: challengeFor(verifier) });
     opts.say(`Open this URL in your browser to sign in:\n${url}\n`);
@@ -205,7 +213,6 @@ export async function browserLogin(opts: BrowserLoginOpts): Promise<OAuthEntry> 
       throw new CliError("oauth.token", `The sign-in could not be completed (${response.status}${detail ? `: ${detail}` : ""}).`, "Run 'deel auth login' again.");
     }
     const entry = entryFromTokenResponse(response.json, (opts.now ?? Date.now)());
-    const issuer = config.issuer;
     // Under the refresh lock, so a refresh of the previous login in another process cannot overwrite or delete this one.
     await withLock(lockPath(issuer), async () => {
       if (!writeOAuthEntry(opts.store, issuer, entry)) throw new CliError("auth.keychain", "Failed to store the login in the keychain.");
@@ -242,6 +249,7 @@ export type LogoutResult = { removed: boolean; revoked: boolean | "unsupported";
 // neither rotate the token being revoked nor store a replacement after the removal.
 export async function logout(store: CredentialStore, config: Config, transport: Transport): Promise<LogoutResult> {
   if (!store.available()) return { removed: false, revoked: false, hadLogin: false };
+  assertIssuerOverride(config);
   const issuer = config.issuer;
   if (!issuer) return { removed: removeStoredLogin(store, config), revoked: false, hadLogin: false };
   return withLock(lockPath(issuer), async () => {

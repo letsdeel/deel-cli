@@ -18,7 +18,7 @@ const fakeStore = (token: string | null): CredentialStore => ({
 });
 
 function withEnv(vars: Record<string, string | undefined>, body: () => void) {
-  const keys = ["DEEL_TOKEN"];
+  const keys = ["DEEL_TOKEN", "DEEL_OAUTH_ISSUER"];
   const saved: Record<string, string | undefined> = {};
   for (const key of keys) saved[key] = process.env[key];
   for (const key of keys) delete process.env[key];
@@ -178,6 +178,16 @@ test("a login stored for another issuer is not found", () => {
   withEnv({ DEEL_OAUTH_ISSUER: "https://elsewhere.example.test" }, () => {
     const { store } = memoryStore({ oauth: entryAt(3_600_000) });
     assert.equal(resolveToken({ config: resolveConfig({ env: "prod" }), store }).source, "none");
+  });
+});
+
+test("an invalid DEEL_OAUTH_ISSUER does not block DEEL_TOKEN but fails the keychain login", () => {
+  withEnv({ DEEL_OAUTH_ISSUER: "http://idp.example.test", DEEL_TOKEN: "tok_env" }, () => {
+    assert.equal(resolveToken({ config: resolveConfig({ env: "prod" }), store: fakeStore("pat") }).source, "env");
+  });
+  withEnv({ DEEL_OAUTH_ISSUER: "http://idp.example.test" }, () => {
+    const config = resolveConfig({ env: "prod" });
+    assert.throws(() => resolveToken({ config, store: fakeStore("pat") }), (error: CliError) => error.code === "config.oauth");
   });
 });
 
