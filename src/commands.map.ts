@@ -17,14 +17,14 @@ export const commandMap: CommandEntry[] = [
   { command: "jobs list",   method: "GET", path: "/jobs" },
   { command: "jobs status", method: "GET", path: "/jobs/{job_id}" },
 
-  { command: "apps list", method: "GET", path: "/apps" },
-  { command: "apps get",  method: "GET", path: "/apps/{app_id}" },
-  { command: "apps update", method: "PATCH", path: "/apps/{app_id}" },
+  { command: "oauth2-apps list", method: "GET", path: "/oauth2-apps" },
+  { command: "oauth2-apps get",  method: "GET", path: "/oauth2-apps/{app_id}" },
+  { command: "oauth2-apps update", method: "PATCH", path: "/oauth2-apps/{app_id}" },
   {
-    command: "apps disable",
+    command: "oauth2-apps disable",
     method: "POST",
-    path: "/apps/{app_id}/disable",
+    path: "/oauth2-apps/{app_id}/disable",
     confirm: "Disable app {app_id}? This revokes all consents and tokens; enable does not restore them.",
   },
-  { command: "apps enable", method: "POST", path: "/apps/{app_id}/enable" },
+  { command: "oauth2-apps enable", method: "POST", path: "/oauth2-apps/{app_id}/enable" },
 ];

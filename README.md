@@ -6,7 +6,7 @@ A command-line client for selected endpoints from the [Deel Public API](https://
 deel auth status --json                              # verify your token and identity
 deel adjustments create --invoice --generate-input  # explore required fields
 deel jobs list --jq '.[] | {job_id, status}'        # filter recent async jobs
-deel apps list --api_access enabled                 # list your organization's integration apps
+deel oauth2-apps list --api_access enabled                 # list your organization's integration apps
 ```
 
 ## Contents
@@ -21,7 +21,7 @@ deel apps list --api_access enabled                 # list your organization's i
 - [Output (`--json`, `--fields`, `--jq`, `--quiet`)](#output)
 - [Idempotency](#idempotency)
 - [Webhooks](#webhooks)
-- [Apps](#apps)
+- [OAuth2 apps](#oauth2-apps)
 - [Environments](#environments)
 - [Corporate proxies & custom CAs](#corporate-proxies--custom-cas)
 - [Exit codes](#exit-codes)
@@ -175,7 +175,7 @@ A command can ask for confirmation before it sends anything: an entry in `src/co
 - When stdin carries the token or the body (`--token-stdin`, `--input -`), the prompt could not read an answer, so `--yes` is required there too.
 - `--help --json` lists the confirmation under `confirm`, so a script or an agent can see it before running the command.
 
-`deel apps disable` is one.
+`deel oauth2-apps disable` is one.
 
 ## Request input
 
@@ -260,22 +260,22 @@ A webhook id can start with `-`, which the argument parser reads as a flag. Pass
 
 `simulate` runs the delivery from Deel's servers, so the receiver URL must be publicly reachable; it is limited to 10 simulations per hour per event type, is never retried and gets no auto-derived `Idempotency-Key`, and exits 1 when the receiver does not answer 2xx.
 
-## Apps
+## OAuth2 apps
 
-`deel apps list` and `deel apps get --app_id <id>` read, and `deel apps update`, `disable` and `enable` change, the integration apps that belong to your organization (the app secret is never returned). The commands are generated from the API spec like the others, so path parameters are flags.
+`deel oauth2-apps list` and `deel oauth2-apps get --app_id <id>` read, and `deel oauth2-apps update`, `disable` and `enable` change, the integration apps that belong to your organization (the app secret is never returned). The commands are generated from the API spec like the others, so path parameters are flags.
 
 ```bash
-deel apps list --api_access disabled --limit 20      # filter by API access; --limit (1 to 100, default 100) and --cursor page the list
-deel apps get --app_id 00000000-0000-0000-0000-000000000000
-deel apps update --app_id <id> --input name="Payroll sync"      # changes only the given fields
-deel apps update --app_id <id> --input '{"redirect_uris":["https://example.com/callback"]}'  # replaces the whole list
-deel apps disable --app_id <id>                                 # asks to confirm; --yes skips the prompt
-deel apps enable --app_id <id>
+deel oauth2-apps list --api_access disabled --limit 20      # filter by API access; --limit (1 to 100, default 100) and --cursor page the list
+deel oauth2-apps get --app_id 00000000-0000-0000-0000-000000000000
+deel oauth2-apps update --app_id <id> --input name="Payroll sync"      # changes only the given fields
+deel oauth2-apps update --app_id <id> --input '{"redirect_uris":["https://example.com/callback"]}'  # replaces the whole list
+deel oauth2-apps disable --app_id <id>                                 # asks to confirm; --yes skips the prompt
+deel oauth2-apps enable --app_id <id>
 ```
 
-`deel apps disable` revokes every consent and token issued to the app; `enable` does not restore them, so people must authorize the app again. It asks `[y/N]` in a terminal. `--yes` skips the prompt and is required when not running in a terminal (no TTY, or `CI` / an agent environment is detected) and when stdin carries the token or the body (`--token-stdin`, `--input -`), since the prompt would read that line as the answer; without it nothing is sent. `deel apps disable --help --json` lists the confirmation under `confirm`.
+`deel oauth2-apps disable` revokes every consent and token issued to the app; `enable` does not restore them, so people must authorize the app again. It asks `[y/N]` in a terminal. `--yes` skips the prompt and is required when not running in a terminal (no TTY, or `CI` / an agent environment is detected) and when stdin carries the token or the body (`--token-stdin`, `--input -`), since the prompt would read that line as the answer; without it nothing is sent. `deel oauth2-apps disable --help --json` lists the confirmation under `confirm`.
 
-`apps list` returns one page at a time. When more results exist, the next-page cursor is printed as `meta.cursor`; pass it back with `--cursor` to get the next page.
+`oauth2-apps list` returns one page at a time. When more results exist, the next-page cursor is printed as `meta.cursor`; pass it back with `--cursor` to get the next page.
 
 ## Environments
 
