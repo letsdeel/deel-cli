@@ -14,6 +14,7 @@ import type { OutputOpts } from "../core/output.ts";
 import { setLoggingEnabled, setLogBodiesEnabled } from "../core/logging.ts";
 import { CliError } from "../core/errors.ts";
 import {
+  DASH_ID_HINT,
   SIGNING_KEY_HINT,
   SIMULATE_USAGE,
   buildCreateBody,
@@ -32,7 +33,7 @@ import {
   updateWebhook,
 } from "../core/webhooks.ts";
 import type { CreateWebhookBody, ListFlags, SimulateWebhookBody, UpdateWebhookBody, WebhookSimulation, WriteFlags } from "../core/webhooks.ts";
-import { commonArgs, configFrom, gatherFlagValues, outputOpts, readHidden } from "./shared.ts";
+import { commonArgs, configFrom, gatherFlagValues, nullableBoolean, nullableString, outputOpts, readHidden } from "./shared.ts";
 import type { Args } from "./shared.ts";
 
 type CittyCtx = { args: unknown; rawArgs: string[] };
@@ -60,17 +61,15 @@ export function listFlagsFrom(args: Args): ListFlags {
   };
 }
 
-// Last occurrence of `--<name>` (true), `--no-<name>` (false) or `--<name>=true|false`;
-// undefined when absent, so an absent boolean is never sent.
-export function readBooleanFlag(rawArgs: string[], name: string): boolean | undefined {
-  let value: boolean | undefined;
+// Last occurrence of `--<name>` (true), `--no-<name>` (false) or `--<name>=true|false|null`
+// (null clears the field); undefined when absent, so an absent boolean is never sent.
+export function readBooleanFlag(rawArgs: string[], name: string): boolean | null | undefined {
+  let value: boolean | null | undefined;
   for (const token of rawArgs) {
     if (token === `--${name}`) value = true;
     else if (token === `--no-${name}`) value = false;
     else if (token.startsWith(`--${name}=`)) {
-      const raw = token.slice(name.length + 3);
-      if (raw !== "true" && raw !== "false") throw new CliError("usage.webhooks", `--${name} must be true or false, got "${raw}"`);
-      value = raw === "true";
+      value = nullableBoolean(token.slice(name.length + 3), `--${name}`);
     }
   }
   return value;
@@ -81,7 +80,7 @@ export function writeFlagsFrom(args: Args, rawArgs: string[]): WriteFlags {
   return {
     name: optionalString(args.name),
     url: optionalString(args.url),
-    description: optionalString(args.description),
+    description: nullableString(optionalString(args.description)),
     status: optionalString(args.status),
     events: gatherFlagValues(rawArgs, "event"),
     includeChildOrgs: readBooleanFlag(rawArgs, "include-child-orgs"),
@@ -180,15 +179,36 @@ export async function runSimulate(ctx: Ctx, id: string, body: SimulateWebhookBod
 // The id of a single-webhook command (get / update / delete / simulate): the positional, or --id=<id> for an id that
 // starts with '-'.
 export function requireId(args: Args, rawArgs: string[], usage: string): string {
+  const twoArgIndex = rawArgs.indexOf("--id");
+  if (twoArgIndex >= 0 && rawArgs[twoArgIndex + 1]?.startsWith("--")) {
+    throw new CliError("usage.webhooks", `--id needs a value, but the next argument is ${rawArgs[twoArgIndex + 1]}.`, DASH_ID_HINT);
+  }
   return resolveWebhookId(args.id, readHidden(rawArgs, "id"), usage);
+}
+
+// `enable` / `disable`: shorthand for `update <id> --status enabled|disabled`, sending only the status.
+function statusCommand(status: UpdateWebhookBody["status"] & string) {
+  const name = status === "enabled" ? "enable" : "disable";
+  return defineCommand({
+    meta: { name, description: `${status === "enabled" ? "Enable" : "Disable"} a webhook: deel webhooks ${name} <id> (an id that starts with '-': --id=<id>)` },
+    args: {
+      id: { type: "positional", required: false, description: "Webhook id" },
+      ...commonArgs,
+    },
+    async run(cittyCtx) {
+      const args = cittyCtx.args as Args;
+      const id = requireId(args, cittyCtx.rawArgs, `deel webhooks ${name} <id>`);
+      await runUpdate(contextFor(cittyCtx), id, { status }, outputOpts(args), optionalString(args["idempotency-key"]));
+    },
+  });
 }
 
 const writeArgs: ArgsDef = {
   name: { type: "string", description: "Webhook name" },
   url: { type: "string", description: "HTTPS endpoint that receives the events" },
   event: { type: "string", description: "Event type to subscribe to (repeatable; see deel webhooks event-types)" },
-  description: { type: "string", description: "Description" },
-  "include-child-orgs": { type: "boolean", description: "Also deliver events of child organizations (--no-include-child-orgs to turn off)" },
+  description: { type: "string", description: "Description (null clears it)" },
+  "include-child-orgs": { type: "boolean", description: "Also deliver events of child organizations (--no-include-child-orgs to turn off, --include-child-orgs=null to clear)" },
 };
 
 export const webhooksCommand = defineCommand({
@@ -199,7 +219,7 @@ export const webhooksCommand = defineCommand({
       args: {
         limit: { type: "string", description: "Page size, 1-100 (opts into paging)" },
         cursor: { type: "string", description: "Next page cursor from a previous call" },
-        all: { type: "boolean", description: "Fetch every page (100 per request)" },
+        all: { type: "boolean", description: "Fetch every page, newest first (100 per request; no --order: a plain list --order name returns the whole list sorted)" },
         status: { type: "string", description: "Filter by status: enabled | disabled" },
         search: { type: "string", description: "Filter by name or URL" },
         order: { type: "string", description: "Sort: name|created_at|status[:asc|desc] (not with --limit/--cursor/--all)" },
@@ -257,6 +277,8 @@ export const webhooksCommand = defineCommand({
         await runUpdate(contextFor(cittyCtx), id, body, outputOpts(args), optionalString(args["idempotency-key"]));
       },
     }),
+    enable: statusCommand("enabled"),
+    disable: statusCommand("disabled"),
     delete: defineCommand({
       meta: { name: "delete", description: "Delete a webhook: deel webhooks delete <id> (asks to confirm; --yes when non-interactive; an id that starts with '-': --id=<id>)" },
       args: {
