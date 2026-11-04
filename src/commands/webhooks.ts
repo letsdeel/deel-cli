@@ -13,6 +13,7 @@ import type { OutputOpts } from "../core/output.ts";
 import { setLoggingEnabled, setLogBodiesEnabled } from "../core/logging.ts";
 import { CliError } from "../core/errors.ts";
 import {
+  DASH_ID_HINT,
   SIGNING_KEY_HINT,
   SIMULATE_USAGE,
   buildCreateBody,
@@ -204,6 +205,10 @@ export async function runSimulate(ctx: Ctx, id: string, body: SimulateWebhookBod
 // The id of a single-webhook command (get / update / delete / simulate): the positional, or --id=<id> for an id that
 // starts with '-'.
 export function requireId(args: Args, rawArgs: string[], usage: string): string {
+  const twoArgIndex = rawArgs.indexOf("--id");
+  if (twoArgIndex >= 0 && rawArgs[twoArgIndex + 1]?.startsWith("--")) {
+    throw new CliError("usage.webhooks", `--id needs a value, but the next argument is ${rawArgs[twoArgIndex + 1]}.`, DASH_ID_HINT);
+  }
   return resolveWebhookId(args.id, readHidden(rawArgs, "id"), usage);
 }
 
@@ -240,7 +245,7 @@ export const webhooksCommand = defineCommand({
       args: {
         limit: { type: "string", description: "Page size, 1-100 (opts into paging)" },
         cursor: { type: "string", description: "Next page cursor from a previous call" },
-        all: { type: "boolean", description: "Fetch every page (100 per request)" },
+        all: { type: "boolean", description: "Fetch every page, newest first (100 per request; no --order: a plain list --order name returns the whole list sorted)" },
         status: { type: "string", description: "Filter by status: enabled | disabled" },
         search: { type: "string", description: "Filter by name or URL" },
         order: { type: "string", description: "Sort: name|created_at|status[:asc|desc] (not with --limit/--cursor/--all)" },

@@ -86,7 +86,12 @@ export function gatherFlagValues(rawArgs: string[], name: string): string[] {
   const prefix = `--${name}`;
   for (let index = 0; index < rawArgs.length; index++) {
     const token = rawArgs[index];
-    if (token === prefix && rawArgs[index + 1] !== undefined) values.push(rawArgs[++index]);
+    if (token === prefix && rawArgs[index + 1] !== undefined) {
+      const value = rawArgs[++index];
+      // A flag in the value position means the value is missing; --name=--x still passes one that starts with --.
+      if (value.startsWith("--")) throw new CliError("usage.flag_value", `${prefix} needs a value, but the next argument is ${value}.`, `Write ${prefix}=${value} if the value really starts with --.`);
+      values.push(value);
+    }
     else if (token.startsWith(prefix + "=")) values.push(token.slice(prefix.length + 1));
   }
   return values;

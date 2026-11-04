@@ -98,9 +98,10 @@ export type WebhookSimulation = {
 
 export const SIGNING_KEY_HINT = "reveal the signing key in Developer Center → Webhooks";
 export const SIMULATE_USAGE = "deel webhooks simulate <id> --event <type>";
-export const SIMULATE_RATE_LIMIT_HINT = "Simulations are limited to 10 simulations per hour per event type; wait before trying again.";
-export const SIMULATE_NOT_FOUND_HINT =
-  "No webhook with this id in your organization, or the event type has no sample payload; check `deel webhooks list` and `deel webhooks event-types`.";
+export const SIMULATE_RATE_LIMIT_HINT = "Limit: 10 simulations per hour per event type; try again later.";
+export const SIMULATE_NOT_FOUND_HINT = "No webhook with this id in your organization; check `deel webhooks list`.";
+export const SIMULATE_BAD_REQUEST_HINT =
+  "The webhook must be enabled and subscribed to this event; see `deel webhooks get <id>` and `deel webhooks event-types`.";
 export const WEBHOOKS_PAGE_SIZE = 100;
 export const WEBHOOKS_MAX_PAGES = 1000;
 const WEBHOOK_STATUSES = ["enabled", "disabled"];
@@ -246,6 +247,7 @@ export function simulateErrorFromResponse(status: number, json: unknown, request
   }
   if (status === 429) appendNext(error, SIMULATE_RATE_LIMIT_HINT);
   if (status === 404) appendNext(error, SIMULATE_NOT_FOUND_HINT);
+  if (status === 400) appendNext(error, SIMULATE_BAD_REQUEST_HINT);
   return error;
 }
 

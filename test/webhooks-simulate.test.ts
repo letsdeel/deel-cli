@@ -12,7 +12,8 @@ const CONFIG = { env: "demo", baseUrl: "https://example.test/rest" };
 const JSON_OUTPUT = { json: true, quiet: false, raw: false };
 const HUMAN_OUTPUT = { json: false, quiet: false, raw: false };
 const RATE_LIMIT_HINT = "10 simulations per hour per event type";
-const NOT_FOUND_HINT = "No webhook with this id in your organization, or the event type has no sample payload";
+const BAD_REQUEST_HINT = "must be enabled and subscribed to this event";
+const NOT_FOUND_HINT = "No webhook with this id in your organization";
 
 const ok = (json: unknown, status = 200): HttpResponse => ({ status, headers: {}, text: "", json });
 
@@ -198,11 +199,19 @@ test("webhooks simulate still reads the old flat { error_code, message } error s
   );
 });
 
-test("webhooks simulate adds neither hint to other error statuses", async () => {
-  const { ctx } = ctxWith(() => ok({ errors: [{ code: "BAD_REQUEST", message: "Webhook is disabled" }] }, 400));
+test("webhooks simulate points a 400 at the webhook's status and subscribed events, with no other hint", async () => {
+  const { ctx } = ctxWith(() => ok({ errors: [{ code: "BAD_REQUEST", message: "Webhook is not subscribed to the 'x' event type" }] }, 400));
   await assert.rejects(
     () => runSimulate(ctx, "wh_1", buildSimulateBody("contract.created"), JSON_OUTPUT),
-    (err: any) => err.code === "BAD_REQUEST" && err.message === "Webhook is disabled" && err.next === undefined,
+    (err: any) => err.code === "BAD_REQUEST" && err.next.includes(BAD_REQUEST_HINT) && !err.next.includes(NOT_FOUND_HINT) && !err.next.includes(RATE_LIMIT_HINT),
+  );
+});
+
+test("webhooks simulate adds none of the hints to other error statuses", async () => {
+  const { ctx } = ctxWith(() => ok({ errors: [{ code: "FORBIDDEN", message: "Missing scope" }] }, 403));
+  await assert.rejects(
+    () => runSimulate(ctx, "wh_1", buildSimulateBody("contract.created"), JSON_OUTPUT),
+    (err: any) => err.code === "FORBIDDEN" && err.next === undefined,
   );
 });
 
