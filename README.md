@@ -16,6 +16,7 @@ deel jobs list --jq '.[] | {job_id, status}'        # filter recent async jobs
 - [Quickstart](#quickstart)
 - [Authentication](#authentication)
 - [Discovering commands](#discovering-commands)
+- [Shell completion](#shell-completion)
 - [Request input (`--input`, `--file`, `--form`)](#request-input)
 - [Output (`--json`, `--fields`, `--jq`, `--quiet`)](#output)
 - [Idempotency](#idempotency)
@@ -163,6 +164,18 @@ deel adjustments create --invoice --generate-input      # JSON body skeleton to 
 ```
 
 `--help` for an action shows what generic `--help` cannot: the request-body fields (which arrive via `--input`, not as flags) and the response fields.
+
+## Shell completion
+
+`deel completion <shell>` prints a completion script for bash, zsh or fish:
+
+```bash
+source <(deel completion bash)     # bash: add to ~/.bashrc
+source <(deel completion zsh)      # zsh: add to ~/.zshrc, after compinit
+deel completion fish | source      # fish: or save to ~/.config/fish/completions/deel.fish
+```
+
+It completes commands and subcommands, an action's flags (including variant selectors like `--invoice`), enum values, `--env` environments, and `--fields` from the action's response fields (`--fields job_id,st<TAB>`). Free-form values such as `--input file://...` fall back to file completion. The script asks the installed `deel` for candidates (`deel __complete ...`, offline, no token needed), so completions always match the commands your version has.
 
 ## Request input
 
