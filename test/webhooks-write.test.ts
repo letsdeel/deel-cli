@@ -77,6 +77,7 @@ test("readBooleanFlag: absent -> undefined, --flag -> true, --no-flag -> false, 
   assert.equal(readBooleanFlag(["--include-child-orgs=false"], "include-child-orgs"), false);
   assert.equal(readBooleanFlag(["--include-child-orgs=true"], "include-child-orgs"), true);
   assert.throws(() => readBooleanFlag(["--include-child-orgs=maybe"], "include-child-orgs"), usage);
+  assert.equal(readBooleanFlag(["--include-child-orgs=null"], "include-child-orgs"), null);
 });
 
 test("isYes accepts only y / yes, case-insensitive", () => {
@@ -308,4 +309,13 @@ test("deel webhooks enable and disable without an id are a usage error", async (
 test("deel webhooks update and delete without an id point at --id=<id> for ids that start with a dash", async () => {
   await assert.rejects(() => run(["webhooks", "update", "--status", "disabled"]), (err: any) => usage(err) && err.next === DASH_ID_HINT);
   await assert.rejects(() => run(["webhooks", "delete", "--yes"]), (err: any) => usage(err) && err.next === DASH_ID_HINT);
+});
+
+test("the literal null clears a nullable field: --description=null and --include-child-orgs=null send JSON null", () => {
+  assert.deepEqual(buildUpdateBody(writeFlagsFrom({ id: "wh_1", description: "null" }, ["wh_1", "--include-child-orgs=null"])), {
+    description: null,
+    include_child_orgs: null,
+  });
+  assert.deepEqual(buildUpdateBody(writeFlagsFrom({ id: "wh_1", description: "nulls" }, ["wh_1"])), { description: "nulls" });
+  assert.equal(buildCreateBody({ name: "Hook", url: "https://x.test/h", events: ["a.b"], description: null }).description, null);
 });

@@ -49,6 +49,12 @@ export function eventFlag(args: Args, rawArgs: string[]): string | undefined {
   return typeof args.event === "string" ? args.event : undefined;
 }
 
+// The literal `null` clears a nullable field (sent as JSON null); any other text is the value.
+function nullableString(value: unknown): string | null | undefined {
+  const text = optionalString(value);
+  return text === "null" ? null : text;
+}
+
 export function listFlagsFrom(args: Args): ListFlags {
   return {
     limit: optionalString(args.limit),
@@ -60,17 +66,17 @@ export function listFlagsFrom(args: Args): ListFlags {
   };
 }
 
-// Last occurrence of `--<name>` (true), `--no-<name>` (false) or `--<name>=true|false`;
-// undefined when absent, so an absent boolean is never sent.
-export function readBooleanFlag(rawArgs: string[], name: string): boolean | undefined {
-  let value: boolean | undefined;
+// Last occurrence of `--<name>` (true), `--no-<name>` (false) or `--<name>=true|false|null`
+// (null clears the field); undefined when absent, so an absent boolean is never sent.
+export function readBooleanFlag(rawArgs: string[], name: string): boolean | null | undefined {
+  let value: boolean | null | undefined;
   for (const token of rawArgs) {
     if (token === `--${name}`) value = true;
     else if (token === `--no-${name}`) value = false;
     else if (token.startsWith(`--${name}=`)) {
       const raw = token.slice(name.length + 3);
-      if (raw !== "true" && raw !== "false") throw new CliError("usage.webhooks", `--${name} must be true or false, got "${raw}"`);
-      value = raw === "true";
+      if (raw !== "true" && raw !== "false" && raw !== "null") throw new CliError("usage.webhooks", `--${name} must be true, false or null, got "${raw}"`);
+      value = raw === "null" ? null : raw === "true";
     }
   }
   return value;
@@ -81,7 +87,7 @@ export function writeFlagsFrom(args: Args, rawArgs: string[]): WriteFlags {
   return {
     name: optionalString(args.name),
     url: optionalString(args.url),
-    description: optionalString(args.description),
+    description: nullableString(args.description),
     status: optionalString(args.status),
     events: gatherFlagValues(rawArgs, "event"),
     includeChildOrgs: readBooleanFlag(rawArgs, "include-child-orgs"),
@@ -233,8 +239,8 @@ const writeArgs: ArgsDef = {
   name: { type: "string", description: "Webhook name" },
   url: { type: "string", description: "HTTPS endpoint that receives the events" },
   event: { type: "string", description: "Event type to subscribe to (repeatable; see deel webhooks event-types)" },
-  description: { type: "string", description: "Description" },
-  "include-child-orgs": { type: "boolean", description: "Also deliver events of child organizations (--no-include-child-orgs to turn off)" },
+  description: { type: "string", description: "Description (null clears it)" },
+  "include-child-orgs": { type: "boolean", description: "Also deliver events of child organizations (--no-include-child-orgs to turn off, --include-child-orgs=null to clear)" },
 };
 
 export const webhooksCommand = defineCommand({
