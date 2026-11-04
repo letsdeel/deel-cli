@@ -2692,6 +2692,22 @@ export const manifest: Manifest = {
           "type": "array",
           "required": false,
           "description": "Highlights shown on the store page. At most 3; the submit needs at least one, each with a title and a text. The list you send replaces the current one.",
+          "properties": [
+            {
+              "name": "title",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "description": "Title of the highlight."
+            },
+            {
+              "name": "text",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Text of the highlight."
+            }
+          ],
           "maxItems": 3
         },
         {
@@ -2699,14 +2715,68 @@ export const manifest: Manifest = {
           "in": "body",
           "type": "array",
           "required": false,
-          "description": "Support links shown on the store page. The submit needs at least one. The list you send replaces the current one."
+          "description": "Support links shown on the store page. The submit needs at least one. The list you send replaces the current one.",
+          "properties": [
+            {
+              "name": "name",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Name of the link."
+            },
+            {
+              "name": "url",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Address of the link."
+            }
+          ]
         },
         {
           "name": "works_with",
           "in": "body",
           "type": "array",
           "required": false,
-          "description": "The Deel products the app works with, each at most once. The list you send replaces the current one."
+          "description": "The Deel products the app works with, each at most once. The list you send replaces the current one.",
+          "properties": [
+            {
+              "name": "name",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "enum": [
+                "Deel Payroll",
+                "Deel HR",
+                "Deel Benefits",
+                "Deel IT",
+                "Deel Hire",
+                "Deel Mobility",
+                "Deel PEO",
+                "Deel EOR",
+                "Deel Contractors"
+              ],
+              "description": "Name of the Deel product."
+            },
+            {
+              "name": "url",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "enum": [
+                "https://www.deel.com/solutions/payroll/",
+                "https://www.deel.com/solutions/hr/",
+                "https://www.deel.com/solutions/benefits/",
+                "https://www.deel.com/solutions/it/",
+                "https://www.deel.com/solutions/hire/",
+                "https://www.deel.com/solutions/mobility/",
+                "https://www.deel.com/solutions/payroll/peo/",
+                "https://www.deel.com/solutions/payroll/eor/",
+                "https://www.deel.com/solutions/payroll/contractors/"
+              ],
+              "description": "Official address of that product, exactly as Deel lists it."
+            }
+          ]
         },
         {
           "name": "what_it_syncs",
