@@ -6,7 +6,7 @@ import { CliError } from "./errors.ts";
 import { HEADER } from "./constants.ts";
 import { credentialStore } from "./keychain.ts";
 import type { CredentialStore } from "./keychain.ts";
-import { assertIssuerOverride, resolveConfig } from "./config.ts";
+import { ENVIRONMENTS, assertIssuerOverride, ownsLegacyPat, resolveConfig } from "./config.ts";
 import type { Config } from "./config.ts";
 import { fetchTransport } from "./http.ts";
 import type { TokenProvider, Transport } from "./http.ts";
@@ -47,21 +47,29 @@ export function resolveToken(opts: ResolveOpts): ResolvedToken {
       const entry = config.issuer ? readOAuthEntry(store, config.issuer) : null;
       if (entry && config.issuer) {
         // OAuth tokens only travel to the environment that issued them.
-        if (!config.oauthBaseUrlOk) {
-          throw new CliError(
-            "auth.base_url",
-            `The stored login for "${env}" is only sent to its own API host, not to ${new URL(config.baseUrl).host}.`,
-            "Use DEEL_TOKEN or --token-stdin with this --base-url, or drop --base-url.",
-          );
-        }
+        if (!config.oauthBaseUrlOk) throw baseUrlRefused(config);
         const oauth = createOAuthSource({ store, issuer: config.issuer, clientId: config.clientId, entry, transport: opts.transport ?? fetchTransport, now: opts.now });
         return { token: entry.access_token, source: "oauth", oauth };
       }
-      const token = store.get(env); // a PAT saved by an earlier release
-      if (token) return { token, source: "keychain" };
+      const token = ENVIRONMENTS[env] ? store.get(env) : null; // a PAT saved by an earlier release
+      if (token) {
+        if (!ownsLegacyPat(config)) throw baseUrlRefused(config);
+        return { token, source: "keychain" };
+      }
     }
   }
   return { token: null, source: "none" };
+}
+
+// Saved logins only travel to their own environment's server; say how to reach another one instead.
+export function baseUrlRefused(config: Config): CliError {
+  const known = ENVIRONMENTS[config.env];
+  const host = new URL(config.baseUrl).host;
+  const allowed = new URL(known ? known.baseUrl : (config.issuer ?? config.baseUrl)).host;
+  const next = known
+    ? `To use ${host} as its own environment, run without --env ${config.env} or DEEL_ENV. Otherwise use DEEL_TOKEN or --token-stdin with a PAT.`
+    : `Use a --base-url on ${allowed}, or unset DEEL_OAUTH_ISSUER.`;
+  return new CliError("auth.base_url", `The "${config.env}" login is only sent to ${allowed}, not to ${host}.`, next);
 }
 
 // What to hand to the HTTP layer: a provider for OAuth (refreshes on demand), the plain token otherwise.

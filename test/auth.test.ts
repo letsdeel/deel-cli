@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { TestContext } from "node:test";
-import { resolveToken, requireToken, authFor, accessTokenScope, maskToken, redactHeaders } from "../src/core/auth.ts";
+import { resolveToken, requireToken, authFor, accessTokenScope, maskToken, redactHeaders, baseUrlRefused } from "../src/core/auth.ts";
 import { resolveConfig } from "../src/core/config.ts";
 import { CliError } from "../src/core/errors.ts";
 import type { HttpResponse, Transport } from "../src/core/http.ts";
@@ -18,7 +18,7 @@ const fakeStore = (token: string | null): CredentialStore => ({
 });
 
 function withEnv(vars: Record<string, string | undefined>, body: () => void) {
-  const keys = ["DEEL_TOKEN", "DEEL_OAUTH_ISSUER"];
+  const keys = ["DEEL_TOKEN", "DEEL_OAUTH_ISSUER", "DEEL_ENV"];
   const saved: Record<string, string | undefined> = {};
   for (const key of keys) saved[key] = process.env[key];
   for (const key of keys) delete process.env[key];
@@ -162,15 +162,38 @@ test("an OAuth login is refused for a base URL on another host", () => {
   withEnv({}, () => {
     const { store } = memoryStore({ oauth: entryAt(3_600_000) });
     const other = resolveConfig({ env: "prod", baseUrl: "https://other.example.test/rest" });
+    assert.throws(
+      () => resolveToken({ config: other, store }),
+      (error: CliError) =>
+        error.code === "auth.base_url" &&
+        error.message === 'The "prod" login is only sent to api.letsdeel.com, not to other.example.test.' &&
+        error.next === "To use other.example.test as its own environment, run without --env prod or DEEL_ENV. Otherwise use DEEL_TOKEN or --token-stdin with a PAT.",
+    );
+  });
+});
+
+test("a legacy PAT is refused for a base URL on another host", () => {
+  withEnv({}, () => {
+    const { store } = memoryStore({ pat: "pat_legacy" });
+    const other = resolveConfig({ env: "prod", baseUrl: "https://other.example.test/rest" });
     assert.throws(() => resolveToken({ config: other, store }), (error: CliError) => error.code === "auth.base_url");
   });
 });
 
-test("a legacy PAT is still sent to a --base-url override (unchanged behaviour)", () => {
-  withEnv({}, () => {
+test("a legacy PAT is never sent to the host of an issuer override", () => {
+  withEnv({ DEEL_OAUTH_ISSUER: "https://idp.example.test" }, () => {
     const { store } = memoryStore({ pat: "pat_legacy" });
-    const other = resolveConfig({ env: "prod", baseUrl: "https://other.example.test/rest" });
-    assert.equal(resolveToken({ config: other, store }).source, "keychain");
+    const config = resolveConfig({ env: "prod", baseUrl: "https://idp.example.test/rest" });
+    assert.throws(() => resolveToken({ config, store }), (error: CliError) => error.code === "auth.base_url");
+  });
+});
+
+test("--base-url without --env never reads the prod login or PAT", () => {
+  withEnv({}, () => {
+    const { store } = memoryStore({ pat: "pat_legacy", oauth: entryAt(3_600_000) });
+    const config = resolveConfig({ baseUrl: "https://other.example.test/rest" });
+    assert.equal(config.env, "other.example.test");
+    assert.deepEqual(resolveToken({ config, store }), { token: null, source: "none" });
   });
 });
 
@@ -188,6 +211,14 @@ test("an invalid DEEL_OAUTH_ISSUER does not block DEEL_TOKEN but fails the keych
   withEnv({ DEEL_OAUTH_ISSUER: "http://idp.example.test" }, () => {
     const config = resolveConfig({ env: "prod" });
     assert.throws(() => resolveToken({ config, store: fakeStore("pat") }), (error: CliError) => error.code === "config.oauth");
+  });
+});
+
+test("with an issuer override, a refused --base-url points at the issuer's host", () => {
+  withEnv({ DEEL_OAUTH_ISSUER: "https://idp.example.test" }, () => {
+    const error = baseUrlRefused(resolveConfig({ env: "custom", baseUrl: "https://other.example.test/rest" }));
+    assert.equal(error.message, 'The "custom" login is only sent to idp.example.test, not to other.example.test.');
+    assert.equal(error.next, "Use a --base-url on idp.example.test, or unset DEEL_OAUTH_ISSUER.");
   });
 });
 

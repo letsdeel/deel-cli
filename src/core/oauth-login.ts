@@ -8,7 +8,7 @@ import { platform } from "node:os";
 import { CliError } from "./errors.ts";
 import { discover, entryFromTokenResponse, lockPath, postForm, readOAuthEntry, removeOAuthEntry, withLock, writeOAuthEntry } from "./oauth.ts";
 import type { OAuthEntry, ServerMetadata } from "./oauth.ts";
-import { ENVIRONMENTS, assertIssuerOverride, requireIssuer } from "./config.ts";
+import { assertIssuerOverride, ownsLegacyPat, requireIssuer } from "./config.ts";
 import type { Config } from "./config.ts";
 import type { Transport } from "./http.ts";
 import type { CredentialStore } from "./keychain.ts";
@@ -221,18 +221,6 @@ export async function browserLogin(opts: BrowserLoginOpts): Promise<OAuthEntry> 
     return entry;
   } finally {
     loopback.close();
-  }
-}
-
-// The legacy PAT stored under the bare env name belongs to the environment's own server. Talking to another
-// server (an issuer override or a different API host) must never touch it.
-export function ownsLegacyPat(config: Config): boolean {
-  const known = ENVIRONMENTS[config.env];
-  if (!known || config.issuer !== known.issuer) return false;
-  try {
-    return new URL(config.baseUrl).origin === new URL(known.baseUrl).origin;
-  } catch {
-    return false;
   }
 }
 

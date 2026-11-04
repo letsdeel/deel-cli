@@ -1,5 +1,5 @@
 // Environment selection. Default prod; --base-url is a hidden testing override.
-// Precedence: --base-url > --env > DEEL_ENV > default (prod).
+// Precedence: --base-url > --env > DEEL_ENV > default (prod). --base-url alone names its own environment after its host.
 
 import { CliError } from "./errors.ts";
 
@@ -33,6 +33,15 @@ function originOf(url: string): string | null {
 }
 
 // The override, undefined when unset, or an error message when it is not an https URL.
+// An unparsable --base-url is reported by resolveConfig itself, so any placeholder name will do here.
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return "custom";
+  }
+}
+
 function httpsOverride(name: string): { value?: string; error?: string } {
   const value = process.env[name]?.trim().replace(/\/$/, "");
   if (!value) return {};
@@ -52,7 +61,8 @@ export function requireIssuer(config: Config): string {
 }
 
 export function resolveConfig(opts: { env?: string; baseUrl?: string }): Config {
-  const env = opts.env ?? process.env.DEEL_ENV ?? "prod";
+  // --base-url without --env is its own environment, so nothing saved for prod or demo is sent to it.
+  const env = opts.env ?? process.env.DEEL_ENV ?? (opts.baseUrl ? hostOf(opts.baseUrl) : "prod");
   const known = ENVIRONMENTS[env];
   let baseUrl = opts.baseUrl;
   if (!baseUrl) {
@@ -84,4 +94,12 @@ export function resolveConfig(opts: { env?: string; baseUrl?: string }): Config 
     oauthBaseUrlOk: trustedOrigins.includes(parsed.origin),
     ...(override.error ? { issuerError: override.error } : {}),
   };
+}
+
+// The legacy PAT stored under the bare env name belongs to the environment's own server. Talking to another
+// server (an issuer override or a different API host) must never read or touch it.
+export function ownsLegacyPat(config: Config): boolean {
+  const known = ENVIRONMENTS[config.env];
+  if (!known || config.issuer !== known.issuer) return false;
+  return originOf(config.baseUrl) === originOf(known.baseUrl);
 }

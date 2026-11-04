@@ -4,7 +4,7 @@
 //   logout  revoke the login (best effort) and remove it from the OS keychain
 
 import { defineCommand } from "citty";
-import { resolveToken, requireToken, authFor, accessTokenScope, maskToken, extractIdentity } from "../core/auth.ts";
+import { resolveToken, requireToken, authFor, accessTokenScope, maskToken, extractIdentity, baseUrlRefused } from "../core/auth.ts";
 import { credentialStore } from "../core/keychain.ts";
 import { browserLogin, logout } from "../core/oauth-login.ts";
 import { fetchTransport } from "../core/http.ts";
@@ -15,6 +15,7 @@ import { CliError } from "../core/errors.ts";
 import { HEADER } from "../core/constants.ts";
 import { commonArgs, configFrom, outputOpts } from "./shared.ts";
 import type { Args } from "./shared.ts";
+import { assertIssuerOverride } from "../core/config.ts";
 import type { Config } from "../core/config.ts";
 import type { Ctx } from "../core/context.ts";
 
@@ -75,9 +76,8 @@ export const authCommand = defineCommand({
         if (!store.available()) {
           throw new CliError("auth.keychain", "No OS keychain available on this platform.", "Use DEEL_TOKEN or --token-stdin with a PAT instead.");
         }
-        if (!config.oauthBaseUrlOk) {
-          throw new CliError("auth.base_url", "A browser login is only sent to its own environment's API host.", "Drop --base-url, or use DEEL_TOKEN or --token-stdin with a PAT.");
-        }
+        assertIssuerOverride(config);
+        if (!config.oauthBaseUrlOk) throw baseUrlRefused(config);
         const ctx = createContext({ config, token: null });
         const entry = await browserLogin({
           config,

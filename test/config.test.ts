@@ -84,8 +84,8 @@ test("a non-https DEEL_OAUTH_ISSUER fails only when an OAuth issuer is needed", 
 
 test("OAuth tokens are only allowed towards the environment's own host", () => {
   withEnvVars({ DEEL_OAUTH_ISSUER: undefined, DEEL_OAUTH_CLIENT_ID: undefined }, () => {
-    assert.equal(resolveConfig({ baseUrl: "https://api.letsdeel.com/rest/v2" }).oauthBaseUrlOk, true);
-    assert.equal(resolveConfig({ baseUrl: "https://other.example.test/rest" }).oauthBaseUrlOk, false);
+    assert.equal(resolveConfig({ env: "prod", baseUrl: "https://api.letsdeel.com/rest/v2" }).oauthBaseUrlOk, true);
+    assert.equal(resolveConfig({ env: "prod", baseUrl: "https://other.example.test/rest" }).oauthBaseUrlOk, false);
   });
 });
 
@@ -109,6 +109,18 @@ test("DEEL_OAUTH_ISSUER takes priority over the issuer derived from --base-url",
     const config = resolveConfig({ env: "nope", baseUrl: "https://x.example.test/rest" });
     assert.equal(config.issuer, "https://idp.example.test");
     assert.equal(config.oauthBaseUrlOk, false);
+  });
+});
+
+test("--base-url without --env or DEEL_ENV is its own environment, named after its host", () => {
+  withEnvVars({ DEEL_ENV: undefined, DEEL_OAUTH_ISSUER: undefined }, () => {
+    const config = resolveConfig({ baseUrl: "https://api.example.test/rest" });
+    assert.equal(config.env, "api.example.test");
+    assert.equal(config.issuer, "https://api.example.test");
+    assert.equal(config.oauthBaseUrlOk, true);
+  });
+  withEnvVars({ DEEL_ENV: "prod" }, () => {
+    assert.equal(resolveConfig({ baseUrl: "https://api.example.test/rest" }).env, "prod");
   });
 });
 

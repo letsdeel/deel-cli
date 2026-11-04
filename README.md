@@ -154,7 +154,7 @@ Resolution precedence (first match wins):
 
 `--token-stdin` and `DEEL_TOKEN` are pass-through and never written to disk. `deel auth login` no longer accepts a PAT: use `DEEL_TOKEN` or `--token-stdin`. A PAT saved in the keychain by an earlier version keeps working until you run `deel auth login` or `deel auth logout`, which remove it.
 
-A browser login is only sent to the API of the environment it was issued for (`--env`), so combining it with `--base-url` pointing at another host is refused; use a PAT for that.
+A stored login (browser login or saved PAT) is only sent to the API of its own environment. `--base-url` without `--env` is treated as a separate environment named after its host, so nothing stored for `prod` or `demo` is sent to it. Combining `--env prod` or `--env demo` with a `--base-url` on another host is refused; use `DEEL_TOKEN` or `--token-stdin` for that.
 
 ## Discovering commands
 

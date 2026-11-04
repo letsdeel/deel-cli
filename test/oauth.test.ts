@@ -8,8 +8,8 @@ import { discover, entryFromTokenResponse, isFresh, lockPath, readOAuthEntry, wi
 import type { HttpResponse, Transport } from "../src/core/http.ts";
 import { tempDir } from "./stubs.ts";
 import type { CliError } from "../src/core/errors.ts";
-import { authorizationUrl, browserLogin, logout, ownsLegacyPat, removeStoredLogin, challengeFor, chooseScopes, newState, newVerifier, revokeLogin, startLoopback } from "../src/core/oauth-login.ts";
-import { resolveConfig } from "../src/core/config.ts";
+import { authorizationUrl, browserLogin, logout, removeStoredLogin, challengeFor, chooseScopes, newState, newVerifier, revokeLogin, startLoopback } from "../src/core/oauth-login.ts";
+import { ownsLegacyPat, resolveConfig } from "../src/core/config.ts";
 import type { CredentialStore } from "../src/core/keychain.ts";
 import type { OAuthEntry } from "../src/core/oauth.ts";
 
