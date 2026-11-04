@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { confirmDescriptor, run } from "../src/cli.ts";
+import { confirmDescriptor, run, variantCommand } from "../src/cli.ts";
 import { captureIO } from "../src/core/io.ts";
 import { CliError } from "../src/core/errors.ts";
 import { manifest } from "../src/manifest.generated.ts";
@@ -121,4 +121,27 @@ test("deel apps enable needs no confirmation", async () => {
 test("the apps disable confirm text names the app and warns about revoked consents and tokens", () => {
   const disable = manifest.descriptors.find((d) => d.command.join(" ") === "apps disable");
   assert.equal(disable?.confirm, "Disable app {app_id}? This revokes all consents and tokens; enable does not restore them.");
+});
+
+test("a variant group takes --yes when any variant confirms and not otherwise", () => {
+  const variant = (name: string, base: Descriptor): Descriptor => ({ ...base, variant: name });
+  const confirming = variantCommand([variant("a", withConfirm), variant("b", withoutConfirm)]);
+  const plain = variantCommand([variant("a", withoutConfirm), variant("b", withoutConfirm)]);
+  assert.equal((confirming.args as Record<string, { type: string }>).yes?.type, "boolean");
+  assert.equal("yes" in (plain.args as object), false);
+});
+
+test("apps disable with --token-stdin and no --yes refuses before reading the token or sending anything", async () => {
+  const originalFetch = globalThis.fetch;
+  let sent = 0;
+  globalThis.fetch = (async () => (sent++, new Response("{}"))) as typeof fetch;
+  try {
+    await assert.rejects(
+      () => run(["apps", "disable", "--app_id", APP_ID, "--token-stdin"]),
+      (err: CliError) => err.code === "usage.confirm" && /stdin carries the token or the input/.test(err.next ?? ""),
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+  assert.equal(sent, 0);
 });

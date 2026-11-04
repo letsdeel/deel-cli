@@ -4,8 +4,9 @@
 
 import { defineCommand } from "citty";
 import type { ArgsDef } from "citty";
-import { createInterface } from "node:readline";
 import { resolveToken, requireToken } from "../core/auth.ts";
+import { promptConfirm } from "../core/prompt.ts";
+import type { Confirm } from "../core/prompt.ts";
 import { createContext } from "../core/context.ts";
 import type { Ctx } from "../core/context.ts";
 import { envelope, render } from "../core/output.ts";
@@ -85,31 +86,6 @@ export function writeFlagsFrom(args: Args, rawArgs: string[]): WriteFlags {
     events: gatherFlagValues(rawArgs, "event"),
     includeChildOrgs: readBooleanFlag(rawArgs, "include-child-orgs"),
   };
-}
-
-export type Confirm = (question: string) => Promise<boolean>;
-
-export function isYes(answer: string): boolean {
-  return /^y(es)?$/i.test(answer.trim());
-}
-
-// Default delete confirmation: one line read from stdin, the question on stderr. Closing the input without an answer
-// (EOF after --token-stdin consumed stdin, Ctrl-D, Ctrl-C) counts as "no", so the promise always settles.
-export function promptConfirm(question: string, input: NodeJS.ReadableStream = process.stdin, output: NodeJS.WritableStream = process.stderr): Promise<boolean> {
-  return new Promise((resolve) => {
-    const rl = createInterface({ input, output });
-    let settled = false;
-    const settle = (value: boolean) => {
-      if (settled) return;
-      settled = true;
-      resolve(value);
-    };
-    rl.once("close", () => settle(false));
-    rl.question(question, (answer) => {
-      settle(isYes(answer));
-      rl.close();
-    });
-  });
 }
 
 function contextFor(cittyCtx: CittyCtx): Ctx {

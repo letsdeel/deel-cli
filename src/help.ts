@@ -105,7 +105,10 @@ export function printContractJson(descriptor: Descriptor): void {
     usage: buildUsage(descriptor),
     version: descriptor.version,
     ...(descriptor.confirm ? { confirm: { message: descriptor.confirm, flag: "yes", requiredWhenNonInteractive: true } } : {}),
-    params: descriptor.params.map((param) => ({ name: param.name, in: param.in, type: param.type, required: param.required, enum: param.enum, description: param.description })),
+    params: [
+      ...descriptor.params.map((param) => ({ name: param.name, in: param.in, type: param.type, required: param.required, enum: param.enum, description: param.description })),
+      ...(descriptor.confirm ? [{ name: "yes", in: "flag", type: "boolean", required: false, description: "Skip the confirmation prompt (required when not running in a terminal)" }] : []),
+    ],
     body: {
       kind: descriptor.bodyKind,
       fields: fieldsToJson(descriptor.bodyProps),
