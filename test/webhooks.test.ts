@@ -272,6 +272,9 @@ test("requireId reads --id=<id> and --id <id> from the raw args, so a leading da
   assert.equal(requireId({}, ["get", "--id=-WZ1uT2DFF01"], "u"), "-WZ1uT2DFF01");
   assert.equal(requireId({}, ["get", "--id", "-WZ1uT2DFF01", "--no-log"], "u"), "-WZ1uT2DFF01");
   assert.throws(() => requireId({}, ["get", "--idempotency-key=x"], "u"), (err: any) => err.code === "usage.webhooks");
+  // a flag where the id should be is a usage error, not an id; --id=--x stays valid
+  assert.throws(() => requireId({}, ["delete", "--id", "--yes"], "u"), (err: any) => err.code === "usage.webhooks" && /--yes/.test(err.message) && /--id=<id>/.test(err.next ?? ""));
+  assert.equal(requireId({}, ["get", "--id=--x"], "u"), "--x");
 });
 
 test("deel webhooks get without an id is a usage error before any request, and mentions --id=<id>", async () => {
