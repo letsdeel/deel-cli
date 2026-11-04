@@ -72,6 +72,14 @@ test("apps list leaves cursor out of meta on the last page", async () => {
   assert.ok(!("cursor" in out().meta));
 });
 
+test("apps list leaves an empty or non-string cursor out of meta", async () => {
+  for (const cursor of ["", 7, true]) {
+    const { ctx, out } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: [], cursor } }));
+    await execute(descriptor(["apps", "list"]), { flags: {}, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
+    assert.ok(!("cursor" in out().meta), `cursor ${JSON.stringify(cursor)} stays out of meta`);
+  }
+});
+
 test("apps get puts the app id in the path and prints the unwrapped app", async () => {
   const { ctx, seen, out } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { id: APP_ID, api_access: "enabled" } } }));
   await execute(descriptor(["apps", "get"]), { flags: { app_id: APP_ID }, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
