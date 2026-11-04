@@ -19,6 +19,7 @@ import { CLI_VERSION } from "./version.ts";
 import { commonArgs, configFrom, gatherFiles, gatherFlagValues, outputOpts } from "./commands/shared.ts";
 import type { Args } from "./commands/shared.ts";
 import { staticCommands } from "./commands/index.ts";
+import { complete, formatCandidates } from "./core/completion.ts";
 import { printActionHelp, printContractJson, printGlobalOptions, printSkeleton, printVariantGroupHelp, printVersion } from "./help.ts";
 
 // ---------------- generated action commands ----------------
@@ -193,6 +194,14 @@ function descriptorFor(positionals: string[], matched: number, argv: string[]): 
 }
 
 export async function run(argv: string[]): Promise<number> {
+  // Hidden entry point for the scripts printed by `deel completion <shell>`:
+  // `deel __complete <words...>` prints candidates for the last word. Offline.
+  if (argv[0] === "__complete") {
+    const candidates = complete(buildRoot(), manifest.descriptors, argv.slice(1));
+    if (candidates.length > 0) process.stdout.write(formatCandidates(candidates) + "\n");
+    return EXIT.OK;
+  }
+
   if (argv.includes("--version") || argv.includes("-v")) {
     printVersion();
     return EXIT.OK;
