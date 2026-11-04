@@ -52,14 +52,15 @@ export type ListFlags = {
   order?: string;
 };
 
-// `deel webhooks create` / `update` flags. `events` holds every --event occurrence.
+// `deel webhooks create` / `update` flags. `events` holds every --event occurrence. A nullable field (description,
+// include_child_orgs) given as `null` is sent as JSON null, which clears it.
 export type WriteFlags = {
   name?: string;
   url?: string;
-  description?: string;
+  description?: string | null;
   status?: string;
   events: string[];
-  includeChildOrgs?: boolean;
+  includeChildOrgs?: boolean | null;
 };
 
 // POST /webhooks body. api_version is always "v2" (the only version the API accepts).
@@ -69,18 +70,18 @@ export type CreateWebhookBody = {
   events: string[];
   status: "enabled" | "disabled";
   api_version: "v2";
-  description?: string;
-  include_child_orgs?: boolean;
+  description?: string | null;
+  include_child_orgs?: boolean | null;
 };
 
 // PATCH /webhooks/{id} body: only the fields the user passed.
 export type UpdateWebhookBody = {
   name?: string;
   url?: string;
-  description?: string;
+  description?: string | null;
   events?: string[];
   status?: "enabled" | "disabled";
-  include_child_orgs?: boolean;
+  include_child_orgs?: boolean | null;
 };
 
 export const SIGNING_KEY_HINT = "reveal the signing key in Developer Center → Webhooks";
