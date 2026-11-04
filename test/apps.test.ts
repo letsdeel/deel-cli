@@ -138,6 +138,19 @@ test("apps disable --help --json exposes the confirmation and apps enable does n
   assert.equal("confirm" in enable, false);
 });
 
+test("apps disable --help --json lists --yes among its params and apps enable does not", async () => {
+  const disable = JSON.parse((await capture(["apps", "disable", "--help", "--json"])).out);
+  assert.deepEqual(disable.params.find((param: { name: string }) => param.name === "yes"), {
+    name: "yes",
+    in: "flag",
+    type: "boolean",
+    required: false,
+    description: "Skip the confirmation prompt (required when not running in a terminal)",
+  });
+  const enable = JSON.parse((await capture(["apps", "enable", "--help", "--json"])).out);
+  assert.equal(enable.params.some((param: { name: string }) => param.name === "yes"), false);
+});
+
 test("apps get --help --json marks created_by and its name as required and nullable", async () => {
   const { out } = await capture(["apps", "get", "--help", "--json"]);
   const createdBy = JSON.parse(out).response.fields.find((field: { name: string }) => field.name === "created_by");
