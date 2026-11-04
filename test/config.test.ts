@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { resolveConfig, requireIssuer, ENVIRONMENTS } from "../src/core/config.ts";
+import { configFrom } from "../src/commands/shared.ts";
 import type { CliError } from "../src/core/errors.ts";
 
 test("defaults to prod", () => {
@@ -130,4 +131,15 @@ test("a known environment keeps its issuer whatever --base-url says", () => {
     assert.equal(config.issuer, "https://api.letsdeel.com");
     assert.equal(config.oauthBaseUrlOk, false);
   });
+});
+
+test("--beta sets config.beta, and it is unset otherwise", () => {
+  assert.equal(resolveConfig({ beta: true }).beta, true);
+  assert.equal(resolveConfig({}).beta, undefined);
+  assert.equal(resolveConfig({ beta: false }).beta, undefined);
+});
+
+test("configFrom wires the --beta flag into the config", () => {
+  assert.equal(configFrom({ beta: true }, []).beta, true);
+  assert.equal(configFrom({}, []).beta, undefined);
 });

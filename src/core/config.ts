@@ -22,6 +22,7 @@ export type Config = {
   oauthBaseUrlOk: boolean;
   // Set when DEEL_OAUTH_ISSUER is invalid; only the OAuth paths fail on it (requireIssuer), so PATs keep working.
   issuerError?: string;
+  beta?: boolean; // --beta: send X-Beta: true so beta endpoints are reachable
 };
 
 function originOf(url: string): string | null {
@@ -61,7 +62,7 @@ export function requireIssuer(config: Config): string {
   return config.issuer;
 }
 
-export function resolveConfig(opts: { env?: string; baseUrl?: string }): Config {
+export function resolveConfig(opts: { env?: string; baseUrl?: string; beta?: boolean }): Config {
   // --base-url without --env is its own environment, so nothing saved for prod or demo is sent to it.
   const env = opts.env ?? process.env.DEEL_ENV ?? (opts.baseUrl ? hostOf(opts.baseUrl) : "prod");
   const known = ENVIRONMENTS[env];
@@ -87,7 +88,7 @@ export function resolveConfig(opts: { env?: string; baseUrl?: string }): Config 
   const issuer = override.error ? null : (override.value ?? known?.issuer ?? parsed.origin);
   const clientId = process.env.DEEL_OAUTH_CLIENT_ID?.trim() || known?.clientId || CLI_OAUTH_CLIENT_ID;
   const trustedOrigins = [known ? originOf(known.baseUrl) : null, issuer ? originOf(issuer) : null];
-  return {
+  const config: Config = {
     env,
     baseUrl: baseUrl.replace(/\/$/, ""),
     issuer,
@@ -95,6 +96,8 @@ export function resolveConfig(opts: { env?: string; baseUrl?: string }): Config 
     oauthBaseUrlOk: trustedOrigins.includes(parsed.origin),
     ...(override.error ? { issuerError: override.error } : {}),
   };
+  if (opts.beta) config.beta = true;
+  return config;
 }
 
 // The legacy PAT stored under the bare env name belongs to the environment's own server. Talking to another

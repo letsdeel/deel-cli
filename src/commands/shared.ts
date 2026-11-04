@@ -25,6 +25,7 @@ export const commonArgs: ArgsDef = {
   raw: { type: "boolean", description: "With --jq, print scalar string results unquoted (like jq -r)" },
   form: { type: "boolean", description: "Send as multipart/form-data (for endpoints that also accept a file upload)" },
   env: { type: "string", description: "Environment: prod | demo (default prod)" },
+  beta: { type: "boolean", description: "Call beta endpoints: sends the X-Beta: true header" },
   "ca-cert": { type: "string", description: "Extra CA certificate (PEM) to trust, on top of the OS store — e.g. an internal/dev root" },
   "token-stdin": { type: "boolean", description: "Read the PAT from stdin" },
   "idempotency-key": { type: "string", description: "Override the auto-derived idempotency key" },
@@ -78,7 +79,7 @@ export function gatherFiles(rawArgs: string[]): Record<string, string[]> {
 }
 
 export function configFrom(args: Args, rawArgs: string[]): Config {
-  return resolveConfig({ env: args.env as string | undefined, baseUrl: readHidden(rawArgs, "base-url") });
+  return resolveConfig({ env: args.env as string | undefined, baseUrl: readHidden(rawArgs, "base-url"), beta: Boolean(args.beta) });
 }
 
 // The credential an API command sends: --token-stdin, then DEEL_TOKEN, then the stored login, which is refused
@@ -94,8 +95,58 @@ export function gatherFlagValues(rawArgs: string[], name: string): string[] {
   const prefix = `--${name}`;
   for (let index = 0; index < rawArgs.length; index++) {
     const token = rawArgs[index];
-    if (token === prefix && rawArgs[index + 1] !== undefined) values.push(rawArgs[++index]);
+    if (token === prefix && rawArgs[index + 1] !== undefined) {
+      const value = rawArgs[++index];
+      // A flag in the value position means the value is missing; --name=--x still passes one that starts with --.
+      if (value.startsWith("--")) throw new CliError("usage.flag_value", `${prefix} needs a value, but the next argument is ${value}.`, `Write ${prefix}=${value} if the value really starts with --.`);
+      values.push(value);
+    }
     else if (token.startsWith(prefix + "=")) values.push(token.slice(prefix.length + 1));
   }
   return values;
+}
+
+// Typed flag values for a field the endpoint schema marks `nullable`: the literal `null` is sent as JSON null (it
+// clears the field), anything else is parsed as the field's type. Absent stays undefined, so it is never sent.
+export const NULL_LITERAL = "null";
+
+function badValue(flag: string, expected: string, got: string): CliError {
+  return new CliError("usage.flag_value", `${flag} must be ${expected} or null, got "${got}".`);
+}
+
+export function nullable<T>(raw: string | undefined, parse: (text: string) => T): T | null | undefined {
+  if (raw === undefined) return undefined;
+  return raw === NULL_LITERAL ? null : parse(raw);
+}
+
+export function nullableString(raw: string | undefined): string | null | undefined {
+  return nullable(raw, (text) => text);
+}
+
+export function nullableNumber(raw: string | undefined, flag: string): number | null | undefined {
+  return nullable(raw, (text) => {
+    const value = Number(text);
+    if (text.trim() === "" || !Number.isFinite(value)) throw badValue(flag, "a number", text);
+    return value;
+  });
+}
+
+export function nullableBoolean(raw: string | undefined, flag: string): boolean | null | undefined {
+  return nullable(raw, (text) => {
+    if (text !== "true" && text !== "false") throw badValue(flag, "true, false", text);
+    return text === "true";
+  });
+}
+
+export function nullableObject(raw: string | undefined, flag: string): Record<string, unknown> | null | undefined {
+  return nullable(raw, (text) => {
+    let value: unknown;
+    try {
+      value = JSON.parse(text);
+    } catch {
+      throw badValue(flag, "a JSON object", text);
+    }
+    if (value === null || typeof value !== "object" || Array.isArray(value)) throw badValue(flag, "a JSON object", text);
+    return value as Record<string, unknown>;
+  });
 }
