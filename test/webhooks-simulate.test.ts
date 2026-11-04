@@ -207,6 +207,14 @@ test("webhooks simulate points a 400 at the webhook's status and subscribed even
   );
 });
 
+test("webhooks simulate keeps the beta 400 free of the subscribed hint", async () => {
+  const { ctx } = ctxWith(() => ok({ errors: [{ code: "BETA_ACCESS_REQUIRED", message: "This API version is in beta." }] }, 400));
+  await assert.rejects(
+    () => runSimulate(ctx, "wh_1", buildSimulateBody("contract.created"), JSON_OUTPUT),
+    (err: any) => err.code === "BETA_ACCESS_REQUIRED" && !String(err.next ?? "").includes(BAD_REQUEST_HINT),
+  );
+});
+
 test("webhooks simulate adds none of the hints to other error statuses", async () => {
   const { ctx } = ctxWith(() => ok({ errors: [{ code: "FORBIDDEN", message: "Missing scope" }] }, 403));
   await assert.rejects(

@@ -248,7 +248,8 @@ export function simulateErrorFromResponse(status: number, json: unknown, request
   }
   if (status === 429) appendNext(error, SIMULATE_RATE_LIMIT_HINT);
   if (status === 404) appendNext(error, SIMULATE_NOT_FOUND_HINT);
-  if (status === 400) appendNext(error, SIMULATE_BAD_REQUEST_HINT);
+  // The gateway answers a missing X-Beta header with a 400 of its own; its hint already says what to do.
+  if (status === 400 && error.code !== "BETA_ACCESS_REQUIRED") appendNext(error, SIMULATE_BAD_REQUEST_HINT);
   return error;
 }
 

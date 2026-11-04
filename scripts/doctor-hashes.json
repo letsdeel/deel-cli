@@ -55,7 +55,7 @@
   "src/core/logging.ts": "d660e82ee1700b8a9926c83174268b1b4fc650a6ae6848dbf83f63f9bc15d9bc",
   "src/core/output.ts": "c05feaa9881bd122896aec0df4233c76a0c5af932eb72098885c0a93f3ed6f56",
   "src/core/tls.ts": "c06f0d810e91f0a7e959f2363750871d6e5e67edcf00ac3a9a05c2ba7fce9f65",
-  "src/core/webhooks.ts": "861192c1216906922b96978f8a9b7bd493c635960954090272e01a32963aa664",
+  "src/core/webhooks.ts": "63e98217b287327236769abb40358631176e68ee6ec698bd3becef2528cdf187",
   "src/help.ts": "39d96d86569a73686f8bd133369646420e5de32497b6d8d2d557d707918b0e2a",
   "src/main.ts": "825c3581a935b3c83e104e905b2dbb99b17ab208659847ae5f9c6f0572364e47",
   "src/manifest.generated.ts": "83bc35a4d69f3ae96f74b653064db97cd2e5d554feb653f4275e9bcecc0a2dc3",
@@ -84,7 +84,7 @@
   "test/sign-darwin.test.ts": "ac2f43cfbb4ba9337a62bdd2b3e52ff0b76f7ac08b1c98b9ee9a7f43c974e345",
   "test/stubs.ts": "dcbf3fd49a134bebf2282a5f43f56954ce3bf4f6b3806fb126ed7e288da15121",
   "test/tls.test.ts": "4e6633bb1f770384994d307b45a8539caf0e640ea077d743766894ee0c89acdf",
-  "test/webhooks-simulate.test.ts": "e2c904ef7100a41635fae65dbc6a58b30fec30c564321fbe1176e9d0f3bbba2f",
+  "test/webhooks-simulate.test.ts": "5397475dcf54004c92910136a621222ad40a9f17bc57daa1059dd0db0207f96c",
   "test/webhooks-write.test.ts": "c8ccef90f2d19069678622468e4690af4bc52997adc5384c91809938fc4b4398",
   "test/webhooks.test.ts": "a4f7ae582a8cbfefb7a76de82171efb4225016ee3b40d39eead1e2ed82600635",
   "tsconfig.json": "8bc19f7dcad83961db3a95a1d2bcf648b4ea52fefc895ab3dd403d6144cb3939"
