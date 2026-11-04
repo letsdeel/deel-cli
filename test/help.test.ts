@@ -187,6 +187,34 @@ test("a global flag's value before the command is not a command word", async () 
   assert.match(unknown.err, /^Unknown command 'widgts'\. Did you mean: widgets\?$/m);
 });
 
+test("boolean flags and --flag=value before the command keep the command word", async () => {
+  for (const flags of [["--debug"], ["--quiet"], ["--no-log"], ["--token-stdin"], ["--env=demo"], ["--debug", "--env=demo"]]) {
+    const { code, out } = await capture([...flags, "widgets", "--help"]);
+    assert.equal(code, EXIT.OK, flags.join(" "));
+    assert.match(out, /^Widgets$/m);
+  }
+});
+
+test("--base-url and camelCase flag values before the command are not command words", async () => {
+  for (const flags of [["--base-url", "https://api.test"], ["--idempotencyKey", "k"], ["--ca-cert", "ca.pem", "--debug"]]) {
+    const { code, out } = await capture([...flags, "widgets", "parts", "--help"]);
+    assert.equal(code, EXIT.OK, flags.join(" "));
+    assert.match(out, /^deel widgets parts$/m);
+  }
+});
+
+test("a command's own flag value after a group is not an unknown command", async () => {
+  const { code, out } = await capture(["widgets", "parts", "--widget-id", "5", "--help"]);
+  assert.equal(code, EXIT.OK);
+  assert.match(out, /^deel widgets parts$/m);
+});
+
+test("an unknown flag does not swallow a command word", async () => {
+  const { code, out } = await capture(["--unknown", "widgets", "--help"]);
+  assert.equal(code, EXIT.OK);
+  assert.match(out, /^Widgets$/m);
+});
+
 test("an empty command word suggests nothing", async () => {
   assert.deepEqual(suggestions("", ["list", "get"]), []);
   const { code, err } = await capture([""]);

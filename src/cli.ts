@@ -197,17 +197,25 @@ function buildRoot(): CommandDef {
   });
 }
 
-// A value-taking global flag (`--env demo`) consumes the next token, so that token is not a command word.
-function takesValue(token: string): boolean {
-  if (!token.startsWith("--") || token.includes("=")) return false;
-  return (commonArgs[token.slice(2)] as { type?: string } | undefined)?.type === "string";
+// A flag followed by a value (`--env demo`, `--widget-id 5`) must not leave that value among the command words.
+// Global flags are classified by their declared type; any other flag takes the next token unless it names a subcommand.
+function flagTakesValue(token: string, next: string | undefined, cmd: CommandDef | undefined): boolean {
+  if (!token.startsWith("--") || token.includes("=") || next === undefined || next.startsWith("-")) return false;
+  const name = token.slice(2).replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+  if (name === "base-url") return true;
+  const declared = (commonArgs[name] ?? (name.startsWith("no-") ? commonArgs[name.slice(3)] : undefined)) as { type?: string } | undefined;
+  if (declared) return declared.type === "string";
+  return !(cmd?.subCommands as Record<string, CommandDef> | undefined)?.[next];
 }
 
-function wordIndexes(argv: string[]): number[] {
+function wordIndexes(argv: string[], root: CommandDef): number[] {
   const indexes: number[] = [];
+  let cmd: CommandDef | undefined = root;
   for (let i = 0; i < argv.length; i++) {
-    if (!argv[i].startsWith("-")) indexes.push(i);
-    else if (takesValue(argv[i])) i++;
+    if (!argv[i].startsWith("-")) {
+      indexes.push(i);
+      cmd = (cmd?.subCommands as Record<string, CommandDef> | undefined)?.[argv[i]];
+    } else if (flagTakesValue(argv[i], argv[i + 1], cmd)) i++;
   }
   return indexes;
 }
@@ -269,7 +277,7 @@ export async function run(argv: string[]): Promise<number> {
   }
 
   const root = buildRoot();
-  const words = wordIndexes(argv);
+  const words = wordIndexes(argv, root);
   const positionals = words.map((i) => argv[i]);
   const { cmd, parent, matched } = resolve(root, positionals);
   const wantsHelp = argv.includes("--help") || argv.includes("-h");
