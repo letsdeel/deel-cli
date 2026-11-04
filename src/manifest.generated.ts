@@ -489,11 +489,11 @@ export const manifest: Manifest = {
     },
     {
       "command": [
-        "apps",
+        "oauth2-apps",
         "disable"
       ],
       "method": "POST",
-      "path": "/apps/{app_id}/disable",
+      "path": "/oauth2-apps/{app_id}/disable",
       "summary": "Disable an app",
       "confirm": "Disable app {app_id}? This revokes all consents and tokens; enable does not restore them.",
       "async": false,
@@ -643,11 +643,11 @@ export const manifest: Manifest = {
     },
     {
       "command": [
-        "apps",
+        "oauth2-apps",
         "enable"
       ],
       "method": "POST",
-      "path": "/apps/{app_id}/enable",
+      "path": "/oauth2-apps/{app_id}/enable",
       "summary": "Enable an app",
       "async": false,
       "bodyKind": "none",
@@ -796,11 +796,11 @@ export const manifest: Manifest = {
     },
     {
       "command": [
-        "apps",
+        "oauth2-apps",
         "get"
       ],
       "method": "GET",
-      "path": "/apps/{app_id}",
+      "path": "/oauth2-apps/{app_id}",
       "summary": "Retrieve an app",
       "async": false,
       "bodyKind": "none",
@@ -951,11 +951,11 @@ export const manifest: Manifest = {
     },
     {
       "command": [
-        "apps",
+        "oauth2-apps",
         "list"
       ],
       "method": "GET",
-      "path": "/apps",
+      "path": "/oauth2-apps",
       "summary": "List apps",
       "async": false,
       "bodyKind": "none",
@@ -1124,11 +1124,11 @@ export const manifest: Manifest = {
     },
     {
       "command": [
-        "apps",
+        "oauth2-apps",
         "update"
       ],
       "method": "PATCH",
-      "path": "/apps/{app_id}",
+      "path": "/oauth2-apps/{app_id}",
       "summary": "Update an app",
       "async": false,
       "bodyKind": "json",
@@ -1498,12 +1498,12 @@ export const manifest: Manifest = {
     },
     {
       "command": [
-        "apps",
+        "oauth2-apps",
         "listing",
         "get"
       ],
       "method": "GET",
-      "path": "/apps/{app_id}/listing",
+      "path": "/oauth2-apps/{app_id}/listing",
       "summary": "Retrieve the listing of an app",
       "async": false,
       "bodyKind": "none",
@@ -1847,12 +1847,12 @@ export const manifest: Manifest = {
     },
     {
       "command": [
-        "apps",
+        "oauth2-apps",
         "listing",
         "create"
       ],
       "method": "POST",
-      "path": "/apps/{app_id}/listing",
+      "path": "/oauth2-apps/{app_id}/listing",
       "summary": "Create the listing of an app",
       "async": false,
       "bodyKind": "json",
@@ -2211,12 +2211,12 @@ export const manifest: Manifest = {
     },
     {
       "command": [
-        "apps",
+        "oauth2-apps",
         "listing",
         "submit"
       ],
       "method": "POST",
-      "path": "/apps/{app_id}/listing/submit",
+      "path": "/oauth2-apps/{app_id}/listing/submit",
       "summary": "Submit the listing of an app for review",
       "async": false,
       "bodyKind": "none",
@@ -2560,12 +2560,12 @@ export const manifest: Manifest = {
     },
     {
       "command": [
-        "apps",
+        "oauth2-apps",
         "listing",
         "update"
       ],
       "method": "PATCH",
-      "path": "/apps/{app_id}/listing",
+      "path": "/oauth2-apps/{app_id}/listing",
       "summary": "Update the listing of an app",
       "async": false,
       "bodyKind": "json",
