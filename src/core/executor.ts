@@ -186,12 +186,18 @@ async function multipartFingerprint(descriptor: Descriptor, call: ParsedCall): P
   return fingerprint;
 }
 
+// `code`, or the older `error_code` some endpoints document, when `code` is absent.
+function errorCodeOf(item: any): string | undefined {
+  const code = item?.code ?? item?.error_code;
+  return typeof code === "string" && code ? code : undefined;
+}
+
 // Map an error response to a CliError. Deel returns errors in one of two shapes:
 // a single `{ error: { code, message, next } }` object, or the compliant
 // `{ errors: [{ code, message, field }] }` array (per the API style guide). We
 // surface the field-level messages from the array so validation failures are
 // actionable instead of a generic "Request failed with status 400".
-function errorFromResponse(status: number, json: unknown, requestId: string): CliError {
+export function errorFromResponse(status: number, json: unknown, requestId: string): CliError {
   const body = json as any;
   const list: any[] | undefined = Array.isArray(body?.errors) ? body.errors : undefined;
 
@@ -199,7 +205,7 @@ function errorFromResponse(status: number, json: unknown, requestId: string): Cl
   let message: string;
   let next: string | undefined;
   if (list && list.length > 0) {
-    code = list[0]?.code ?? `http.${status}`;
+    code = errorCodeOf(list[0]) ?? `http.${status}`;
     message =
       list
         .map((item) => (item?.field ? `${item.field}: ${item.message ?? item.code ?? "invalid"}` : item?.message ?? item?.code))
@@ -208,7 +214,7 @@ function errorFromResponse(status: number, json: unknown, requestId: string): Cl
     next = list[0]?.next;
   } else {
     const payload = body?.error ?? body ?? {};
-    code = payload.code ?? `http.${status}`;
+    code = errorCodeOf(payload) ?? `http.${status}`;
     message = payload.message ?? `Request failed with status ${status}`;
     next = payload.next;
   }
