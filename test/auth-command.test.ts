@@ -228,6 +228,14 @@ test("auth logout says when the server has no revocation endpoint", async (t) =>
   assert.match(err(), /does not support revocation/);
 });
 
+test("auth logout without a stored login sends nothing and reports nothing removed", async (t) => {
+  isolated(t);
+  const { io, data, err } = captureIO();
+  await authLogout(ARGS, resolveConfig({ env: "prod" }), { store: memoryStore().store, transport: async () => assert.fail("no request expected"), io });
+  assert.deepEqual(data(), { removed: false, env: "prod", revoked: false });
+  assert.equal(err(), "");
+});
+
 // ---------------- the credential every API command sends ----------------
 
 test("API commands refuse to send a stored login to a --base-url outside its environment", (t) => {

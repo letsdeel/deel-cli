@@ -321,6 +321,18 @@ test("a refresh error from the server reaches the terminal without control chara
   );
 });
 
+test("a refresh error whose error field is not a string is left out of the message", async (t) => {
+  isolated(t);
+  const { store } = memoryStore({ oauth: entryAt(0) });
+  const { transport } = oauthTransport(() => tokenResponse({ error: { code: 42 } }, 500));
+  const resolved = resolveToken({ config: CONFIG, store, transport, now: () => NOW });
+  await assert.rejects(
+    () => (authFor(resolved) as () => Promise<string>)(),
+    (error: CliError) => error.code === "auth.refresh" && error.message === "Refreshing the login failed (500).",
+  );
+  assert.notEqual(readOAuthEntry(store, ISSUER), null);
+});
+
 test("a login removed by another process while waiting is reported as expired", async (t) => {
   isolated(t);
   const { store, items } = memoryStore({ oauth: entryAt(0) });
