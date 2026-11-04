@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { resolveConfig, ENVIRONMENTS } from "../src/core/config.ts";
+import { configFrom } from "../src/commands/shared.ts";
 
 test("defaults to prod", () => {
   const config = resolveConfig({});
@@ -34,4 +35,15 @@ test("DEEL_ENV is honored when no --env is passed", () => {
     if (prev === undefined) delete process.env.DEEL_ENV;
     else process.env.DEEL_ENV = prev;
   }
+});
+
+test("--beta sets config.beta, and it is unset otherwise", () => {
+  assert.equal(resolveConfig({ beta: true }).beta, true);
+  assert.equal(resolveConfig({}).beta, undefined);
+  assert.equal(resolveConfig({ beta: false }).beta, undefined);
+});
+
+test("configFrom wires the --beta flag into the config", () => {
+  assert.equal(configFrom({ beta: true }, []).beta, true);
+  assert.equal(configFrom({}, []).beta, undefined);
 });

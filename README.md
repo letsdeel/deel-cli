@@ -19,6 +19,7 @@ deel jobs list --jq '.[] | {job_id, status}'        # filter recent async jobs
 - [Request input (`--input`, `--file`, `--form`)](#request-input)
 - [Output (`--json`, `--fields`, `--jq`, `--quiet`)](#output)
 - [Idempotency](#idempotency)
+- [Webhooks](#webhooks)
 - [Environments](#environments)
 - [Corporate proxies & custom CAs](#corporate-proxies--custom-cas)
 - [Exit codes](#exit-codes)
@@ -232,6 +233,21 @@ deel jobs list --quiet
 
 Every mutating request (`POST`/`PUT`/`PATCH`/`DELETE`) carries an `Idempotency-Key`. By default it is a **deterministic UUIDv5** derived from a canonicalized form of the request (method + path + query + body), so re-running the identical command sends the identical key and the server can dedupe a retry. Override it with `--idempotency-key <value>` when you want a fresh attempt.
 
+## Webhooks
+
+`deel webhooks list`, `get <id>` and `event-types` read webhook subscriptions; the signing key is never printed (reveal it in Developer Center → Webhooks).
+
+```bash
+deel webhooks create --name Payroll --url https://hooks.example.com/deel --event contract.created  # --event is repeatable
+deel webhooks update <id> --status disabled                    # changes only the given fields
+deel webhooks delete <id> --yes                                # --yes is required when non-interactive
+deel webhooks simulate <id> --event contract.created           # Deel delivers a test event to the receiver
+```
+
+A webhook id can start with `-`, which the argument parser reads as a flag. Pass such an id as `--id=<id>` on `get`, `update`, `delete` and `simulate`: `deel webhooks get --id=-WZ1uT2DFF01`. `--id` wins over a positional id.
+
+`simulate` runs the delivery from Deel's servers, so the receiver URL must be publicly reachable; it is limited to 10 simulations per hour per event type, is never retried and gets no auto-derived `Idempotency-Key`, and exits 1 when the receiver does not answer 2xx.
+
 ## Environments
 
 | `--env`          | Base URL                                       |
@@ -243,6 +259,14 @@ Every API call — including `deel job status`/`deel job list` and the generated
 `deel jobs status`/`deel jobs list` — goes through this same `/rest`-prefixed
 base URL. There is no separate, unprefixed origin for any endpoint.
 
+
+## Beta endpoints
+
+An endpoint that is still in beta answers `BETA_ACCESS_REQUIRED` unless the request carries `X-Beta: true`. Pass `--beta` (on any command) to send that header:
+
+```bash
+deel webhooks simulate <id> --event contract.created --beta
+```
 
 ## Corporate proxies & custom CAs
 

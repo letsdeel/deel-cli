@@ -41,5 +41,6 @@ export const HEADER = {
   cliVersion: "x-deel-cli-version",
   apiVersion: "x-version",         // API spec version; omitted when descriptor.version is absent
   idempotencyKey: "idempotency-key",
+  beta: "x-beta",                  // opt in to a beta API version (--beta)
   retryAfter: "retry-after",
 } as const;
