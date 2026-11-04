@@ -1,5 +1,5 @@
 // Environment selection. Default prod; --base-url is a hidden testing override.
-// Precedence: --base-url > --env > DEEL_ENV > default (prod).
+// Precedence: --base-url > DEEL_CLI_BASE_URL > --env > DEEL_ENV > default (prod).
 
 import { CliError } from "./errors.ts";
 
@@ -15,7 +15,9 @@ export type Config = {
 
 export function resolveConfig(opts: { env?: string; baseUrl?: string }): Config {
   const env = opts.env ?? process.env.DEEL_ENV ?? "prod";
-  let baseUrl = opts.baseUrl;
+  const envBaseUrl = process.env.DEEL_CLI_BASE_URL?.trim();
+  const source = opts.baseUrl ? "--base-url" : "DEEL_CLI_BASE_URL";
+  let baseUrl = opts.baseUrl || envBaseUrl || undefined;
   if (!baseUrl) {
     baseUrl = ENVIRONMENTS[env];
     if (!baseUrl) {
@@ -27,10 +29,10 @@ export function resolveConfig(opts: { env?: string; baseUrl?: string }): Config 
   try {
     parsed = new URL(baseUrl);
   } catch {
-    throw new CliError("config.baseurl", `Invalid --base-url "${baseUrl}".`);
+    throw new CliError("config.baseurl", `Invalid ${source} "${baseUrl}".`);
   }
   if (parsed.protocol !== "https:") {
-    throw new CliError("config.baseurl", `--base-url must use https (got "${baseUrl}").`, "The API token is only sent over https.");
+    throw new CliError("config.baseurl", `${source} must use https (got "${baseUrl}").`, "The API token is only sent over https.");
   }
   return { env, baseUrl: baseUrl.replace(/\/$/, "") };
 }

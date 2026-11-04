@@ -289,6 +289,7 @@ Location: `~/Library/Logs/deel/deel.log` (macOS),
 | ------------------- | ----------------------------------------------------------- |
 | `DEEL_TOKEN`        | PAT value                                                   |
 | `DEEL_ENV`          | Default environment (`prod` / `demo`)                       |
+| `DEEL_CLI_BASE_URL` | Override the API base URL (https only); beats `--env`/`DEEL_ENV`, `--base-url` beats it |
 | `DEEL_LOG`          | `off` to disable local logging                              |
 | `DEEL_LOG_BODIES`   | `1` to include response bodies in the local log (off by default) |
 | `DEEL_LOG_DIR`      | Override the log directory                                  |

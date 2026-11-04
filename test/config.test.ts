@@ -35,3 +35,57 @@ test("DEEL_ENV is honored when no --env is passed", () => {
     else process.env.DEEL_ENV = prev;
   }
 });
+
+function withBaseUrlEnv(value: string | undefined, fn: () => void) {
+  const prev = process.env.DEEL_CLI_BASE_URL;
+  if (value === undefined) delete process.env.DEEL_CLI_BASE_URL;
+  else process.env.DEEL_CLI_BASE_URL = value;
+  try {
+    fn();
+  } finally {
+    if (prev === undefined) delete process.env.DEEL_CLI_BASE_URL;
+    else process.env.DEEL_CLI_BASE_URL = prev;
+  }
+}
+
+test("DEEL_CLI_BASE_URL is used when no --base-url is passed", () => {
+  withBaseUrlEnv("https://example.test/rest", () => {
+    assert.equal(resolveConfig({}).baseUrl, "https://example.test/rest");
+  });
+});
+
+test("--base-url beats DEEL_CLI_BASE_URL", () => {
+  withBaseUrlEnv("https://env.test/rest", () => {
+    assert.equal(resolveConfig({ baseUrl: "https://flag.test/rest" }).baseUrl, "https://flag.test/rest");
+  });
+});
+
+test("DEEL_CLI_BASE_URL beats --env", () => {
+  withBaseUrlEnv("https://env.test/rest", () => {
+    assert.equal(resolveConfig({ env: "demo" }).baseUrl, "https://env.test/rest");
+  });
+});
+
+test("an empty DEEL_CLI_BASE_URL falls back to --env", () => {
+  withBaseUrlEnv("", () => {
+    assert.equal(resolveConfig({ env: "demo" }).baseUrl, ENVIRONMENTS.demo);
+  });
+});
+
+test("DEEL_CLI_BASE_URL trailing slash is stripped", () => {
+  withBaseUrlEnv("https://env.test/rest/", () => {
+    assert.equal(resolveConfig({}).baseUrl, "https://env.test/rest");
+  });
+});
+
+test("an invalid DEEL_CLI_BASE_URL names the variable", () => {
+  withBaseUrlEnv("not a url", () => {
+    assert.throws(() => resolveConfig({}), /DEEL_CLI_BASE_URL/);
+  });
+});
+
+test("a non-https DEEL_CLI_BASE_URL is rejected", () => {
+  withBaseUrlEnv("http://localhost:8787/rest", () => {
+    assert.throws(() => resolveConfig({}), /DEEL_CLI_BASE_URL must use https/);
+  });
+});
