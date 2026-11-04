@@ -209,6 +209,50 @@ test("a command's own flag value after a group is not an unknown command", async
   assert.match(out, /^deel widgets parts$/m);
 });
 
+test("a boolean flag never takes the next word, so a typo after it is still unknown", async () => {
+  for (const flag of ["--debug", "--no-log", "--quiet", "--token-stdin"]) {
+    const { code, out, err } = await capture([flag, "widgts"]);
+    assert.equal(code, EXIT.ERROR, flag);
+    assert.equal(out, "");
+    assert.match(err, /^Unknown command 'widgts'\. Did you mean: widgets\?$/m);
+  }
+});
+
+test("a declared string flag takes the next word even when it names a command", async () => {
+  for (const flag of ["--fields", "--idempotencyKey", "--idempotency-key", "--ca-cert", "--base-url"]) {
+    const { code, out } = await capture([flag, "widgets", "widgets", "--help"]);
+    assert.equal(code, EXIT.OK, flag);
+    assert.match(out, /^Widgets$/m);
+  }
+});
+
+test("a nested command runs with flags before and between its words", async () => {
+  const realFetch = globalThis.fetch;
+  const realToken = process.env.DEEL_TOKEN;
+  const urls: string[] = [];
+  globalThis.fetch = (async (url: unknown) => {
+    urls.push(String(url));
+    return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+  process.env.DEEL_TOKEN = "test-token";
+  try {
+    for (const argv of [
+      ["--env", "demo", "--no-log", "widgets", "parts", "list", "--widget_id", "5"],
+      ["--env", "demo", "widgets", "--no-log", "parts", "--fields", "id", "list", "--widget_id", "5"],
+    ]) {
+      urls.length = 0;
+      const { code, err } = await capture(argv);
+      assert.equal(code, EXIT.OK, `${argv.join(" ")}: ${err}`);
+      assert.equal(urls.length, 1, argv.join(" "));
+      assert.match(urls[0], /\/widgets\/5\/parts$/);
+    }
+  } finally {
+    globalThis.fetch = realFetch;
+    if (realToken === undefined) delete process.env.DEEL_TOKEN;
+    else process.env.DEEL_TOKEN = realToken;
+  }
+});
+
 test("an unknown flag does not swallow a command word", async () => {
   const { code, out } = await capture(["--unknown", "widgets", "--help"]);
   assert.equal(code, EXIT.OK);
