@@ -1,8 +1,10 @@
-// `deel webhooks list | get <id> | event-types` — read-only webhook commands.
+// `deel webhooks list | get <id> | event-types | create | update <id> | delete <id>`.
 // Every webhook goes through stripSigningKey before rendering, so the signing
 // key never reaches stdout; the hint about where to reveal it goes to stderr.
 
 import { defineCommand } from "citty";
+import type { ArgsDef } from "citty";
+import { createInterface } from "node:readline";
 import { resolveToken, requireToken } from "../core/auth.ts";
 import { createContext } from "../core/context.ts";
 import type { Ctx } from "../core/context.ts";
@@ -13,16 +15,21 @@ import { CliError } from "../core/errors.ts";
 import {
   DASH_ID_HINT,
   SIGNING_KEY_HINT,
+  buildCreateBody,
   buildListQuery,
+  buildUpdateBody,
+  createWebhook,
+  deleteWebhook,
   getWebhook,
   listAllWebhooks,
   listWebhookEventTypes,
   listWebhooks,
   resolveWebhookId,
   stripSigningKey,
+  updateWebhook,
 } from "../core/webhooks.ts";
-import type { ListFlags } from "../core/webhooks.ts";
-import { commonArgs, configFrom, outputOpts, readHidden } from "./shared.ts";
+import type { CreateWebhookBody, ListFlags, UpdateWebhookBody, WriteFlags } from "../core/webhooks.ts";
+import { commonArgs, configFrom, gatherFlagValues, nullableBoolean, nullableString, outputOpts, readHidden } from "./shared.ts";
 import type { Args } from "./shared.ts";
 
 type CittyCtx = { args: unknown; rawArgs: string[] };
@@ -40,6 +47,57 @@ export function listFlagsFrom(args: Args): ListFlags {
     search: optionalString(args.search),
     order: optionalString(args.order),
   };
+}
+
+// Last occurrence of `--<name>` (true), `--no-<name>` (false) or `--<name>=true|false|null`
+// (null clears the field); undefined when absent, so an absent boolean is never sent.
+export function readBooleanFlag(rawArgs: string[], name: string): boolean | null | undefined {
+  let value: boolean | null | undefined;
+  for (const token of rawArgs) {
+    if (token === `--${name}`) value = true;
+    else if (token === `--no-${name}`) value = false;
+    else if (token.startsWith(`--${name}=`)) {
+      value = nullableBoolean(token.slice(name.length + 3), `--${name}`);
+    }
+  }
+  return value;
+}
+
+// create / update flags. --event is repeatable, so it is read from the raw args.
+export function writeFlagsFrom(args: Args, rawArgs: string[]): WriteFlags {
+  return {
+    name: optionalString(args.name),
+    url: optionalString(args.url),
+    description: nullableString(optionalString(args.description)),
+    status: optionalString(args.status),
+    events: gatherFlagValues(rawArgs, "event"),
+    includeChildOrgs: readBooleanFlag(rawArgs, "include-child-orgs"),
+  };
+}
+
+export type Confirm = (question: string) => Promise<boolean>;
+
+export function isYes(answer: string): boolean {
+  return /^y(es)?$/i.test(answer.trim());
+}
+
+// Default delete confirmation: one line read from stdin, the question on stderr. Closing the input without an answer
+// (EOF after --token-stdin consumed stdin, Ctrl-D, Ctrl-C) counts as "no", so the promise always settles.
+export function promptConfirm(question: string, input: NodeJS.ReadableStream = process.stdin, output: NodeJS.WritableStream = process.stderr): Promise<boolean> {
+  return new Promise((resolve) => {
+    const rl = createInterface({ input, output });
+    let settled = false;
+    const settle = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+    rl.once("close", () => settle(false));
+    rl.question(question, (answer) => {
+      settle(isYes(answer));
+      rl.close();
+    });
+  });
 }
 
 function contextFor(cittyCtx: CittyCtx): Ctx {
@@ -77,8 +135,31 @@ export async function runEventTypes(ctx: Ctx, output: OutputOpts): Promise<void>
   await render(ctx.io, envelope(await listWebhookEventTypes(ctx)), output);
 }
 
-// The id of `get <id>` (and, in later commands, update / delete / simulate): the positional, or --id=<id> for an id
-// that starts with '-'.
+export async function runCreate(ctx: Ctx, body: CreateWebhookBody, output: OutputOpts, idempotencyKey?: string): Promise<void> {
+  await renderWebhooks(ctx, await createWebhook(ctx, body, idempotencyKey), output);
+}
+
+export async function runUpdate(ctx: Ctx, id: string, body: UpdateWebhookBody, output: OutputOpts, idempotencyKey?: string): Promise<void> {
+  await renderWebhooks(ctx, await updateWebhook(ctx, id, body, idempotencyKey), output);
+}
+
+export type DeleteOpts = { yes: boolean; idempotencyKey?: string; confirm?: Confirm };
+
+// No DELETE is sent without --yes or an interactive yes.
+export async function runDelete(ctx: Ctx, id: string, opts: DeleteOpts, output: OutputOpts): Promise<void> {
+  if (!opts.yes) {
+    if (!ctx.io.interactive) {
+      throw new CliError("usage.webhooks", `Refusing to delete webhook ${id} without confirmation`, "Pass --yes to delete non-interactively.");
+    }
+    const confirmed = await (opts.confirm ?? promptConfirm)(`Delete webhook ${id}? [y/N] `);
+    if (!confirmed) throw new CliError("webhooks.delete_aborted", `Aborted: webhook ${id} was not deleted`);
+  }
+  const result = await deleteWebhook(ctx, id, opts.idempotencyKey);
+  await renderWebhooks(ctx, { id, ...result }, output);
+}
+
+// The id of a single-webhook command (get / update / delete / simulate): the positional, or --id=<id> for an id that
+// starts with '-'.
 export function requireId(args: Args, rawArgs: string[], usage: string): string {
   const twoArgIndex = rawArgs.indexOf("--id");
   if (twoArgIndex >= 0 && rawArgs[twoArgIndex + 1]?.startsWith("--")) {
@@ -87,8 +168,33 @@ export function requireId(args: Args, rawArgs: string[], usage: string): string 
   return resolveWebhookId(args.id, readHidden(rawArgs, "id"), usage);
 }
 
+// `enable` / `disable`: shorthand for `update <id> --status enabled|disabled`, sending only the status.
+function statusCommand(status: UpdateWebhookBody["status"] & string) {
+  const name = status === "enabled" ? "enable" : "disable";
+  return defineCommand({
+    meta: { name, description: `${status === "enabled" ? "Enable" : "Disable"} a webhook: deel webhooks ${name} <id> (an id that starts with '-': --id=<id>)` },
+    args: {
+      id: { type: "positional", required: false, description: "Webhook id" },
+      ...commonArgs,
+    },
+    async run(cittyCtx) {
+      const args = cittyCtx.args as Args;
+      const id = requireId(args, cittyCtx.rawArgs, `deel webhooks ${name} <id>`);
+      await runUpdate(contextFor(cittyCtx), id, { status }, outputOpts(args), optionalString(args["idempotency-key"]));
+    },
+  });
+}
+
+const writeArgs: ArgsDef = {
+  name: { type: "string", description: "Webhook name" },
+  url: { type: "string", description: "HTTPS endpoint that receives the events" },
+  event: { type: "string", description: "Event type to subscribe to (repeatable; see deel webhooks event-types)" },
+  description: { type: "string", description: "Description (null clears it)" },
+  "include-child-orgs": { type: "boolean", description: "Also deliver events of child organizations (--no-include-child-orgs to turn off, --include-child-orgs=null to clear)" },
+};
+
 export const webhooksCommand = defineCommand({
-  meta: { name: "webhooks", description: "Webhook subscriptions (read-only)" },
+  meta: { name: "webhooks", description: "Webhook subscriptions" },
   subCommands: {
     list: defineCommand({
       meta: { name: "list", description: "List webhooks (whole list by default; --limit/--cursor for one page, --all for every page)" },
@@ -123,6 +229,50 @@ export const webhooksCommand = defineCommand({
       async run(cittyCtx) {
         const args = cittyCtx.args as Args;
         await runEventTypes(contextFor(cittyCtx), outputOpts(args));
+      },
+    }),
+    create: defineCommand({
+      meta: { name: "create", description: "Create a webhook: deel webhooks create --name <name> --url <https-url> --event <type> [--event <type> ...]" },
+      args: {
+        ...writeArgs,
+        status: { type: "string", description: "enabled | disabled (default enabled)" },
+        ...commonArgs,
+      },
+      async run(cittyCtx) {
+        const args = cittyCtx.args as Args;
+        const body = buildCreateBody(writeFlagsFrom(args, cittyCtx.rawArgs)); // usage errors before any token lookup
+        await runCreate(contextFor(cittyCtx), body, outputOpts(args), optionalString(args["idempotency-key"]));
+      },
+    }),
+    update: defineCommand({
+      meta: { name: "update", description: "Change a webhook (only the given fields): deel webhooks update <id> --status disabled (an id that starts with '-': --id=<id>)" },
+      args: {
+        id: { type: "positional", required: false, description: "Webhook id" },
+        ...writeArgs,
+        status: { type: "string", description: "enabled | disabled" },
+        ...commonArgs,
+      },
+      async run(cittyCtx) {
+        const args = cittyCtx.args as Args;
+        const id = requireId(args, cittyCtx.rawArgs, "deel webhooks update <id> [--name ...] [--url ...] [--event ...] [--status ...]");
+        const body = buildUpdateBody(writeFlagsFrom(args, cittyCtx.rawArgs)); // usage errors before any token lookup
+        await runUpdate(contextFor(cittyCtx), id, body, outputOpts(args), optionalString(args["idempotency-key"]));
+      },
+    }),
+    enable: statusCommand("enabled"),
+    disable: statusCommand("disabled"),
+    delete: defineCommand({
+      meta: { name: "delete", description: "Delete a webhook: deel webhooks delete <id> (asks to confirm; --yes when non-interactive; an id that starts with '-': --id=<id>)" },
+      args: {
+        id: { type: "positional", required: false, description: "Webhook id" },
+        yes: { type: "boolean", description: "Delete without asking for confirmation" },
+        ...commonArgs,
+      },
+      async run(cittyCtx) {
+        const args = cittyCtx.args as Args;
+        const id = requireId(args, cittyCtx.rawArgs, "deel webhooks delete <id> [--yes]");
+        const opts = { yes: args.yes === true, idempotencyKey: optionalString(args["idempotency-key"]) };
+        await runDelete(contextFor(cittyCtx), id, opts, outputOpts(args));
       },
     }),
   },
