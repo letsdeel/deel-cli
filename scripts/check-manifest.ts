@@ -16,8 +16,8 @@ function headerErrors(entries: readonly MapEntry[], descriptors: readonly AnyDes
   for (const d of descriptors) {
     const k = entryKey(d.command.join(" "), d.method, d.path, d.variant);
     if (!mapHeaders.has(k)) continue; // orphan, reported above
-    const want = Object.keys(mapHeaders.get(k)!).sort();
-    const have = d.params.filter((p) => p.in === "header").map((p) => p.name).sort();
+    const want = Object.entries(mapHeaders.get(k)!).map(([flag, header]) => `${flag}=${header.toLowerCase()}`).sort();
+    const have = d.params.filter((p) => p.in === "header").map((p) => `${p.name}=${(p.header ?? "").toLowerCase()}`).sort();
     if (want.join() !== have.join()) {
       errors.push(`[headers] ${d.command.join(" ")} ${d.method} ${d.path}: manifest header flags [${have}] differ from map [${want}]`);
     }
