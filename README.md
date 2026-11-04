@@ -6,7 +6,7 @@ A command-line client for selected endpoints from the [Deel Public API](https://
 deel auth status --json                              # verify your token and identity
 deel adjustments create --invoice --generate-input  # explore required fields
 deel jobs list --jq '.[] | {job_id, status}'        # filter recent async jobs
-deel apps list --api_access enabled                 # list your organization's integration apps
+deel oauth2-apps list --api_access enabled                 # list your organization's integration apps
 ```
 
 ## Contents
@@ -21,7 +21,7 @@ deel apps list --api_access enabled                 # list your organization's i
 - [Output (`--json`, `--fields`, `--jq`, `--quiet`)](#output)
 - [Idempotency](#idempotency)
 - [Webhooks](#webhooks)
-- [Apps](#apps)
+- [OAuth2 apps](#oauth2-apps)
 - [Environments](#environments)
 - [Corporate proxies & custom CAs](#corporate-proxies--custom-cas)
 - [Exit codes](#exit-codes)
@@ -175,7 +175,7 @@ A command can ask for confirmation before it sends anything: an entry in `src/co
 - When stdin carries the token or the body (`--token-stdin`, `--input -`), the prompt could not read an answer, so `--yes` is required there too.
 - `--help --json` lists the confirmation under `confirm`, so a script or an agent can see it before running the command.
 
-`deel apps disable` is one.
+`deel oauth2-apps disable` is one.
 
 ## Request input
 
@@ -260,43 +260,43 @@ A webhook id can start with `-`, which the argument parser reads as a flag. Pass
 
 `simulate` runs the delivery from Deel's servers, so the receiver URL must be publicly reachable; it is limited to 10 simulations per hour per event type, is never retried and gets no auto-derived `Idempotency-Key`, and exits 1 when the receiver does not answer 2xx.
 
-## Apps
+## OAuth2 apps
 
-`deel apps list` and `deel apps get --app_id <id>` read, and `deel apps update`, `disable` and `enable` change, the integration apps that belong to your organization (the app secret is never returned). The commands are generated from the API spec like the others, so path parameters are flags.
+`deel oauth2-apps list` and `deel oauth2-apps get --app_id <id>` read, and `deel oauth2-apps update`, `disable` and `enable` change, the integration apps that belong to your organization (the app secret is never returned). The commands are generated from the API spec like the others, so path parameters are flags.
 
 ```bash
-deel apps list --api_access disabled --limit 20      # filter by API access; --limit (1 to 100, default 100) and --cursor page the list
-deel apps get --app_id 00000000-0000-0000-0000-000000000000
-deel apps update --app_id <id> --input name="Payroll sync"      # changes only the given fields
-deel apps update --app_id <id> --input '{"redirect_uris":["https://example.com/callback"]}'  # replaces the whole list
-deel apps disable --app_id <id>                                 # asks to confirm; --yes skips the prompt
-deel apps enable --app_id <id>
+deel oauth2-apps list --api_access disabled --limit 20      # filter by API access; --limit (1 to 100, default 100) and --cursor page the list
+deel oauth2-apps get --app_id 00000000-0000-0000-0000-000000000000
+deel oauth2-apps update --app_id <id> --input name="Payroll sync"      # changes only the given fields
+deel oauth2-apps update --app_id <id> --input '{"redirect_uris":["https://example.com/callback"]}'  # replaces the whole list
+deel oauth2-apps disable --app_id <id>                                 # asks to confirm; --yes skips the prompt
+deel oauth2-apps enable --app_id <id>
 ```
 
-`deel apps disable` revokes every consent and token issued to the app; `enable` does not restore them, so people must authorize the app again. It asks `[y/N]` in a terminal. `--yes` skips the prompt and is required when not running in a terminal (no TTY, or `CI` / an agent environment is detected) and when stdin carries the token or the body (`--token-stdin`, `--input -`), since the prompt would read that line as the answer; without it nothing is sent. `deel apps disable --help --json` lists the confirmation under `confirm`.
+`deel oauth2-apps disable` revokes every consent and token issued to the app; `enable` does not restore them, so people must authorize the app again. It asks `[y/N]` in a terminal. `--yes` skips the prompt and is required when not running in a terminal (no TTY, or `CI` / an agent environment is detected) and when stdin carries the token or the body (`--token-stdin`, `--input -`), since the prompt would read that line as the answer; without it nothing is sent. `deel oauth2-apps disable --help --json` lists the confirmation under `confirm`.
 
-`apps list` returns one page at a time. When more results exist, the next-page cursor is printed as `meta.cursor`; pass it back with `--cursor` to get the next page.
+`oauth2-apps list` returns one page at a time. When more results exist, the next-page cursor is printed as `meta.cursor`; pass it back with `--cursor` to get the next page.
 
 ### App listing
 
-An app's page in the App Store is its listing. `deel apps listing get --app_id <id>` reads it: whether it is live (`status`), the revision you are working on or that is under review (`latest_revision.status` is `draft`, `in_review`, `published` or `rejected`, with the reviewer's notes when rejected), its content, categories and the logo. `deel app-store categories` lists the category ids a listing can use. Both need `--beta`.
+An app's page in the App Store is its listing. `deel oauth2-apps listing get --app_id <id>` reads it: whether it is live (`status`), the revision you are working on or that is under review (`latest_revision.status` is `draft`, `in_review`, `published` or `rejected`, with the reviewer's notes when rejected), its content, categories and the logo. `deel app-store categories` lists the category ids a listing can use. Both need `--beta`.
 
 ```bash
-deel apps listing get --app_id <id> --beta
+deel oauth2-apps listing get --app_id <id> --beta
 deel app-store categories --beta
 ```
 
 An app with no listing, and an app of another organization, both answer 404.
 
-`deel apps listing create`, `update` and `submit` write it. A listing goes through `draft`, `in_review` and then `published` or `rejected`:
+`deel oauth2-apps listing create`, `update` and `submit` write it. A listing goes through `draft`, `in_review` and then `published` or `rejected`:
 
 ```bash
-deel apps listing create --app_id <id> --beta --input '{"name":"Payroll sync"}'    # once per app
-deel apps listing update --app_id <id> --beta --input '{"short_description":"Sync timesheets to payroll","categories":[182]}'
-deel apps listing submit --app_id <id> --beta                                   # sends the draft to review
+deel oauth2-apps listing create --app_id <id> --beta --input '{"name":"Payroll sync"}'    # once per app
+deel oauth2-apps listing update --app_id <id> --beta --input '{"short_description":"Sync timesheets to payroll","categories":[182]}'
+deel oauth2-apps listing submit --app_id <id> --beta                                   # sends the draft to review
 ```
 
-`update` saves a draft and changes only the fields you send; each list you send (`highlights`, `support_resources`, `works_with`, `what_it_syncs`, `categories`) replaces the current one. `deel apps listing update --help` lists every field. Test account details are accepted and never printed back. A listing in review cannot be changed (409) until the review ends; read `latest_revision.review_notes` after a rejection, edit, and submit again. A draft shows the logo you saved, but the listing goes live in the App Store only once Deel approves it.
+`update` saves a draft and changes only the fields you send; each list you send (`highlights`, `support_resources`, `works_with`, `what_it_syncs`, `categories`) replaces the current one. `deel oauth2-apps listing update --help` lists every field. Test account details are accepted and never printed back. A listing in review cannot be changed (409) until the review ends; read `latest_revision.review_notes` after a rejection, edit, and submit again. A draft shows the logo you saved, but the listing goes live in the App Store only once Deel approves it.
 
 ## Files
 
@@ -306,7 +306,7 @@ deel apps listing submit --app_id <id> --beta                                   
 deel files create --input '{"filename":"logo.png","size":2048}'      # prints file_id, one_time_secret and the upload target
 # send the bytes to the upload target yourself: a presigned form POST (url + fields, with the file as the last field)
 deel files status --file_id <file_id> --one_time_secret <secret>     # wait for "ready" (the virus scan is done)
-deel apps listing update --app_id <id> --beta --input '{"logo":{"file_id":"<file_id>","one_time_secret":"<secret>"}}'
+deel oauth2-apps listing update --app_id <id> --beta --input '{"logo":{"file_id":"<file_id>","one_time_secret":"<secret>"}}'
 ```
 
 Files larger than the server's multipart threshold are uploaded in parts: pass `--upload_method multipart` to `files create`, upload each part with an HTTP PUT, then call `deel files complete --file_id <id> --one_time_secret <secret> --input ...` with the part numbers and ETags. The secret is a single-purpose handle for that one file, but it still appears in your shell history and process list when typed as a flag, so use a variable or a throwaway shell for it.

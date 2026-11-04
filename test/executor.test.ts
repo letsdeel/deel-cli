@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { execute } from "../src/core/executor.ts";
+import { errorFromResponse, execute } from "../src/core/executor.ts";
 import { createContext } from "../src/core/context.ts";
 import { captureIO } from "../src/core/io.ts";
 import type { Descriptor } from "../src/types.ts";
@@ -285,4 +285,12 @@ test("execute() attaches multiple files to a single multipart field", async () =
   const parts = (body as FormData).getAll("files");
   assert.equal(parts.length, 2);
   assert.deepEqual(parts.map((p) => (p as File).name).sort(), ["a.pdf", "b.pdf"]);
+});
+
+test("errorFromResponse falls back to error_code when code is absent, and to http.<status> when neither is a string", () => {
+  assert.equal(errorFromResponse(404, { errors: [{ error_code: "NOT_FOUND", message: "Webhook not found" }] }, "r1").code, "NOT_FOUND");
+  assert.equal(errorFromResponse(404, { error_code: "NOT_FOUND", message: "Webhook not found" }, "r1").code, "NOT_FOUND");
+  assert.equal(errorFromResponse(404, { errors: [{ code: "WEBHOOK_NOT_FOUND", error_code: "OTHER", message: "m" }] }, "r1").code, "WEBHOOK_NOT_FOUND");
+  assert.equal(errorFromResponse(404, { errors: [{ message: "Webhook not found" }] }, "r1").code, "http.404");
+  assert.equal(errorFromResponse(500, { errors: [{ error_code: 42, message: "m" }] }, "r1").code, "http.500");
 });
