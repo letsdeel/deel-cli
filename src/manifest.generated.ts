@@ -489,11 +489,11 @@ export const manifest: Manifest = {
     },
     {
       "command": [
-        "apps",
+        "oauth2-apps",
         "get"
       ],
       "method": "GET",
-      "path": "/apps/{app_id}",
+      "path": "/oauth2-apps/{app_id}",
       "summary": "Retrieve an app",
       "async": false,
       "bodyKind": "none",
@@ -644,11 +644,11 @@ export const manifest: Manifest = {
     },
     {
       "command": [
-        "apps",
+        "oauth2-apps",
         "list"
       ],
       "method": "GET",
-      "path": "/apps",
+      "path": "/oauth2-apps",
       "summary": "List apps",
       "async": false,
       "bodyKind": "none",

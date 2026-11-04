@@ -46,53 +46,53 @@ async function capture(argv: string[]): Promise<{ code: number; out: string }> {
   }
 }
 
-test("apps list sends the paging and api_access filters as query params", async () => {
+test("oauth2-apps list sends the paging and api_access filters as query params", async () => {
   const { ctx, seen } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: [], cursor: null } }));
-  await execute(descriptor(["apps", "list"]), { flags: { limit: "10", cursor: "abc", api_access: "enabled" }, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
+  await execute(descriptor(["oauth2-apps", "list"]), { flags: { limit: "10", cursor: "abc", api_access: "enabled" }, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
   const req = seen[0];
   assert.equal(req.method, "GET");
-  assert.equal(new URL(req.url).pathname, "/rest/apps");
+  assert.equal(new URL(req.url).pathname, "/rest/oauth2-apps");
   assert.equal(new URL(req.url).searchParams.get("limit"), "10");
   assert.equal(new URL(req.url).searchParams.get("cursor"), "abc");
   assert.equal(new URL(req.url).searchParams.get("api_access"), "enabled");
   assert.equal(req.headers["idempotency-key"], undefined);
 });
 
-test("apps list prints the apps and surfaces the next-page cursor in meta", async () => {
+test("oauth2-apps list prints the apps and surfaces the next-page cursor in meta", async () => {
   const { ctx, out } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: [{ id: APP_ID, name: "Sync" }], cursor: "next-1" } }));
-  await execute(descriptor(["apps", "list"]), { flags: {}, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
+  await execute(descriptor(["oauth2-apps", "list"]), { flags: {}, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
   const parsed = out();
   assert.equal(parsed.data[0].id, APP_ID);
   assert.equal(parsed.meta.cursor, "next-1");
 });
 
-test("apps list leaves cursor out of meta on the last page", async () => {
+test("oauth2-apps list leaves cursor out of meta on the last page", async () => {
   const { ctx, out } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: [], cursor: null } }));
-  await execute(descriptor(["apps", "list"]), { flags: {}, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
+  await execute(descriptor(["oauth2-apps", "list"]), { flags: {}, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
   assert.ok(!("cursor" in out().meta));
 });
 
-test("apps list leaves an empty or non-string cursor out of meta", async () => {
+test("oauth2-apps list leaves an empty or non-string cursor out of meta", async () => {
   for (const cursor of ["", 7, true]) {
     const { ctx, out } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: [], cursor } }));
-    await execute(descriptor(["apps", "list"]), { flags: {}, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
+    await execute(descriptor(["oauth2-apps", "list"]), { flags: {}, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
     assert.ok(!("cursor" in out().meta), `cursor ${JSON.stringify(cursor)} stays out of meta`);
   }
 });
 
-test("apps get puts the app id in the path and prints the unwrapped app", async () => {
+test("oauth2-apps get puts the app id in the path and prints the unwrapped app", async () => {
   const { ctx, seen, out } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { id: APP_ID, api_access: "enabled" } } }));
-  await execute(descriptor(["apps", "get"]), { flags: { app_id: APP_ID }, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
-  assert.equal(new URL(seen[0].url).pathname, `/rest/apps/${APP_ID}`);
+  await execute(descriptor(["oauth2-apps", "get"]), { flags: { app_id: APP_ID }, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
+  assert.equal(new URL(seen[0].url).pathname, `/rest/oauth2-apps/${APP_ID}`);
   assert.equal(out().data.api_access, "enabled");
 });
 
-test("apps get maps a 404 to a not-found error", async () => {
+test("oauth2-apps get maps a 404 to a not-found error", async () => {
   const { ctx } = ctxWith(() => ({ status: 404, headers: {}, text: "", json: { errors: [{ code: "NOT_FOUND", message: "App not found" }] } }));
-  await assert.rejects(() => execute(descriptor(["apps", "get"]), { flags: { app_id: APP_ID }, files: {} }, ctx, { output: OUTPUT, debug: false, form: false }), /App not found/);
+  await assert.rejects(() => execute(descriptor(["oauth2-apps", "get"]), { flags: { app_id: APP_ID }, files: {} }, ctx, { output: OUTPUT, debug: false, form: false }), /App not found/);
 });
 
-test("apps commands send X-Beta: true with --beta and hint at --beta when it is missing", async () => {
+test("oauth2-apps commands send X-Beta: true with --beta and hint at --beta when it is missing", async () => {
   const headers: Record<string, string>[] = [];
   const originalFetch = globalThis.fetch;
   const originalToken = process.env.DEEL_TOKEN;
@@ -108,8 +108,8 @@ test("apps commands send X-Beta: true with --beta and hint at --beta when it is 
       : new Response(JSON.stringify({ errors: [{ code: "BETA_ACCESS_REQUIRED", message: "Beta only" }] }), { status: 403 });
   }) as typeof fetch;
   try {
-    await assert.rejects(() => run(["apps", "get", "--app_id", APP_ID]), (err: { code: string; next?: string }) => /--beta/.test(err.next ?? ""));
-    await run(["apps", "get", "--app_id", APP_ID, "--beta"]);
+    await assert.rejects(() => run(["oauth2-apps", "get", "--app_id", APP_ID]), (err: { code: string; next?: string }) => /--beta/.test(err.next ?? ""));
+    await run(["oauth2-apps", "get", "--app_id", APP_ID, "--beta"]);
   } finally {
     globalThis.fetch = originalFetch;
     process.stdout.write = originalWrite;
@@ -120,15 +120,15 @@ test("apps commands send X-Beta: true with --beta and hint at --beta when it is 
   assert.equal(Object.entries(headers[1]).find(([name]) => name.toLowerCase() === "x-beta")?.[1], "true");
 });
 
-test("apps list --help --json describes the filters and the app fields", async () => {
-  const { code, out } = await capture(["apps", "list", "--help", "--json"]);
+test("oauth2-apps list --help --json describes the filters and the app fields", async () => {
+  const { code, out } = await capture(["oauth2-apps", "list", "--help", "--json"]);
   assert.equal(code, 0);
   const contract = JSON.stringify(JSON.parse(out));
   for (const name of ["api_access", "limit", "cursor", "redirect_uris", "client_type"]) assert.match(contract, new RegExp(name));
 });
 
-test("apps get --help --json marks created_by and its name as required and nullable", async () => {
-  const { out } = await capture(["apps", "get", "--help", "--json"]);
+test("oauth2-apps get --help --json marks created_by and its name as required and nullable", async () => {
+  const { out } = await capture(["oauth2-apps", "get", "--help", "--json"]);
   const createdBy = JSON.parse(out).response.fields.find((field: { name: string }) => field.name === "created_by");
   assert.equal(createdBy.required, true);
   assert.equal(createdBy.nullable, true);
@@ -139,13 +139,13 @@ test("apps get --help --json marks created_by and its name as required and nulla
   assert.equal("nullable" in status, false);
 });
 
-test("apps get --help prints nullable next to the created_by fields", async () => {
-  const { out } = await capture(["apps", "get", "--help"]);
+test("oauth2-apps get --help prints nullable next to the created_by fields", async () => {
+  const { out } = await capture(["oauth2-apps", "get", "--help"]);
   assert.match(out, /created_by\s+object\s+nullable/);
 });
 
-test("apps get --help lists the --app_id flag", async () => {
-  const { code, out } = await capture(["apps", "get", "--help"]);
+test("oauth2-apps get --help lists the --app_id flag", async () => {
+  const { code, out } = await capture(["oauth2-apps", "get", "--help"]);
   assert.equal(code, 0);
   assert.match(out, /app_id/);
 });
