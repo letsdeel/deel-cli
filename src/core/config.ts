@@ -32,8 +32,8 @@ function originOf(url: string): string | null {
   }
 }
 
-// The override, undefined when unset, or an error message when it is not an https URL.
-// An unparsable --base-url is reported by resolveConfig itself, so any placeholder name will do here.
+// The host of a --base-url, used as the environment name. An unparsable --base-url is reported by resolveConfig
+// itself, so any placeholder name will do here.
 function hostOf(url: string): string {
   try {
     return new URL(url).host;
@@ -42,6 +42,7 @@ function hostOf(url: string): string {
   }
 }
 
+// The override, undefined when unset, or an error message when it is not an https URL.
 function httpsOverride(name: string): { value?: string; error?: string } {
   const value = process.env[name]?.trim().replace(/\/$/, "");
   if (!value) return {};

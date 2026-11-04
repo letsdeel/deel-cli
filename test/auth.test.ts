@@ -132,12 +132,18 @@ function oauthTransport(onRefresh: (body: URLSearchParams) => HttpResponse) {
 
 const tokenResponse = (json: unknown, status = 200): HttpResponse => ({ status, headers: {}, text: "", json });
 
-function withLockDir(t: TestContext) {
-  const saved = process.env.DEEL_LOG_DIR;
+// For the async tests, which withEnv cannot wrap: a private lock directory, and none of the caller's
+// DEEL_TOKEN, DEEL_OAUTH_ISSUER or DEEL_ENV, restored after the test.
+function isolated(t: TestContext) {
+  const keys = ["DEEL_LOG_DIR", "DEEL_TOKEN", "DEEL_OAUTH_ISSUER", "DEEL_ENV"];
+  const saved = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  for (const key of keys) delete process.env[key];
   process.env.DEEL_LOG_DIR = tempDir(t);
   t.after(() => {
-    if (saved === undefined) delete process.env.DEEL_LOG_DIR;
-    else process.env.DEEL_LOG_DIR = saved;
+    for (const key of keys) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
   });
 }
 
@@ -240,7 +246,7 @@ test("accessTokenScope gives null when the token cannot be decoded or has no sco
 });
 
 test("a fresh access token is used without any network call", async (t) => {
-  withLockDir(t);
+  isolated(t);
   const { store } = memoryStore({ oauth: entryAt(3_600_000) });
   const { transport, refreshes } = oauthTransport(() => assert.fail("should not refresh"));
   const resolved = resolveToken({ config: CONFIG, store, transport, now: () => NOW });
@@ -249,7 +255,7 @@ test("a fresh access token is used without any network call", async (t) => {
 });
 
 test("an access token near expiry is refreshed and the rotated login is stored", async (t) => {
-  withLockDir(t);
+  isolated(t);
   const { store, items } = memoryStore({ oauth: entryAt(30_000) });
   const { transport, refreshes } = oauthTransport(() => tokenResponse({ access_token: "at_new", refresh_token: "rt_new", expires_in: 3600, scope: "people:read" }));
   const resolved = resolveToken({ config: CONFIG, store, transport, now: () => NOW });
@@ -265,7 +271,7 @@ test("an access token near expiry is refreshed and the rotated login is stored",
 });
 
 test("two concurrent callers, in one process or two, cause exactly one network refresh", async (t) => {
-  withLockDir(t);
+  isolated(t);
   const { store } = memoryStore({ oauth: entryAt(10_000) });
   const { transport, refreshes } = oauthTransport(() => tokenResponse({ access_token: "at_new", refresh_token: "rt_new", expires_in: 3600 }));
   // Two resolutions over one keychain stand for two deel processes sharing the lock directory.
@@ -281,7 +287,7 @@ test("two concurrent callers, in one process or two, cause exactly one network r
 });
 
 test("invalid_grant on refresh removes the login and asks the user to sign in again", async (t) => {
-  withLockDir(t);
+  isolated(t);
   const { store, items } = memoryStore({ oauth: entryAt(0) });
   const { transport } = oauthTransport(() => tokenResponse({ error: "invalid_grant" }, 400));
   const resolved = resolveToken({ config: CONFIG, store, transport, now: () => NOW });
@@ -294,7 +300,7 @@ test("invalid_grant on refresh removes the login and asks the user to sign in ag
 });
 
 test("a transient refresh failure keeps the login", async (t) => {
-  withLockDir(t);
+  isolated(t);
   const { store, items } = memoryStore({ oauth: entryAt(0) });
   const { transport } = oauthTransport(() => tokenResponse({ error: "server_error" }, 503));
   const resolved = resolveToken({ config: CONFIG, store, transport, now: () => NOW });
@@ -303,7 +309,7 @@ test("a transient refresh failure keeps the login", async (t) => {
 });
 
 test("a login removed by another process while waiting is reported as expired", async (t) => {
-  withLockDir(t);
+  isolated(t);
   const { store, items } = memoryStore({ oauth: entryAt(0) });
   const { transport } = oauthTransport(() => assert.fail("must not refresh"));
   const resolved = resolveToken({ config: CONFIG, store, transport, now: () => NOW });
@@ -312,7 +318,7 @@ test("a login removed by another process while waiting is reported as expired", 
 });
 
 test("a failed write of the rotated login drops the spent entry", async (t) => {
-  withLockDir(t);
+  isolated(t);
   const { store, items } = memoryStore({ oauth: entryAt(0) });
   const failing: CredentialStore = { ...store, set: () => false };
   const { transport } = oauthTransport(() => tokenResponse({ access_token: "a", refresh_token: "b", expires_in: 60 }));

@@ -226,6 +226,8 @@ function jwtExpiry(token: string): number | null {
 
 // ---------------- cross-process lock ----------------
 
+// The lock sits in the CLI's per-user state directory, next to the log file. Processes that refresh the same
+// login must agree on it, so they must also agree on DEEL_LOG_DIR.
 export function lockPath(issuer: string): string {
   const host = new URL(issuer).host.replace(/[^A-Za-z0-9.-]/g, "_");
   const digest = createHash("sha256").update(issuerKey(issuer)).digest("hex").slice(0, 12);
@@ -287,8 +289,12 @@ export async function withLock<T>(
         if (readLock(path) === held) unlinkSync(path); // still the stale owner's file, not a fresh lock taken meanwhile
         continue;
       }
-    } catch {
-      continue; // released between our open and stat
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "ENOENT") continue; // released between our open and stat
+      // A stale lock that cannot be removed (e.g. left by another user): wait out the deadline, then say where it is.
+      if (now() > deadline) throw new CliError("auth.lock", `Could not remove the stale lock file ${path}.`, "Delete the file and try again.");
+      await sleep(LOCK_POLL_MS);
+      continue;
     }
     if (now() > deadline) throw new CliError("auth.lock", "Timed out waiting for another deel process to refresh the login.", "Try again.");
     await sleep(LOCK_POLL_MS);

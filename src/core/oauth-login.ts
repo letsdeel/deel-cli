@@ -64,7 +64,13 @@ export async function startLoopback(opts: { state: string; issuer: string; timeo
       res.end(body, after);
     };
     const address = server.address() as AddressInfo;
-    const url = new URL(req.url ?? "/", `http://127.0.0.1:${address.port}`);
+    let url: URL;
+    try {
+      url = new URL(req.url ?? "/", `http://127.0.0.1:${address.port}`);
+    } catch {
+      reply(400, PAGE("Bad request", "Nothing here.")); // e.g. "//", which parses as a URL with an empty host
+      return;
+    }
     // Host check blocks DNS-rebinding pages from reaching the listener.
     if (finished || req.headers.host !== `127.0.0.1:${address.port}` || url.pathname !== CALLBACK_PATH) {
       reply(404, PAGE("Not found", "Nothing here."));
