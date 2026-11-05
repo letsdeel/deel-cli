@@ -8,7 +8,7 @@ import { defineCommand, runCommand, showUsage } from "citty";
 import type { ArgsDef, CommandDef } from "citty";
 import type { Descriptor } from "./types.ts";
 import { manifest } from "./manifest.generated.ts";
-import { flagOf, generatedDescriptors, selectAlternate } from "./public-api/commands.ts";
+import { argvHasFlag, flagOf, generatedDescriptors, selectAlternate } from "./public-api/commands.ts";
 import { resolveToken, requireToken } from "./core/auth.ts";
 import { parseInput } from "./core/input.ts";
 import { createContext } from "./core/context.ts";
@@ -230,7 +230,7 @@ function descriptorFor(positionals: string[], matched: number, argv: string[]): 
   if (candidates.length === 0) return undefined;
   if (candidates.length === 1) return candidates[0];
   if (!candidates[0].variant) {
-    const given = (flag: string) => argv.some((token) => token === `--${flag}` || token.startsWith(`--${flag}=`));
+    const given = (flag: string) => argvHasFlag(argv, flag);
     const anyPathParam = candidates.some((c) => c.params.some((param) => param.in === "path" && given(flagOf(param))));
     return anyPathParam ? selectAlternate(candidates, given) : undefined;
   }

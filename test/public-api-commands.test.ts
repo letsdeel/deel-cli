@@ -9,7 +9,7 @@ import type { Descriptor } from "../src/types.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
 import { EXIT } from "../src/core/errors.ts";
 import { manifest as handPicked } from "../src/manifest.generated.ts";
-import { flagOf, generatedManifest, selectAlternate, setGeneratedDescriptorsForTests } from "../src/public-api/commands.ts";
+import { argvHasFlag, flagOf, flagSpellings, generatedManifest, selectAlternate, setGeneratedDescriptorsForTests } from "../src/public-api/commands.ts";
 import { parseDefinitions } from "../scripts/public-api/definitions.ts";
 import { generate } from "../scripts/public-api/generate.ts";
 
@@ -70,6 +70,41 @@ test("a merged command without path params lists its forms", async () => {
 test("a merged command's path params pick the form for --help", async () => {
   const { out } = await capture(["widgets", "notes", "list", "--widget_id", "w1", "--help"]);
   assert.match(out, /List notes on a widget/);
+});
+
+test("a merged command's path params pick the form for --help however the flag is spelled", async () => {
+  for (const argv of [["--widget_id=w1"], ["--widget-id", "w1"], ["--widget-id=w1"], ["--widgetId", "w1"], ["--widgetId=w1"]]) {
+    const { out } = await capture(["widgets", "notes", "list", ...argv, "--help"]);
+    assert.match(out, /List notes on a widget/, argv.join(" "));
+  }
+});
+
+test("a merged command's path params pick the form for --generate-input in the = and kebab spellings", async () => {
+  const { code, out } = await capture(["widgets", "notes", "list", "--widget-id=w1", "--generate-input"]);
+  assert.equal(code, EXIT.OK);
+  assert.deepEqual(JSON.parse(out), {});
+});
+
+test("a merged command's kebab and camel path flags select the same form when the command runs", async () => {
+  for (const argv of [["--widget-id", "w_1"], ["--widgetId", "w_1"], ["--widget_id=w_1"]]) {
+    const { code, sent } = await callApi(["widgets", "notes", "list", ...argv]);
+    assert.equal(code, EXIT.OK, argv.join(" "));
+    assert.equal(sent.length, 1, argv.join(" "));
+    assert.equal(sent[0].url.pathname, "/rest/widgets/w_1/notes", argv.join(" "));
+  }
+});
+
+test("flagSpellings lists the written, camelCase and kebab-case forms of a flag", () => {
+  assert.deepEqual(flagSpellings("widget_id"), ["widget_id", "widgetId", "widget-id"]);
+  assert.deepEqual(flagSpellings("limit"), ["limit"]);
+  assert.deepEqual(flagSpellings("fields-param"), ["fields-param", "fieldsParam"]);
+});
+
+test("argvHasFlag matches --flag and --flag=value in every spelling, and nothing else", () => {
+  assert.equal(argvHasFlag(["--widget-id", "w1"], "widget_id"), true);
+  assert.equal(argvHasFlag(["--widgetId=w1"], "widget_id"), true);
+  assert.equal(argvHasFlag(["--widget_idx", "w1"], "widget_id"), false);
+  assert.equal(argvHasFlag(["widget_id"], "widget_id"), false);
 });
 
 test("--generate-input works on a merged command without path params", async () => {

@@ -529,6 +529,14 @@ test("deref does not cache a schema whose expansion cut a cycle that is still op
   assert.doesNotThrow(() => JSON.stringify(b));
 });
 
+test("deref resolves JSON-pointer escapes: ~1 is a slash and ~0 is a tilde", () => {
+  const root = { components: { schemas: { "A/B": { type: "string" }, "A~B": { type: "integer" }, "A~1B": { type: "boolean" } } } };
+  assert.deepEqual(deref({ $ref: "#/components/schemas/A~1B" }, root), { type: "string" });
+  assert.deepEqual(deref({ $ref: "#/components/schemas/A~0B" }, root), { type: "integer" });
+  // ~01 is the literal "~1": the ~0 is decoded last, so it does not turn into a slash.
+  assert.deepEqual(deref({ $ref: "#/components/schemas/A~01B" }, root), { type: "boolean" });
+});
+
 test("the node budget is per operation, not across the document", () => {
   const { components } = fanOut(14); // about 82,000 nodes each time it is used, 200,000 allowed per operation
   const operation = { operationId: "x-v2026-01-01", responses: { "200": { description: "ok", content: { "application/json": { schema: { $ref: "#/components/schemas/S0" } } } } } };

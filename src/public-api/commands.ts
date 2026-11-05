@@ -20,6 +20,20 @@ export function flagOf(param: CliParam): string {
   return param.flag ?? param.name;
 }
 
+// The spellings the parser accepts for one flag: as written, camelCase and kebab-case (--widget_id, --widgetId, --widget-id).
+export function flagSpellings(flag: string): string[] {
+  const words = flag.split(/[-_\s]+|(?<=[a-z0-9])(?=[A-Z])/).filter(Boolean);
+  const camel = words.map((word, index) => (index === 0 ? word.toLowerCase() : word[0].toUpperCase() + word.slice(1).toLowerCase())).join("");
+  const kebab = words.map((word) => word.toLowerCase()).join("-");
+  return [...new Set([flag, camel, kebab])];
+}
+
+// Whether argv spells the flag in any accepted way, as `--flag value` or `--flag=value`.
+export function argvHasFlag(argv: string[], flag: string): boolean {
+  const spellings = flagSpellings(flag);
+  return argv.some((token) => spellings.some((spelling) => token === `--${spelling}` || token.startsWith(`--${spelling}=`)));
+}
+
 function pathParamsOf(descriptor: Descriptor): CliParam[] {
   return descriptor.params.filter((param) => param.in === "path");
 }
