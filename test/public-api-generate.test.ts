@@ -289,3 +289,149 @@ test("loadJson only fetches https, never follows a redirect and reads at most th
     globalThis.fetch = realFetch;
   }
 });
+
+// ---- what a descriptor carries ----
+
+const gadgetOp = (extra: Record<string, any> = {}) => ({ summary: "S", responses: { "200": { description: "ok" } }, ...extra });
+const gadget = (extra: Record<string, any>) => ({ api: "rest", method: "GET", path: "/gadgets", version: "2026-01-01", beta_until: null, sunset_at: null, operation: gadgetOp(), ...extra });
+
+test("a descriptor carries the param types, enum, body shape and response contract of its operation", () => {
+  const { manifest, errors } = generate(
+    parseDefinitions([
+      gadget({
+        method: "POST",
+        path: "/gadgets/{gadget_id}/parts",
+        operation: gadgetOp({
+          parameters: [
+            { name: "gadget_id", in: "path", schema: { type: "string" } },
+            { name: "limit", in: "query", required: true, schema: { type: "integer" }, description: "Page size" },
+            { name: "active", in: "query", schema: { type: "boolean" } },
+            { name: "kind", in: "query", schema: { type: "string", enum: ["a", "b", null] } },
+            { name: "tags", in: "query", schema: { type: "array", items: { type: "string" } } },
+          ],
+          requestBody: {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: { data: { type: "array", maxItems: 5, items: { type: "object", required: ["name"], properties: { name: { type: "string" }, qty: { type: "integer" } } } } },
+                },
+              },
+            },
+          },
+          responses: {
+            "202": {
+              description: "accepted",
+              content: { "application/json": { schema: { type: "object", properties: { data: { type: "object", required: ["id"], properties: { id: { type: "string" }, ok: { type: "boolean" } } } } } } },
+            },
+          },
+        }),
+      }),
+    ]),
+    options(),
+  );
+  assert.deepEqual(errors, []);
+  assert.deepEqual(manifest.descriptors, [
+    {
+      command: ["gadgets", "parts", "create"],
+      method: "POST",
+      path: "/gadgets/{gadget_id}/parts",
+      summary: "S",
+      version: "2026-01-01",
+      async: true,
+      bodyKind: "json-array",
+      supportsMultipart: false,
+      bodyWrapper: "data",
+      params: [
+        { name: "gadget_id", in: "path", type: "string", required: true },
+        { name: "limit", in: "query", type: "integer", required: true, description: "Page size" },
+        { name: "active", in: "query", type: "boolean", required: false },
+        { name: "kind", in: "query", type: "string", required: false, enum: ["a", "b"] },
+        { name: "tags", in: "query", type: "array", required: false },
+      ],
+      bodyProps: [
+        { name: "name", in: "body", type: "string", required: true },
+        { name: "qty", in: "body", type: "integer", required: false },
+      ],
+      maxItems: 5,
+      fileFields: [],
+      responseKind: "object",
+      responseFields: [
+        { name: "id", in: "body", type: "string", required: true },
+        { name: "ok", in: "body", type: "boolean", required: false },
+      ],
+      api: "rest",
+      versions: [{ version: "2026-01-01", beta_until: null, sunset_at: null }],
+    },
+  ]);
+});
+
+// ---- --from-openapi is held to the same input checks as --from ----
+
+test("--from-openapi rejects a path or version that --from would reject", () => {
+  const doc = (path: string, extra: Record<string, any> = {}) => ({ paths: { [path]: { get: { operationId: "x-v2026-01-01", responses: { "200": { description: "ok" } }, ...extra } } } });
+  assert.throws(() => definitionsFromOpenApi(doc("/rest/contracts/../../scim/Users"), "rest"), /invalid path/);
+  assert.throws(() => definitionsFromOpenApi(doc("/rest/x?admin=1"), "rest"), /invalid path/);
+  assert.throws(() => definitionsFromOpenApi(doc("/rest/ok", { "x-version": "latest" }), "rest"), /invalid version/);
+  assert.equal(definitionsFromOpenApi(doc("/rest/ok"), "rest").length, 1);
+});
+
+test("the OpenAPI bridge expands only parameters, request bodies and success responses", () => {
+  const doc = {
+    paths: {
+      "/rest/things": {
+        get: {
+          operationId: "listThings-v2026-01-01",
+          responses: {
+            "200": { description: "ok", content: { "application/json": { schema: { type: "object", properties: { id: { type: "string" } } } }, "text/csv": { schema: { $ref: "#/components/schemas/Missing" } } } },
+            "404": { $ref: "#/components/responses/Missing" },
+          },
+        },
+      },
+    },
+  };
+  const [definition] = definitionsFromOpenApi(doc, "rest");
+  assert.deepEqual(Object.keys(definition.operation.responses), ["200"]);
+  assert.deepEqual(Object.keys(definition.operation.responses["200"].content), ["application/json"]);
+});
+
+// ---- $ref expansion stays bounded ----
+
+function fanOut(depth: number) {
+  const schemas: Record<string, any> = { [`S${depth}`]: { type: "string" } };
+  for (let i = 0; i < depth; i++) schemas[`S${i}`] = { type: "object", properties: { a: { $ref: `#/components/schemas/S${i + 1}` }, b: { $ref: `#/components/schemas/S${i + 1}` } } };
+  return { components: { schemas } };
+}
+
+test("deref expands a schema once however many places reference it", () => {
+  const out = deref({ $ref: "#/components/schemas/S0" }, fanOut(10));
+  assert.equal(out.properties.a, out.properties.b);
+});
+
+test("deref gives up on a chain that fans out to millions of nodes instead of hanging", () => {
+  assert.throws(() => deref({ $ref: "#/components/schemas/S0" }, fanOut(40)), /expand to more than/);
+});
+
+test("a schema that refers back to itself is still cut at the second visit", () => {
+  const root = { components: { schemas: { Node: { type: "object", properties: { next: { $ref: "#/components/schemas/Node" } } } } } };
+  assert.deepEqual(deref({ $ref: "#/components/schemas/Node" }, root), { type: "object", properties: { next: { type: "object" } } });
+});
+
+// ---- a renamed path param is the same route ----
+
+test("a renamed path param still matches its override, its released name and its summary entry", () => {
+  const param = (name: string) => gadgetOp({ parameters: [{ name, in: "path", schema: { type: "string" } }] });
+  const overrides = { "PATCH /types/{typeId}": "kinds update" };
+  const released = generate(parseDefinitions([gadget({ method: "PATCH", path: "/types/{typeId}", operation: param("typeId") })]), options({ overrides }));
+  assert.deepEqual(names(released.manifest.descriptors), ["kinds update"]);
+
+  const renamed = parseDefinitions([gadget({ method: "PATCH", path: "/types/{type_id}", operation: param("type_id") })]);
+  const next = generate(renamed, options({ overrides, previous: released.manifest }));
+  assert.deepEqual(next.errors, []);
+  assert.deepEqual(next.warnings, []);
+  assert.deepEqual(names(next.manifest.descriptors), ["kinds update"]);
+  assert.deepEqual([next.summary.added.length, next.summary.removed.length, next.summary.changed.length, next.summary.bump], [0, 0, 1, "patch"]);
+
+  const locked = generate(renamed, options({ previous: released.manifest }));
+  assert.match(locked.errors.join("\n"), /Lock: .*released as "deel kinds update"/);
+});

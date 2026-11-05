@@ -93,6 +93,11 @@ function endpointKey(descriptor: { api?: Api; method: string; path: string }): s
   return overrideKey(descriptor.api ?? "rest", descriptor.method, descriptor.path);
 }
 
+// An endpoint is the same route when only its path params were renamed ({typeId} -> {type_id}), so
+// overrides, the name lock and the summary all match on this spelling-free key.
+const withoutParamNames = (key: string) => key.replace(/\{[^}]+\}/g, "{}");
+const routeIdOf = (descriptor: { api?: Api; method: string; path: string }) => withoutParamNames(endpointKey(descriptor));
+
 function isBeta(entry: Definition, now: Date): boolean {
   return entry.beta_until !== null && new Date(entry.beta_until).getTime() > now.getTime();
 }
@@ -175,7 +180,8 @@ export function generate(definitions: Definition[], options: GenerateOptions): G
     byEndpoint.set(key, [...(byEndpoint.get(key) ?? []), entry]);
   }
 
-  const previousByEndpoint = new Map((options.previous?.descriptors ?? []).map((descriptor) => [endpointKey(descriptor), descriptor]));
+  const previousByEndpoint = new Map((options.previous?.descriptors ?? []).map((descriptor) => [routeIdOf(descriptor), descriptor]));
+  const overridesByRoute = new Map(Object.entries(options.overrides).map(([key, words]) => [withoutParamNames(key), { key, words }]));
   const usedOverrides = new Set<string>();
   const descriptors: Descriptor[] = [];
   const operationOf = new Map<Descriptor, Definition>();
@@ -197,11 +203,12 @@ export function generate(definitions: Definition[], options: GenerateOptions): G
       errors.push((error as Error).message);
       continue;
     }
-    if (options.overrides[key]) {
-      command = options.overrides[key].trim().split(/\s+/);
-      usedOverrides.add(key);
+    const override = overridesByRoute.get(withoutParamNames(key));
+    if (override) {
+      command = override.words.trim().split(/\s+/);
+      usedOverrides.add(override.key);
     }
-    const released = previousByEndpoint.get(key);
+    const released = previousByEndpoint.get(withoutParamNames(key));
     if (released && released.command.join(" ") !== command.join(" ")) {
       errors.push(`Lock: ${key} was released as "deel ${released.command.join(" ")}" and would become "deel ${command.join(" ")}". Released names never change.`);
       command = released.command;
@@ -288,13 +295,13 @@ export function generate(definitions: Definition[], options: GenerateOptions): G
 
 export function summarize(before: Descriptor[], after: Descriptor[]): Summary {
   const entry = (descriptor: Descriptor): SummaryEntry => ({ command: descriptor.command.join(" "), method: descriptor.method, path: descriptor.path });
-  const beforeMap = new Map(before.map((descriptor) => [endpointKey(descriptor), descriptor]));
-  const afterMap = new Map(after.map((descriptor) => [endpointKey(descriptor), descriptor]));
-  const added = after.filter((descriptor) => !beforeMap.has(endpointKey(descriptor))).map(entry);
-  const removed = before.filter((descriptor) => !afterMap.has(endpointKey(descriptor))).map(entry);
+  const beforeMap = new Map(before.map((descriptor) => [routeIdOf(descriptor), descriptor]));
+  const afterMap = new Map(after.map((descriptor) => [routeIdOf(descriptor), descriptor]));
+  const added = after.filter((descriptor) => !beforeMap.has(routeIdOf(descriptor))).map(entry);
+  const removed = before.filter((descriptor) => !afterMap.has(routeIdOf(descriptor))).map(entry);
   const changed = after
     .filter((descriptor) => {
-      const old = beforeMap.get(endpointKey(descriptor));
+      const old = beforeMap.get(routeIdOf(descriptor));
       return old !== undefined && JSON.stringify(old) !== JSON.stringify(descriptor);
     })
     .map(entry);

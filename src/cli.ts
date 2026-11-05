@@ -140,6 +140,12 @@ function alternativesCommand(descriptors: Descriptor[]): CommandDef {
       const args = cittyCtx.args as Args;
       const descriptor = selectAlternate(descriptors, (flag) => args[flag] !== undefined);
       if (!descriptor) throw new CliError("usage.params", `Missing path parameters for every form of 'deel ${descriptors[0].command.join(" ")}'.`, "Run it with --help to see the forms.");
+      // A flag of another form would otherwise be accepted and dropped without a word.
+      const own = new Set(descriptor.params.map(flagOf));
+      const stray = descriptors.flatMap((d) => d.params.map(flagOf)).find((flag) => !own.has(flag) && args[flag] !== undefined && args[flag] !== false);
+      if (stray) {
+        throw new CliError("usage.params", `--${stray} does not apply to ${descriptor.method} ${descriptor.path}, the form your path parameters select.`, "Run it with --help to see the forms.");
+      }
       await runDescriptor(descriptor, cittyCtx);
     },
   });
