@@ -103,10 +103,18 @@ function isSunset(entry: Definition, now: Date): boolean {
   return entry.sunset_at !== null && new Date(entry.sunset_at).getTime() <= now.getTime();
 }
 
+// The documentation section an operation is listed under: its first tag. A tag that
+// names a team handle (@...) is not a section and is skipped.
+export function groupOf(operation: AnyObj): string | undefined {
+  const tags = Array.isArray(operation.tags) ? operation.tags : [];
+  return tags.map((tag: unknown) => (typeof tag === "string" ? tag.trim() : "")).find((tag: string) => tag && !tag.startsWith("@"));
+}
+
 function toDescriptor(command: string[], primary: Definition, versions: VersionInfo[], beta: boolean): Descriptor {
   const operation = primary.operation;
   const { bodyKind, bodyProps, maxItems, fileFields, supportsMultipart, bodyWrapper } = bodyFrom(operation);
   const { responseKind, responseFields } = responseFrom(operation);
+  const group = groupOf(operation);
   return {
     command,
     method: primary.method,
@@ -124,6 +132,7 @@ function toDescriptor(command: string[], primary: Definition, versions: VersionI
     responseKind,
     responseFields,
     api: primary.api,
+    ...(group ? { group } : {}),
     ...(beta ? { beta: true } : {}),
     versions,
   };

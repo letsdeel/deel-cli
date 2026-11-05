@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { deriveCommand, kebab } from "../scripts/public-api/naming.ts";
 import { definitionsFromOpenApi, deref, loadJson, newDerefState, parseDefinitions } from "../scripts/public-api/definitions.ts";
-import { generate, summarize } from "../scripts/public-api/generate.ts";
+import { generate, groupOf, summarize } from "../scripts/public-api/generate.ts";
 import type { GenerateOptions } from "../scripts/public-api/generate.ts";
 import type { Descriptor } from "../src/types.ts";
 
@@ -52,6 +52,18 @@ test("generates one command per endpoint from the fixtures", () => {
     "widgets reports list",
     "widgets update",
   ]);
+});
+
+test("a descriptor's group is the operation's first tag that isn't a team handle", () => {
+  assert.equal(groupOf({ tags: ["Contracts", "EOR"] }), "Contracts");
+  assert.equal(groupOf({ tags: ["@a-team-handle", " Contracts "] }), "Contracts");
+  assert.equal(groupOf({ tags: ["@a-team-handle"] }), undefined);
+  assert.equal(groupOf({ tags: "Contracts" }), undefined);
+  assert.equal(groupOf({}), undefined);
+  const [definition] = widgets();
+  const tagged = { ...definition, operation: { ...definition.operation, tags: ["Widgets"] } };
+  assert.equal(generate([tagged], options()).manifest.descriptors[0].group, "Widgets");
+  assert.equal(generate([definition], options()).manifest.descriptors[0].group, undefined);
 });
 
 test("a sunset endpoint is left out", () => {

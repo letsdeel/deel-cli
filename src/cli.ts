@@ -7,8 +7,7 @@
 import { defineCommand, parseArgs, runCommand, showUsage } from "citty";
 import type { ArgsDef, CommandDef } from "citty";
 import type { Descriptor } from "./types.ts";
-import { manifest } from "./manifest.generated.ts";
-import { generatedDescriptors, selectAlternate } from "./public-api/commands.ts";
+import { allDescriptors, selectAlternate } from "./public-api/commands.ts";
 import { argvEnables, argvHasFlag, argvMentionsFlag, flagOf } from "./core/flags.ts";
 import { resolveToken, requireToken } from "./core/auth.ts";
 import { parseInput } from "./core/input.ts";
@@ -21,11 +20,21 @@ import { CLI_VERSION } from "./version.ts";
 import { commonArgs, configFrom, gatherFiles, gatherFlagValues, outputOpts } from "./commands/shared.ts";
 import type { Args } from "./commands/shared.ts";
 import { staticCommands } from "./commands/index.ts";
-import { printActionHelp, printAlternativesHelp, printContractJson, printGlobalOptions, printSkeleton, printVariantGroupHelp, printVersion } from "./help.ts";
-
-function allDescriptors(): Descriptor[] {
-  return [...manifest.descriptors, ...generatedDescriptors()];
-}
+import {
+  isGroupCommand,
+  printActionHelp,
+  printAlternativesHelp,
+  printContractJson,
+  printGlobalOptions,
+  printGroupHelp,
+  printRootHelp,
+  printSkeleton,
+  printUnknownCommand,
+  printVariantGroupHelp,
+  printVersion,
+  sectionsByWord,
+  titleSectionOf,
+} from "./help.ts";
 
 // ---------------- generated action commands ----------------
 
@@ -102,8 +111,10 @@ function variantCommand(descriptors: Descriptor[]): CommandDef {
       } as ArgsDef[string];
     }
   }
+  const summaries = descriptors.map((d) => d.summary).filter(Boolean).join(" / ");
+  const flags = variants.map((v) => `--${v}`).join(", ");
   return defineCommand({
-    meta: { name, description: `${name} (variants: ${variants.map((v) => `--${v}`).join(", ")})` },
+    meta: { name, description: summaries ? `${summaries} (${flags})` : `(${flags})` },
     args,
     async run(cittyCtx) {
       const args = cittyCtx.args as Args;
@@ -170,7 +181,7 @@ function treeToCommand(name: string, node: CommandTree | Descriptor | Descriptor
   if (!(node instanceof Map)) return actionCommand(node as Descriptor);
   const subCommands: Record<string, CommandDef> = {};
   for (const [childName, childNode] of node as CommandTree) subCommands[childName] = treeToCommand(childName, childNode);
-  return defineCommand({ meta: { name, description: `${name} operations` }, subCommands });
+  return defineCommand({ meta: { name }, subCommands });
 }
 
 // ---------------- root ----------------
@@ -186,9 +197,31 @@ function buildRoot(): CommandDef {
   });
 }
 
+// A flag followed by a value (`--env demo`, `--widget-id 5`) must not leave that value among the command words.
+// Global flags are classified by their declared type; any other flag takes the next token unless it names a subcommand.
+function flagTakesValue(token: string, next: string | undefined, cmd: CommandDef | undefined): boolean {
+  if (!token.startsWith("--") || token.includes("=") || next === undefined || next.startsWith("-")) return false;
+  const name = token.slice(2).replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
+  if (name === "base-url") return true;
+  const declared = (commonArgs[name] ?? (name.startsWith("no-") ? commonArgs[name.slice(3)] : undefined)) as { type?: string } | undefined;
+  if (declared) return declared.type === "string";
+  return !(cmd?.subCommands as Record<string, CommandDef> | undefined)?.[next];
+}
+
+function wordIndexes(argv: string[], root: CommandDef): number[] {
+  const indexes: number[] = [];
+  let cmd: CommandDef | undefined = root;
+  for (let i = 0; i < argv.length; i++) {
+    if (!argv[i].startsWith("-")) {
+      indexes.push(i);
+      cmd = (cmd?.subCommands as Record<string, CommandDef> | undefined)?.[argv[i]];
+    } else if (flagTakesValue(argv[i], argv[i + 1], cmd)) i++;
+  }
+  return indexes;
+}
+
 // Walk the tree by the leading positional tokens to find the target command.
-function resolve(root: CommandDef, argv: string[]): { cmd: CommandDef; parent?: CommandDef; matched: number } {
-  const positionals = argv.filter((token) => !token.startsWith("-"));
+function resolve(root: CommandDef, positionals: string[]): { cmd: CommandDef; parent?: CommandDef; matched: number } {
   let cmd = root;
   let parent: CommandDef | undefined;
   let matched = 0;
@@ -227,6 +260,16 @@ function descriptorFor(positionals: string[], matched: number, argv: string[]): 
   return undefined;
 }
 
+function groupTitle(path: string[], cmd: CommandDef): string {
+  const description = (cmd.meta as { description?: string } | undefined)?.description;
+  if (description) return description;
+  if (path.length === 1) {
+    const section = titleSectionOf(path[0], allDescriptors().filter((descriptor) => descriptor.command[0] === path[0]));
+    if (section) return section;
+  }
+  return `deel ${path.join(" ")}`;
+}
+
 export async function run(argv: string[]): Promise<number> {
   if (argv.includes("--version") || argv.includes("-v")) {
     printVersion();
@@ -234,17 +277,21 @@ export async function run(argv: string[]): Promise<number> {
   }
 
   const root = buildRoot();
-  const { cmd, parent, matched } = resolve(root, argv);
+  const words = wordIndexes(argv, root);
+  const positionals = words.map((i) => argv[i]);
+  const { cmd, parent, matched } = resolve(root, positionals);
   const wantsHelp = argv.includes("--help") || argv.includes("-h");
-  const hasPositional = argv.some((token) => !token.startsWith("-"));
-  const isGroup = typeof cmd.run !== "function";
+  const isGroup = isGroupCommand(cmd) || cmd === root;
 
-  if (hasPositional && matched === 0) {
-    process.stderr.write(`Unknown command. Run 'deel --help' to see available commands.\n`);
+  if (positionals.length > 0 && matched === 0) {
+    printUnknownCommand(positionals[0], [], root);
     return EXIT.ERROR;
   }
 
-  const positionals = argv.filter((token) => !token.startsWith("-"));
+  if (isGroup && positionals.length > matched) {
+    printUnknownCommand(positionals[matched], positionals.slice(0, matched), cmd);
+    return EXIT.ERROR;
+  }
   const variantCandidates = descriptorsFor(positionals, matched);
   const descriptor = descriptorFor(positionals, matched, argv);
 
@@ -285,13 +332,25 @@ export async function run(argv: string[]): Promise<number> {
     else printActionHelp(descriptor);
     return EXIT.OK;
   }
-  // Root / domain / group help: citty's usage; add the global-options section at root.
-  if (wantsHelp || isGroup) {
+  if (cmd === root && (wantsHelp || isGroup)) {
+    printRootHelp(root, sectionsByWord(allDescriptors()), new Set(Object.keys(staticCommands)));
+    printGlobalOptions();
+    return EXIT.OK;
+  }
+  if (isGroup) {
+    const path = positionals.slice(0, matched);
+    printGroupHelp(cmd, path, groupTitle(path, cmd), !Object.hasOwn(staticCommands, path[0]));
+    return EXIT.OK;
+  }
+  // A static command's own help (auth login, job status, commands, ...): citty's usage.
+  if (wantsHelp) {
     await showUsage(cmd, parent);
-    if (cmd === root) printGlobalOptions();
     return EXIT.OK;
   }
 
-  await runCommand(root, { rawArgs: argv });
+  // citty takes the first non-flag token as the command, so a flag value before the command words moves after them.
+  const leading = new Set(words.slice(0, matched));
+  const rawArgs = [...argv.filter((_, i) => leading.has(i)), ...argv.filter((_, i) => !leading.has(i))];
+  await runCommand(root, { rawArgs });
   return EXIT.OK;
 }

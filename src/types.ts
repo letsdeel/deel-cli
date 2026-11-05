@@ -37,8 +37,9 @@ export type Descriptor = {
   responseKind: "object" | "array" | "none"; // shape of the success response's data
   responseFields: CliParam[]; // top-level fields of the response data (the contract)
   // Generated public API commands only (src/public-api/manifest.json):
-  api?: "rest" | "scim";
-  beta?: boolean;
+  api?: "rest" | "scim"; // which base path the command calls
+  group?: string; // documentation section: the operation's first tag (groups `deel --help`)
+  beta?: boolean; // the command's version is still in beta (no stable version exists)
   versions?: VersionInfo[]; // every live version of the endpoint, oldest first
 };
 

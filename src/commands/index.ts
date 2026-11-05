@@ -5,6 +5,7 @@ import type { CommandDef } from "citty";
 import { authCommand } from "./auth.ts";
 import { jobCommand } from "./job.ts";
 import { webhooksCommand } from "./webhooks.ts";
+import { createCommandsCommand } from "./commands.ts";
 
 export { authCommand, jobCommand, webhooksCommand };
 
@@ -15,4 +16,5 @@ export const staticCommands: Record<string, CommandDef> = {
   auth: authCommand,
   job: jobCommand,
   webhooks: webhooksCommand,
+  commands: createCommandsCommand(() => staticCommands),
 };
