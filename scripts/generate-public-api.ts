@@ -1,7 +1,5 @@
 #!/usr/bin/env node
-// Generates src/public-api/manifest.json from a definitions file or URL (--from) or from the
-// public OpenAPI documents (--from-openapi; prefix scim= for the SCIM one). Exit 1 on any naming error,
-// and when the input holds no definitions at all.
+// Generates src/public-api/manifest.json from a definitions file or URL (--from) or the public OpenAPI documents (--from-openapi; scim= prefix for SCIM).
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -45,7 +43,6 @@ async function main(argv: string[]): Promise<number> {
     }
   }
 
-  // An input with nothing in it would otherwise replace the manifest with an empty one and release-remove every command.
   if (definitions.length === 0) {
     process.stderr.write("[error] The input holds no definitions; nothing written.\n");
     return 1;
@@ -58,7 +55,6 @@ async function main(argv: string[]): Promise<number> {
   if (values.previous && !existsSync(lockPath)) throw new Error(`--previous ${values.previous} does not exist`);
   let previous: GeneratedManifest | undefined;
   if (existsSync(lockPath)) {
-    // A wrong file would otherwise read as "nothing released" and switch the name lock off.
     const parsed = JSON.parse(readFileSync(lockPath, "utf8"));
     if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.descriptors)) throw new Error(`${lockPath} is not a generated manifest`);
     previous = parsed as GeneratedManifest;

@@ -111,8 +111,7 @@ async function multipartBody(descriptor: Descriptor, call: ParsedCall): Promise<
 }
 
 export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx, opts: ExecOpts): Promise<void> {
-  // A SCIM command belongs on the /scim base path, which this version does not select yet. Refuse it
-  // before the request, so the bearer token is never sent to the /rest API instead.
+  // Refused before the request so the bearer token is never sent to the /rest API.
   if (descriptor.api === "scim") throw new CliError("usage.scim", "SCIM commands are not supported by this version of the CLI.", "Update the CLI.");
   const path = buildPath(descriptor, call.flags);
   const query = buildQuery(descriptor, call.flags);

@@ -84,7 +84,7 @@ test("a collection and its parent-scoped twin merge into one command", () => {
 
 test("any other same-name pair is an error", () => {
   const definitions = widgets();
-  definitions.push({ ...definitions[0], path: "/widgets/{a}/{b}", method: "GET", operation: { responses: {} } }); // "widgets get" twice, path params that don't nest
+  definitions.push({ ...definitions[0], path: "/widgets/{a}/{b}", method: "GET", operation: { responses: {} } });
   const { errors } = generate(definitions, options());
   assert.ok(errors.some((error) => /Ambiguous command "deel widgets get"/.test(error)), errors.join("\n"));
 });
@@ -174,7 +174,7 @@ test("the OpenAPI bridge inlines $refs, merges path-level params, strips the bas
   assert.deepEqual(definition.operation.parameters.map((param: { name: string }) => param.name), ["widget_id"]);
   const data = definition.operation.responses["200"].content["application/json"].schema.properties.data;
   assert.equal(data.properties.id.type, "string");
-  assert.deepEqual(data.properties.parent, { type: "object" }); // the cycle stops here
+  assert.deepEqual(data.properties.parent, { type: "object" });
   const { manifest, errors } = generate([definition], options());
   assert.deepEqual(errors, []);
   assert.deepEqual(names(manifest.descriptors), ["widgets get"]);
@@ -199,7 +199,7 @@ test("a version that renamed its path params is the same endpoint, not a clash",
   assert.deepEqual(errors, []);
   assert.equal(manifest.descriptors.length, 1);
   const [gadget] = manifest.descriptors;
-  assert.equal(gadget.path, "/gadgets/{gadgetId}"); // the stable version's path and flags
+  assert.equal(gadget.path, "/gadgets/{gadgetId}");
   assert.deepEqual(gadget.versions!.map((v) => v.version), ["2026-01-01", "2026-09-01"]);
 });
 
@@ -290,8 +290,6 @@ test("loadJson only fetches https, never follows a redirect and reads at most th
   }
 });
 
-// ---- what a descriptor carries ----
-
 const gadgetOp = (extra: Record<string, any> = {}) => ({ summary: "S", responses: { "200": { description: "ok" } }, ...extra });
 const gadget = (extra: Record<string, any>) => ({ api: "rest", method: "GET", path: "/gadgets", version: "2026-01-01", beta_until: null, sunset_at: null, operation: gadgetOp(), ...extra });
 
@@ -366,8 +364,6 @@ test("a descriptor carries the param types, enum, body shape and response contra
   ]);
 });
 
-// ---- --from-openapi is held to the same input checks as --from ----
-
 test("--from-openapi rejects a path or version that --from would reject", () => {
   const doc = (path: string, extra: Record<string, any> = {}) => ({ paths: { [path]: { get: { operationId: "x-v2026-01-01", responses: { "200": { description: "ok" } }, ...extra } } } });
   assert.throws(() => definitionsFromOpenApi(doc("/rest/contracts/../../scim/Users"), "rest"), /invalid path/);
@@ -395,8 +391,6 @@ test("the OpenAPI bridge leaves error responses and other media types unexpanded
   assert.deepEqual(Object.keys(definition.operation.responses["200"].content), ["application/json"]);
 });
 
-// ---- $ref expansion stays bounded ----
-
 function fanOut(depth: number) {
   const schemas: Record<string, any> = { [`S${depth}`]: { type: "string" } };
   for (let i = 0; i < depth; i++) schemas[`S${i}`] = { type: "object", properties: { a: { $ref: `#/components/schemas/S${i + 1}` }, b: { $ref: `#/components/schemas/S${i + 1}` } } };
@@ -417,8 +411,6 @@ test("a schema that refers back to itself is still cut at the second visit", () 
   assert.deepEqual(deref({ $ref: "#/components/schemas/Node" }, root), { type: "object", properties: { next: { type: "object" } } });
 });
 
-// ---- a renamed path param is the same route ----
-
 test("a renamed path param still matches its override, its released name and its summary entry", () => {
   const param = (name: string) => gadgetOp({ parameters: [{ name, in: "path", schema: { type: "string" } }] });
   const overrides = { "PATCH /types/{typeId}": "kinds update" };
@@ -435,8 +427,6 @@ test("a renamed path param still matches its override, its released name and its
   const locked = generate(renamed, options({ previous: released.manifest }));
   assert.match(locked.errors.join("\n"), /Lock: .*released as "deel kinds update"/);
 });
-
-// ---- the OpenAPI bridge builds request bodies, responses and parameters ----
 
 const thingDoc = (): Record<string, any> => ({
   paths: {
@@ -479,7 +469,6 @@ test("the OpenAPI bridge follows a $ref'd request body and success response and 
   assert.deepEqual(Object.keys(requestBody.content), ["application/json", "multipart/form-data"]);
   assert.deepEqual(requestBody.content["application/json"].schema, { type: "object", required: ["name"], properties: { name: { type: "string" } } });
   assert.deepEqual(responses["200"].content["application/json"].schema.properties.data, { type: "object", required: ["id"], properties: { id: { type: "string" } } });
-  // The operation's own `mode` replaces the path-level one.
   assert.deepEqual(parameters.map((param: any) => [param.name, Boolean(param.required)]), [["thing_id", false], ["mode", true]]);
 
   const { manifest, errors } = generate([definition], options());
@@ -509,8 +498,6 @@ test("parseDefinitions refuses an entry without an operation object", () => {
   for (const operation of [null, [], "text"]) assert.throws(() => parseDefinitions([{ ...entry, operation }]), /has no operation object/);
 });
 
-// ---- the $ref cache stays correct ----
-
 test("deref does not cache a schema whose expansion cut a cycle that is still open", () => {
   const root = {
     components: {
@@ -523,7 +510,6 @@ test("deref does not cache a schema whose expansion cut a cycle that is still op
   const state = newDerefState();
   deref({ $ref: "#/components/schemas/A" }, root, state);
   const b = deref({ $ref: "#/components/schemas/B" }, root, state);
-  // B reached on its own still carries all of A, and the cycle is cut only on the way back to B.
   assert.deepEqual(b.properties.a.properties.x, { type: "string" });
   assert.notDeepEqual(b.properties.a, { type: "object" });
   assert.doesNotThrow(() => JSON.stringify(b));

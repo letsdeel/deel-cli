@@ -1,5 +1,5 @@
 // Root command wiring and routing. Builds the nested command tree from the
-// hand-picked manifest and the generated public API manifest, merges in the static commands, and dispatches a run to
+// generated manifest, merges in the static commands, and dispatches a run to
 // citty — delegating body/response help to src/help.ts and the actual request
 // to the executor. Each handler builds a Context (io + composed transport +
 // clock/rng) and passes it down — no module reaches for process.* or a global.
@@ -22,8 +22,6 @@ import type { Args } from "./commands/shared.ts";
 import { staticCommands } from "./commands/index.ts";
 import { printActionHelp, printAlternativesHelp, printContractJson, printGlobalOptions, printSkeleton, printVariantGroupHelp, printVersion } from "./help.ts";
 
-// Hand-picked commands (src/commands.map.ts) and generated public API commands share one
-// tree. The generator guarantees their names never clash.
 function allDescriptors(): Descriptor[] {
   return [...manifest.descriptors, ...generatedDescriptors()];
 }
@@ -117,8 +115,7 @@ function variantCommand(descriptors: Descriptor[]): CommandDef {
   });
 }
 
-// Merged generated command: a collection and its parent-scoped twin share one name, and
-// the path-param flags given pick the endpoint. Path params are optional at parse time.
+// A collection and its parent-scoped twin share one name; the path-param flags given pick the endpoint.
 function alternativesCommand(descriptors: Descriptor[]): CommandDef {
   const name = descriptors[0].command[descriptors[0].command.length - 1];
   const args: ArgsDef = { ...commonArgs };
@@ -152,8 +149,7 @@ function alternativesCommand(descriptors: Descriptor[]): CommandDef {
 }
 
 // Build a nested command tree from the descriptors' multi-token command paths.
-// Repeated leaves (same command, different variant, or a merged generated command) are
-// accumulated into Descriptor[].
+// Repeated leaves (same command, different variant) are accumulated into Descriptor[].
 type CommandTree = Map<string, CommandTree | Descriptor | Descriptor[]>;
 
 function insertIntoTree(tree: CommandTree, descriptor: Descriptor): void {
@@ -223,8 +219,7 @@ function descriptorsFor(positionals: string[], matched: number): Descriptor[] {
 }
 
 // Single descriptor for a resolved path. For variant groups, selects by the variant
-// flag present in argv; for merged commands, by the path-param flags present.
-// Returns undefined if no unique match (triggers group help).
+// flag present in argv; returns undefined if no unique match (triggers group help).
 function descriptorFor(positionals: string[], matched: number, argv: string[]): Descriptor | undefined {
   const candidates = descriptorsFor(positionals, matched);
   if (candidates.length === 0) return undefined;
@@ -263,7 +258,6 @@ export async function run(argv: string[]): Promise<number> {
 
   const isMerged = variantCandidates.length > 1 && !variantCandidates[0].variant;
 
-  // --generate-input on a merged command: every form of it shares the body shape.
   if (isMerged && !descriptor && argv.includes("--generate-input")) {
     printSkeleton(variantCandidates[0]);
     return EXIT.OK;

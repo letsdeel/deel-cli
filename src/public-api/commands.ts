@@ -1,5 +1,4 @@
-// Generated public API commands: the manifest, and how a merged command (a collection and its
-// parent-scoped twin, e.g. /contracts/custom_fields and /contracts/{contract_id}/custom_fields) picks its endpoint.
+// Generated public API commands, and how a merged command picks its endpoint.
 
 import type { CliParam, Descriptor, GeneratedManifest } from "../types.ts";
 import generated from "./manifest.json" with { type: "json" };
@@ -28,7 +27,6 @@ export function flagSpellings(flag: string): string[] {
   return [...new Set([flag, camel, kebab])];
 }
 
-// Whether argv spells the flag in any accepted way, as `--flag value` or `--flag=value`.
 export function argvHasFlag(argv: string[], flag: string): boolean {
   const spellings = flagSpellings(flag);
   return argv.some((token) => spellings.some((spelling) => token === `--${spelling}` || token.startsWith(`--${spelling}=`)));

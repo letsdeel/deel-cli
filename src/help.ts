@@ -69,7 +69,6 @@ export function printVariantGroupHelp(descriptors: Descriptor[]): void {
   out(`Help:  deel ${cmd} --<variant> --help\n\n`);
 }
 
-// Merged generated command help: shown when `--help` is given without path params.
 export function printAlternativesHelp(descriptors: Descriptor[]): void {
   const out = process.stdout.write.bind(process.stdout);
   const cmd = descriptors[0].command.join(" ");

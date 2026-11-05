@@ -15,7 +15,6 @@ export type Definition = {
   operation: AnyObj;
 };
 
-// Only standard OpenAPI Operation fields are kept; x- extensions and anything else are dropped.
 const OPERATION_FIELDS = ["operationId", "summary", "description", "tags", "parameters", "requestBody", "responses", "deprecated"] as const;
 
 export function pickOperation(operation: AnyObj): AnyObj {
@@ -62,8 +61,7 @@ function isValidTimestamp(value: unknown): boolean {
   return value === null || value === undefined || (typeof value === "string" && !Number.isNaN(Date.parse(value)));
 }
 
-// The same checks run on every definition, whichever input produced it: the path and version end up in
-// request URLs and headers, so a hostile or malformed value must never reach the manifest.
+// Both inputs run through this: the path and version end up in request URLs and headers.
 function assertValidDefinition(entry: AnyObj, label: string): void {
   if (entry.api !== "rest" && entry.api !== "scim") throw new Error(`${label} has unknown api "${entry.api}"`);
   if (typeof entry.path !== "string" || !isValidPath(entry.path)) throw new Error(`${label} has an invalid path ${JSON.stringify(entry.path)}`);
@@ -103,8 +101,7 @@ export function parseDefinitions(json: unknown): Definition[] {
   return parsed;
 }
 
-// A schema that references the next one twice expands to 2^n nodes, and a spec under the size cap can
-// reach that, so one operation may not expand past this many nodes.
+// A schema that references the next one twice expands to 2^n nodes, so one operation may not expand past this many.
 const MAX_EXPANDED_NODES = 200_000;
 
 type CachedRef = { value: any; size: number };
@@ -133,8 +130,7 @@ function count(state: DerefState, nodes: number): void {
   if (state.size > MAX_EXPANDED_NODES) throw new Error(`The definitions expand to more than ${MAX_EXPANDED_NODES} nodes in one operation (a $ref chain that fans out)`);
 }
 
-// Inline every local `$ref` (#/...). A reference back into a schema that is already
-// being expanded becomes `{ type: "object" }`, which is all the CLI needs from it.
+// Inline every local `$ref`. A reference back into a schema already being expanded becomes `{ type: "object" }`.
 export function deref(node: unknown, root: AnyObj, state: DerefState = newDerefState(), stack: string[] = []): any {
   if (Array.isArray(node)) {
     count(state, 1);
@@ -174,7 +170,6 @@ export function deref(node: unknown, root: AnyObj, state: DerefState = newDerefS
   return out;
 }
 
-// Follows a chain of top-level `$ref`s (a component response or request body) without expanding the contents.
 function resolveTop(node: any, root: AnyObj): any {
   let current = node;
   for (let hops = 0; current && typeof current.$ref === "string"; hops++) {
@@ -186,8 +181,7 @@ function resolveTop(node: any, root: AnyObj): any {
 
 const BODY_TYPES = ["application/json", "multipart/form-data"];
 
-// The generator reads the parameters, the JSON and multipart request schemas and the JSON schema of
-// the success response, so only those are expanded (error responses and other media types are not).
+// Only what the generator reads is expanded: parameters, JSON and multipart request schemas, 2xx JSON responses.
 function slimOperation(operation: AnyObj, parameters: AnyObj[], root: AnyObj, state: DerefState): AnyObj {
   const slim: AnyObj = {};
   for (const field of ["operationId", "summary", "description", "tags", "deprecated"]) if (operation[field] !== undefined) slim[field] = operation[field];
@@ -216,7 +210,6 @@ function versionOf(operation: AnyObj): string | undefined {
 
 // One definition per method and path: the public documents carry only the latest stable version.
 export function definitionsFromOpenApi(doc: AnyObj, api: Api): Definition[] {
-  // Valid JSON that is not an OpenAPI document (an error body, the wrong file) must not read as "no endpoints".
   if (!doc || typeof doc !== "object" || Array.isArray(doc) || !doc.paths || typeof doc.paths !== "object" || Object.keys(doc.paths).length === 0) {
     throw new Error("Not an OpenAPI document: expected a non-empty `paths` object");
   }

@@ -1,6 +1,5 @@
 // Deterministic command names: the static path segments, kebab-cased, plus one action from the HTTP method.
 // The action is always the last word, so a new endpoint can't turn an existing command into a group.
-// Path parameters become required flags; SCIM commands live under a `scim` group.
 
 export type Api = "rest" | "scim";
 
@@ -16,7 +15,6 @@ export function isParamSegment(segment: string): boolean {
   return segment.includes("{");
 }
 
-// "custom_fields" -> "custom-fields", "vendorBills" -> "vendor-bills", "Users" -> "users".
 export function kebab(segment: string): string {
   return segment
     .replace(/([a-z0-9])([A-Z])/g, "$1-$2")

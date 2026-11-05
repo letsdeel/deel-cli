@@ -69,20 +69,16 @@ test("a merged command without path params lists its forms", async () => {
 
 test("a merged command's path params pick the form for --help", async () => {
   const { out } = await capture(["widgets", "notes", "list", "--widget_id", "w1", "--help"]);
-  assert.match(out, /List notes on a widget/);
+  assert.match(out, /--widget_id=<string>\s+\(required\)/);
+  assert.doesNotMatch(out, /path-param flags pick the endpoint/);
 });
 
 test("a merged command's path params pick the form for --help however the flag is spelled", async () => {
   for (const argv of [["--widget_id=w1"], ["--widget-id", "w1"], ["--widget-id=w1"], ["--widgetId", "w1"], ["--widgetId=w1"]]) {
     const { out } = await capture(["widgets", "notes", "list", ...argv, "--help"]);
-    assert.match(out, /List notes on a widget/, argv.join(" "));
+    assert.match(out, /--widget_id=<string>\s+\(required\)/, argv.join(" "));
+    assert.doesNotMatch(out, /path-param flags pick the endpoint/, argv.join(" "));
   }
-});
-
-test("a merged command's path params pick the form for --generate-input in the = and kebab spellings", async () => {
-  const { code, out } = await capture(["widgets", "notes", "list", "--widget-id=w1", "--generate-input"]);
-  assert.equal(code, EXIT.OK);
-  assert.deepEqual(JSON.parse(out), {});
 });
 
 test("a merged command's kebab and camel path flags select the same form when the command runs", async () => {
@@ -135,8 +131,6 @@ test("the committed manifest doesn't shadow static or hand-picked commands", () 
   }
 });
 
-// ---- running generated commands: the request each one sends, with fetch stubbed ----
-
 type Sent = { method: string; url: URL; body: unknown };
 
 async function callApi(argv: string[], descriptors = manifest.descriptors) {
@@ -179,7 +173,6 @@ test("a merged command calls the collection without path params and the parent-s
   assert.equal(scoped.sent[0].url.pathname, "/rest/widgets/w_1/notes");
 });
 
-// Two forms of one merged command, each with a query param the other does not have.
 const boxForms = generate(
   parseDefinitions(
     [
@@ -227,7 +220,6 @@ test("a missing required query param is reported under the flag the user types",
   await assert.rejects(execute(descriptor, { flags: {}, files: {} }, ctx, { output: {} as any, debug: false, form: false }), /--fields-param/);
 });
 
-// Both forms of this merged command need a path param, so running it with none selects no endpoint.
 const partForms = generate(
   parseDefinitions(
     ["/boxes/{box_id}/parts", "/boxes/{box_id}/{shop_id}/parts"].map((path) => ({

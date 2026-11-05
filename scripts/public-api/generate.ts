@@ -1,5 +1,3 @@
-// Core of the generator: definitions -> manifest, with the checks that keep command names stable.
-
 import { bodyFrom, responseFrom } from "../../.claude/skills/deel-cli-extractor/extract.ts";
 import type { CliParam, Descriptor, GeneratedManifest, ScalarType, VersionInfo } from "../../src/types.ts";
 import { commonArgs } from "../../src/commands/shared.ts";
@@ -12,8 +10,8 @@ type AnyObj = Record<string, any>;
 export const GENERATOR = "scripts/generate-public-api.ts";
 
 export type Reserved = {
-  commands: { command: string[]; method: string; path: string }[]; // hand-picked commands
-  topLevel: Set<string>; // static commands (auth, job, ...)
+  commands: { command: string[]; method: string; path: string }[];
+  topLevel: Set<string>;
 };
 
 export type Summary = {
@@ -93,8 +91,7 @@ function endpointKey(descriptor: { api?: Api; method: string; path: string }): s
   return overrideKey(descriptor.api ?? "rest", descriptor.method, descriptor.path);
 }
 
-// An endpoint is the same route when only its path params were renamed ({typeId} -> {type_id}), so
-// overrides, the name lock and the summary all match on this spelling-free key.
+// A route is the same when only its path params were renamed ({typeId} -> {type_id}); overrides, the name lock and the summary match on this key.
 const withoutParamNames = (key: string) => key.replace(/\{[^}]+\}/g, "{}");
 const routeIdOf = (descriptor: { api?: Api; method: string; path: string }) => withoutParamNames(endpointKey(descriptor));
 
@@ -146,8 +143,6 @@ function mergeable(group: Descriptor[]): boolean {
   return true;
 }
 
-// Routes match by position, not by param name, so GET /x/{typeId} and GET /x/{type_id} are one route:
-// a newer version that renamed its path params.
 function routeKey(entry: Definition): string {
   return `${entry.api} ${entry.method} ${entry.path.replace(/\{[^}]+\}/g, "{}")}`;
 }
@@ -156,7 +151,6 @@ function baseOperationId(entry: Definition | undefined): string | undefined {
   return entry?.operation.operationId?.replace(/-v\d{4}-\d{2}-\d{2}$/, "");
 }
 
-// A path already written the way the command spells it (kebab-case) wins over its aliases.
 function isKebabPath(path: string): boolean {
   return path.split("/").filter((segment) => segment && !isParamSegment(segment)).every((segment) => kebab(segment) === segment);
 }
@@ -265,7 +259,6 @@ export function generate(definitions: Definition[], options: GenerateOptions): G
     }
   }
 
-  // Hand-picked and static commands own their names.
   const handPicked = new Map(options.reserved.commands.map((entry) => [entry.command.join(" "), entry]));
   const handPickedEndpoints = new Set(options.reserved.commands.map((entry) => overrideKey("rest", entry.method, entry.path)));
   for (const [name, group] of byCommand) {

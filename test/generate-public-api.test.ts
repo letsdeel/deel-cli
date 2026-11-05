@@ -50,7 +50,6 @@ test("an error exits 1 and writes nothing", () => {
   const dir = mkdtempSync(join(tmpdir(), "generate-public-api-"));
   const clash = join(dir, "definitions.json");
   const entry = (path: string) => ({ api: "rest", method: "GET", path, version: "2026-01-01", operation: { summary: "x", responses: { "200": { description: "ok" } } } });
-  // The same route and version twice, under two spellings of its path param.
   writeFileSync(clash, JSON.stringify([entry("/gadgets/{a}"), entry("/gadgets/{b}")]));
   const out = join(dir, "out");
   const { code, stderr } = generate(["--from", clash, "--out", out, "--previous", EMPTY]);
