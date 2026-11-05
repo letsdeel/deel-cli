@@ -91,7 +91,7 @@
   "test/macho-fixture.ts": "051b7218a565afb64d74a9ecb82c25b27ec1755505237da048ec7e9f26fdd9f5",
   "test/output.test.ts": "87df3f927f89496b6e2d8af48b0eb384885ce592f36edfd13408b590f1b79ee2",
   "test/public-api-cli.test.ts": "e56b468ccc496bf652315092c847b6d2f6629d4fe5ca90f878bd9f6e9265c6e2",
-  "test/public-api-commands.test.ts": "d4bb36af6363d9600decd05082350883c528c54f60a74f9bf45154a26e8a2dca",
+  "test/public-api-commands.test.ts": "88ccb2ca274ab0b39caa8eb072417521ddcc184890de9d37aad3f663def0cd41",
   "test/public-api-generate.test.ts": "d65c7deb49d53206e8d3062298e8c463c79a1db5b2770d3bc5a8c71fc744c0c3",
   "test/shared.test.ts": "916d7b2440f5748b1b641e622b71086a12639114d8eb53cc69b11a720b718f7b",
   "test/sign-darwin.test.ts": "ac2f43cfbb4ba9337a62bdd2b3e52ff0b76f7ac08b1c98b9ee9a7f43c974e345",

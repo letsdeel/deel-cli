@@ -59,6 +59,35 @@ test("a param named like a global flag is shown with its -param flag", async () 
   assert.equal(fields.flag, "fields-param");
 });
 
+test("the human --help and the usage line show a renamed param under its -param flag", async () => {
+  const { out } = await capture(["widgets", "update", "--help"]);
+  assert.match(out, /--fields-param=<string>/);
+  assert.doesNotMatch(out, /--fields=<string>/);
+
+  const required: Descriptor = {
+    command: ["things", "list"], method: "GET", path: "/things", version: "2026-01-01", async: false, bodyKind: "none",
+    supportsMultipart: false, bodyWrapper: "none", fileFields: [], bodyProps: [], responseKind: "none", responseFields: [],
+    params: [{ name: "fields", in: "query", type: "string", required: true, flag: "fields-param" }],
+  };
+  const humanHelp = await capture(["things", "list", "--help"], [required]);
+  assert.match(humanHelp.out, /USAGE  deel things list \[GLOBAL OPTIONS\] --fields-param=<string>/);
+  const contract = JSON.parse((await capture(["things", "list", "--help", "--json"], [required])).out);
+  assert.match(contract.usage, /--fields-param=<string>/);
+  assert.doesNotMatch(contract.usage, /--fields=/);
+});
+
+test("an array param renamed to -param sends every repeated value, not the global --fields", async () => {
+  const descriptor: Descriptor = {
+    command: ["things", "list"], method: "GET", path: "/things", version: "2026-01-01", async: false, bodyKind: "none",
+    supportsMultipart: false, bodyWrapper: "none", fileFields: [], bodyProps: [], responseKind: "none", responseFields: [],
+    params: [{ name: "fields", in: "query", type: "array", required: false, flag: "fields-param" }],
+  };
+  const { code, sent } = await callApi(["things", "list", "--fields-param", "a", "--fields-param=b"], [descriptor]);
+  assert.equal(code, EXIT.OK);
+  assert.equal(sent.length, 1);
+  assert.deepEqual(sent[0].url.searchParams.getAll("fields"), ["a", "b"]);
+});
+
 test("a merged command without path params lists its forms", async () => {
   const { code, out } = await capture(["widgets", "notes", "list", "--help"]);
   assert.equal(code, EXIT.OK);
