@@ -174,7 +174,7 @@ A command can ask for confirmation before it sends anything: an entry in `src/co
 - In a terminal it asks `[y/N]` on stderr. Only `y` or `yes` goes ahead; anything else, an empty answer, end of input or Ctrl-C aborts and sends nothing (exit code 1, error `<group>.aborted`).
 - `--yes` skips the prompt.
 - Without a terminal (no TTY, or `CI` / an agent environment is detected) and without `--yes`, it refuses to run with `usage.confirm`, which names `--yes`. It never goes ahead silently.
-- When stdin carries the token or the body (`--token-stdin`, `--input -`), the prompt could not read an answer, so `--yes` is required there too.
+- When stdin carries the token or the body (`--token-stdin`, `--input -`) or is not a terminal (piped input would be read as the answer), the prompt could not read an answer, so `--yes` is required there too.
 - `--help --json` lists the confirmation under `confirm`, so a script or an agent can see it before running the command.
 
 `deel oauth2-apps disable` is one.
@@ -295,13 +295,13 @@ A webhook id can start with `-`, which the argument parser reads as a flag. Pass
 ```bash
 deel oauth2-apps list --api_access disabled --limit 20      # filter by API access; --limit (1 to 100, default 100) and --cursor page the list
 deel oauth2-apps get --app_id 00000000-0000-0000-0000-000000000000
-deel oauth2-apps update --app_id <id> --input name="Payroll sync"      # changes only the given fields
+deel oauth2-apps update --app_id <id> --input '{"name":"Payroll sync"}'  # changes only the given fields; use JSON for values with spaces
 deel oauth2-apps update --app_id <id> --input '{"redirect_uris":["https://example.com/callback"]}'  # replaces the whole list
 deel oauth2-apps disable --app_id <id>                                 # asks to confirm; --yes skips the prompt
 deel oauth2-apps enable --app_id <id>
 ```
 
-`deel oauth2-apps disable` revokes every consent and token issued to the app; `enable` does not restore them, so people must authorize the app again. It asks `[y/N]` in a terminal. `--yes` skips the prompt and is required when not running in a terminal (no TTY, or `CI` / an agent environment is detected) and when stdin carries the token or the body (`--token-stdin`, `--input -`), since the prompt would read that line as the answer; without it nothing is sent. `deel oauth2-apps disable --help --json` lists the confirmation under `confirm`.
+`deel oauth2-apps disable` revokes every consent and token issued to the app; `enable` does not restore them, so people must authorize the app again. It asks `[y/N]` in a terminal. `--yes` skips the prompt and is required when not running in a terminal (no TTY, or `CI` / an agent environment is detected) and when stdin carries the token or the body (`--token-stdin`, `--input -`) or is piped, since the prompt would read that line as the answer; without it nothing is sent. `deel oauth2-apps disable --help --json` lists the confirmation under `confirm`.
 
 `oauth2-apps list` returns one page at a time. When more results exist, the next-page cursor is printed as `meta.cursor`; pass it back with `--cursor` to get the next page.
 

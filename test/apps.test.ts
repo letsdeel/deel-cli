@@ -134,9 +134,12 @@ test("oauth2-apps disable --help --json exposes the confirmation and oauth2-apps
     message: "Disable app {app_id}? This revokes all consents and tokens; enable does not restore them.",
     flag: "yes",
     requiredWhenNonInteractive: true,
+    requiredWhenStdinInUse: true,
   });
+  assert.match(disable.usage, /\[--yes\]$/);
   const enable = JSON.parse((await capture(["oauth2-apps", "enable", "--help", "--json"])).out);
   assert.equal("confirm" in enable, false);
+  assert.doesNotMatch(enable.usage, /--yes/);
 });
 
 test("oauth2-apps disable --help --json lists --yes among its params and oauth2-apps enable does not", async () => {
@@ -146,7 +149,7 @@ test("oauth2-apps disable --help --json lists --yes among its params and oauth2-
     in: "flag",
     type: "boolean",
     required: false,
-    description: "Skip the confirmation prompt (required when not running in a terminal)",
+    description: "Skip the confirmation prompt (required without a terminal, or when stdin carries the token or the input)",
   });
   const enable = JSON.parse((await capture(["oauth2-apps", "enable", "--help", "--json"])).out);
   assert.equal(enable.params.some((param: { name: string }) => param.name === "yes"), false);
