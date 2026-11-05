@@ -15,6 +15,7 @@ import { createContext } from "./core/context.ts";
 import { execute } from "./core/executor.ts";
 import { setLoggingEnabled, setLogBodiesEnabled } from "./core/logging.ts";
 import { EXIT } from "./core/errors.ts";
+import { API_GROUP } from "./core/constants.ts";
 import { CliError } from "./core/errors.ts";
 import { CLI_VERSION } from "./version.ts";
 import { commonArgs, configFrom, gatherFiles, gatherFlagValues, outputOpts } from "./commands/shared.ts";
@@ -164,21 +165,25 @@ function insertIntoTree(tree: CommandTree, descriptor: Descriptor): void {
   }
 }
 
-function treeToCommand(name: string, node: CommandTree | Descriptor | Descriptor[]): CommandDef {
+function treeToCommand(name: string, node: CommandTree | Descriptor | Descriptor[], description = `${name} operations`): CommandDef {
   if (Array.isArray(node)) return node[0].variant ? variantCommand(node) : alternativesCommand(node);
   if (!(node instanceof Map)) return actionCommand(node as Descriptor);
   const subCommands: Record<string, CommandDef> = {};
   for (const [childName, childNode] of node as CommandTree) subCommands[childName] = treeToCommand(childName, childNode);
-  return defineCommand({ meta: { name, description: `${name} operations` }, subCommands });
+  return defineCommand({ meta: { name, description }, subCommands });
 }
 
 // ---------------- root ----------------
+
+const API_GROUP_DESCRIPTION = "Call any documented Deel API endpoint: deel api <resource> <action>";
 
 function buildRoot(): CommandDef {
   const tree: CommandTree = new Map();
   for (const descriptor of allDescriptors()) insertIntoTree(tree, descriptor);
   const subCommands: Record<string, CommandDef> = { ...staticCommands };
-  for (const [name, node] of tree) subCommands[name] = treeToCommand(name, node);
+  for (const [name, node] of tree) {
+    subCommands[name] = name === API_GROUP ? treeToCommand(name, node, API_GROUP_DESCRIPTION) : treeToCommand(name, node);
+  }
   return defineCommand({
     meta: { name: "deel", version: CLI_VERSION, description: "Deel CLI — spec-driven client for the Deel Public API" },
     subCommands,
@@ -244,6 +249,13 @@ export async function run(argv: string[]): Promise<number> {
   }
 
   const positionals = argv.filter((token) => !token.startsWith("-"));
+  // Under a group, a word that names none of its commands is a mistake, not a request for the group's help.
+  const unknown = positionals[matched];
+  if (isGroup && matched > 0 && !wantsHelp && unknown !== undefined) {
+    const group = `deel ${positionals.slice(0, matched).join(" ")}`;
+    process.stderr.write(`Unknown command '${unknown}' under '${group}'. Run '${group} --help' to see its commands.\n`);
+    return EXIT.ERROR;
+  }
   const variantCandidates = descriptorsFor(positionals, matched);
   const descriptor = descriptorFor(positionals, matched, argv);
 

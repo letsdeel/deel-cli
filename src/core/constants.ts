@@ -30,6 +30,8 @@ export const AGENT_ENV_SIGNALS = ["CI", "CLAUDE_CODE", "CURSOR", "CODEX"] as con
 
 // --- Command resolver vocabulary ---
 export const RESERVED_COMMANDS = new Set(["job", "auth", "webhooks"]);
+// Every generated public API command lives under `deel api`; no static or hand-picked command may use the word.
+export const API_GROUP = "api";
 export const COMMAND_SUFFIX_MODIFIERS = ["-bulk", "-async"];
 
 // --- Header names (lowercase; fetch normalizes) ---
