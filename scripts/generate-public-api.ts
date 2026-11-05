@@ -56,7 +56,13 @@ async function main(argv: string[]): Promise<number> {
   // The released names are the committed manifest's, wherever the new one is written, unless --previous names another.
   const lockPath = values.previous ? resolve(process.cwd(), values.previous) : resolve(REPO_ROOT, "src/public-api/manifest.json");
   if (values.previous && !existsSync(lockPath)) throw new Error(`--previous ${values.previous} does not exist`);
-  const previous = existsSync(lockPath) ? (JSON.parse(readFileSync(lockPath, "utf8")) as GeneratedManifest) : undefined;
+  let previous: GeneratedManifest | undefined;
+  if (existsSync(lockPath)) {
+    // A wrong file would otherwise read as "nothing released" and switch the name lock off.
+    const parsed = JSON.parse(readFileSync(lockPath, "utf8"));
+    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.descriptors)) throw new Error(`${lockPath} is not a generated manifest`);
+    previous = parsed as GeneratedManifest;
+  }
 
   const result = generate(definitions, {
     reserved: { commands: handPicked.descriptors, topLevel: RESERVED_COMMANDS },

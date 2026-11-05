@@ -191,3 +191,27 @@ test("a missing required query param is reported under the flag the user types",
   });
   await assert.rejects(execute(descriptor, { flags: {}, files: {} }, ctx, { output: {} as any, debug: false, form: false }), /--fields-param/);
 });
+
+// Both forms of this merged command need a path param, so running it with none selects no endpoint.
+const partForms = generate(
+  parseDefinitions(
+    ["/boxes/{box_id}/parts", "/boxes/{box_id}/{shop_id}/parts"].map((path) => ({
+      api: "rest", method: "GET", path, version: "2026-01-01", beta_until: null, sunset_at: null,
+      operation: { summary: "List parts", responses: { "200": { description: "ok" } } },
+    })),
+  ),
+  { reserved: { commands: [], topLevel: new Set() }, overrides: {}, now: new Date("2026-10-30T00:00:00Z") },
+);
+
+test("a merged command whose forms all need path params says so and sends nothing when none is given", async () => {
+  assert.deepEqual(partForms.errors, []);
+  assert.equal(partForms.manifest.descriptors.length, 2);
+  const { code, err, sent } = await callApi(["boxes", "parts", "list"], partForms.manifest.descriptors);
+  assert.notEqual(code, EXIT.OK);
+  assert.match(err, /Missing path parameters for every form of 'deel boxes parts list'/);
+  assert.equal(sent.length, 0);
+
+  const { code: ok, sent: calls } = await callApi(["boxes", "parts", "list", "--box_id", "b1", "--shop_id", "s1"], partForms.manifest.descriptors);
+  assert.equal(ok, EXIT.OK);
+  assert.equal(calls[0].url.pathname, "/rest/boxes/b1/s1/parts");
+});

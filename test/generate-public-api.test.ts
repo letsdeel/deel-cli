@@ -102,3 +102,36 @@ test("input that holds no definitions exits 1 and leaves the manifest alone", ()
   assert.match(second.stderr, /Not an OpenAPI document/);
   assert.equal(existsSync(join(out, "manifest.json")), false);
 });
+
+test("--previous must be a generated manifest, or the name lock would silently switch off", () => {
+  const dir = mkdtempSync(join(tmpdir(), "generate-public-api-"));
+  for (const wrong of [fixture("widgets.json"), (() => { const file = join(dir, "object.json"); writeFileSync(file, "{}"); return file; })()]) {
+    const out = join(dir, "out");
+    const { code, stderr } = generate(["--from", fixture("widgets.json"), "--out", out, "--previous", wrong]);
+    assert.equal(code, 1);
+    assert.match(stderr, /is not a generated manifest/);
+    assert.equal(existsSync(join(out, "manifest.json")), false);
+  }
+});
+
+test("--from-openapi tags a scim= document as SCIM and an unprefixed or rest= one as REST", () => {
+  const dir = mkdtempSync(join(tmpdir(), "generate-public-api-"));
+  const doc = (prefix: string, path: string, operationId: string) => {
+    const file = join(dir, `${prefix}-${operationId}.json`);
+    writeFileSync(file, JSON.stringify({ paths: { [`/${prefix}${path}`]: { get: { operationId: `${operationId}-v2026-01-01`, responses: { "200": { description: "ok" } } } } } }));
+    return file;
+  };
+  const out = join(dir, "out");
+  const { code, stderr } = generate([
+    "--from-openapi", doc("rest", "/contracts", "listContracts"),
+    "--from-openapi", `rest=${doc("rest", "/people", "listPeople")}`,
+    "--from-openapi", `scim=${doc("scim", "/Users", "listUsers")}`,
+    "--out", out, "--previous", EMPTY,
+  ]);
+  assert.equal(code, 0, stderr);
+  const descriptors = JSON.parse(readFileSync(join(out, "manifest.json"), "utf8")).descriptors;
+  assert.deepEqual(
+    descriptors.map((descriptor: { api: string; command: string[] }) => [descriptor.api, descriptor.command.join(" ")]),
+    [["rest", "contracts list"], ["rest", "people list"], ["scim", "scim users list"]],
+  );
+});
