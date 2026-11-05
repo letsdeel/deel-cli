@@ -2,7 +2,7 @@
 // server discovery, the stored credential, and refresh-token rotation under a cross-process lock.
 
 import { createHash, randomBytes } from "node:crypto";
-import { mkdirSync, openSync, closeSync, writeSync, readFileSync, unlinkSync, statSync } from "node:fs";
+import { mkdirSync, openSync, closeSync, writeSync, readFileSync, unlinkSync, statSync, renameSync, linkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { CliError } from "./errors.ts";
 import { HEADER } from "./constants.ts";
@@ -11,6 +11,7 @@ import type { CredentialStore } from "./keychain.ts";
 import type { HttpResponse, Transport } from "./http.ts";
 
 export const REFRESH_SKEW_MS = 60_000; // refresh when the access token has less than this left
+export const DEFAULT_TOKEN_LIFETIME_MS = 5 * 60_000; // assumed when the server gives no expires_in and the token no exp
 export const LOCK_STALE_MS = 30_000; // a lock file with no owner recorded and older than this was left by a crash
 export const LOCK_MAX_AGE_MS = 5 * 60_000; // past this a lock is stale even if its pid is alive (the pid may have been reused)
 export const LOCK_WAIT_MS = 35_000; // how long to wait for another process's refresh
@@ -214,8 +215,9 @@ export function entryFromTokenResponse(json: unknown, now: number, previous?: OA
     throw new CliError("oauth.token", "The token response is missing an access token or refresh token.");
   }
   const expiresIn = typeof body.expires_in === "number" || typeof body.expires_in === "string" ? Number(body.expires_in) : NaN;
-  // Without a lifetime, fall back to the token's exp or refresh on next use: throwing would drop a rotated refresh token.
-  const expiresAt = Number.isFinite(expiresIn) ? now + expiresIn * 1000 : (jwtExpiry(accessToken) ?? now);
+  // Without a lifetime, fall back to the token's exp, then to a short default: throwing would drop a rotated refresh
+  // token, and treating it as expired would rotate the refresh token on every command.
+  const expiresAt = Number.isFinite(expiresIn) ? now + expiresIn * 1000 : (jwtExpiry(accessToken) ?? now + DEFAULT_TOKEN_LIFETIME_MS);
   return { v: 2, access_token: accessToken, refresh_token: refreshToken, expires_at: new Date(expiresAt).toISOString() };
 }
 
@@ -266,6 +268,24 @@ function isStale(owner: string, ageMs: number, staleMs: number): boolean {
   return !isAlive(pid) || ageMs > LOCK_MAX_AGE_MS;
 }
 
+// Re-reading and then unlinking is not atomic: another process may remove the stale file and take a fresh lock in
+// between. Renaming is atomic, so move the file aside first and only delete it if it still holds the stale owner.
+// Otherwise it is a live lock: put it back, unless yet another lock has been taken there meanwhile.
+export function removeStaleLock(path: string, held: string, owner: string): void {
+  const aside = `${path}.${owner.replace(":", "-")}.stale`;
+  renameSync(path, aside);
+  try {
+    if (readLock(aside) === held) return;
+    try {
+      linkSync(aside, path);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+    }
+  } finally {
+    unlinkSync(aside);
+  }
+}
+
 export async function withLock<T>(
   path: string,
   body: () => Promise<T>,
@@ -291,7 +311,7 @@ export async function withLock<T>(
     try {
       const held = readLock(path);
       if (held !== null && isStale(held, now() - statSync(path).mtimeMs, staleMs)) {
-        if (readLock(path) === held) unlinkSync(path); // still the stale owner's file, not a fresh lock taken meanwhile
+        removeStaleLock(path, held, owner);
         continue;
       }
     } catch (error) {

@@ -432,6 +432,34 @@ test("browserLogin stores its login after a refresh in flight, so the refresh ca
   assert.equal(readOAuthEntry(store, ISSUER)?.access_token, "at-new");
 });
 
+test("browserLogin exchanges the code only once it holds the lock, so a busy lock cannot spend the code and lose the login", async () => {
+  const { store } = memoryStore();
+  const order: string[] = [];
+  const { transport } = loginTransport(() => {
+    order.push("exchange");
+    return { status: 200, headers: {}, text: "", json: { access_token: "at-new", refresh_token: "rt-new", expires_in: 3600 } };
+  });
+  const inRefresh = deferred();
+  const refresh = withLock(lockPath(ISSUER), async () => {
+    inRefresh.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    order.push("refresh released");
+  });
+  await inRefresh.promise;
+  await browserLogin({
+    config,
+    store,
+    transport,
+    say: () => {},
+    openUrl: (url) => {
+      const parsed = new URL(url);
+      void get(`${parsed.searchParams.get("redirect_uri")}?code=c&state=${parsed.searchParams.get("state")}&iss=${encodeURIComponent(ISSUER)}`);
+    },
+  });
+  await refresh;
+  assert.deepEqual(order, ["refresh released", "exchange"]);
+});
+
 // ---------------- the legacy PAT belongs to the environment's own server ----------------
 
 function withEnvVar(name: string, value: string, body: () => Promise<void> | void) {

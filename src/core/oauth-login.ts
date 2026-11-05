@@ -201,25 +201,26 @@ export async function browserLogin(opts: BrowserLoginOpts): Promise<OAuthEntry> 
     opts.say(`Open this URL in your browser to sign in:\n${url}\n`);
     if (opts.open !== false) (opts.openUrl ?? openBrowser)(url);
     const { code } = await loopback.result;
-    const response = await postForm(opts.transport, metadata.token_endpoint, {
-      grant_type: "authorization_code",
-      code,
-      redirect_uri: loopback.redirectUri,
-      client_id: config.clientId,
-      code_verifier: verifier,
-    });
-    if (response.status >= 400) {
-      const body = (response.json ?? {}) as { error?: unknown; error_description?: unknown };
-      const detail = [body.error, body.error_description].filter((part): part is string => typeof part === "string").map((part) => printable(part)).join(": ");
-      throw new CliError("oauth.token", `The sign-in could not be completed (${response.status}${detail ? `: ${detail}` : ""}).`, "Run 'deel auth login' again.");
-    }
-    const entry = entryFromTokenResponse(response.json, (opts.now ?? Date.now)());
-    // Under the refresh lock, so a refresh of the previous login in another process cannot overwrite or delete this one.
-    await withLock(lockPath(issuer), async () => {
-      if (!writeOAuthEntry(opts.store, issuer, entry)) throw new CliError("auth.keychain", "Failed to store the login in the keychain.");
+    // The exchange and the store run under the refresh lock: waiting for the lock after the code is spent could time
+    // out and lose the new login, and a refresh of the previous login in another process cannot overwrite this one.
+    return await withLock(lockPath(issuer), async () => {
+      const response = await postForm(opts.transport, metadata.token_endpoint, {
+        grant_type: "authorization_code",
+        code,
+        redirect_uri: loopback.redirectUri,
+        client_id: config.clientId,
+        code_verifier: verifier,
+      });
+      if (response.status >= 400) {
+        const body = (response.json ?? {}) as { error?: unknown; error_description?: unknown };
+        const detail = [body.error, body.error_description].filter((part): part is string => typeof part === "string").map((part) => printable(part)).join(": ");
+        throw new CliError("oauth.token", `The sign-in could not be completed (${response.status}${detail ? `: ${detail}` : ""}).`, "Run 'deel auth login' again.");
+      }
+      const stored = entryFromTokenResponse(response.json, (opts.now ?? Date.now)());
+      if (!writeOAuthEntry(opts.store, issuer, stored)) throw new CliError("auth.keychain", "Failed to store the login in the keychain.");
       if (ownsLegacyPat(config)) opts.store.remove(config.env); // drop a PAT saved by an earlier release
+      return stored;
     });
-    return entry;
   } finally {
     loopback.close();
   }

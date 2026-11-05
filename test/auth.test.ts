@@ -196,6 +196,19 @@ test("a legacy PAT is never sent to the host of an issuer override", () => {
   });
 });
 
+test("a legacy PAT refused because of an issuer override names the override, not the same host twice", () => {
+  withEnv({ DEEL_OAUTH_ISSUER: "https://idp.example.test" }, () => {
+    const { store } = memoryStore({ pat: "pat_legacy" });
+    assert.throws(
+      () => resolveToken({ config: resolveConfig({ env: "prod" }), store }),
+      (error: CliError) =>
+        error.code === "auth.base_url" &&
+        error.message === 'The "prod" PAT saved by an earlier release is not sent while DEEL_OAUTH_ISSUER points at https://idp.example.test.' &&
+        error.next === "Unset DEEL_OAUTH_ISSUER, or use DEEL_TOKEN or --token-stdin with a PAT.",
+    );
+  });
+});
+
 test("--base-url without --env never reads the prod login or PAT", () => {
   withEnv({}, () => {
     const { store } = memoryStore({ pat: "pat_legacy", oauth: entryAt(3_600_000) });

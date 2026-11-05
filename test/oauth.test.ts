@@ -1,10 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, existsSync, mkdtempSync, readFileSync, utimesSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdtempSync, readFileSync, readdirSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CHUNK_SIZE, LOCK_MAX_AGE_MS, discover, entryFromTokenResponse, isFresh, postForm, readOAuthEntry, withLock, writeOAuthEntry } from "../src/core/oauth.ts";
+import { CHUNK_SIZE, DEFAULT_TOKEN_LIFETIME_MS, LOCK_MAX_AGE_MS, discover, entryFromTokenResponse, isFresh, postForm, readOAuthEntry, removeStaleLock, withLock, writeOAuthEntry } from "../src/core/oauth.ts";
 import type { HttpRequest, HttpResponse, Transport } from "../src/core/http.ts";
 import { tempDir } from "./stubs.ts";
 import type { CliError } from "../src/core/errors.ts";
@@ -79,10 +79,11 @@ test("entryFromTokenResponse without expires_in keeps the rotated refresh token"
   const fromExp = entryFromTokenResponse({ access_token: jwt, refresh_token: "r2" }, 1000);
   assert.equal(fromExp.refresh_token, "r2");
   assert.equal(fromExp.expires_at, new Date(5_000_000).toISOString());
-  // An opaque token with no lifetime is stored as already expired, so the next use refreshes it.
+  // An opaque token with no lifetime gets a short default, so it is not refreshed (and rotated) on every command.
   const opaque = entryFromTokenResponse({ access_token: "opaque", refresh_token: "r3" }, 1000);
   assert.equal(opaque.refresh_token, "r3");
-  assert.equal(isFresh(opaque, 1000), false);
+  assert.equal(opaque.expires_at, new Date(1000 + DEFAULT_TOKEN_LIFETIME_MS).toISOString());
+  assert.equal(isFresh(opaque, 1000), true);
 });
 
 test("isFresh uses a 60 second skew", () => {
@@ -147,6 +148,24 @@ test("withLock takes over a lock past the maximum age even when its owner pid is
   const ancient = new Date(Date.now() - LOCK_MAX_AGE_MS - 60_000);
   utimesSync(path, ancient, ancient);
   assert.equal(await withLock(path, async () => "ran", { waitMs: 150 }), "ran");
+});
+
+test("removing a stale lock deletes only the stale owner's file", (t) => {
+  const dir = tempDir(t);
+  const path = join(dir, "x.lock");
+  writeFileSync(path, "111:stale");
+  removeStaleLock(path, "111:stale", "222:me");
+  assert.equal(existsSync(path), false);
+  assert.deepEqual(readdirSync(dir), []);
+});
+
+test("removing a stale lock puts back a fresh lock taken after the stale one was read", (t) => {
+  const dir = tempDir(t);
+  const path = join(dir, "x.lock");
+  writeFileSync(path, "333:fresh"); // another process removed the stale file and took the lock meanwhile
+  removeStaleLock(path, "111:stale", "222:me");
+  assert.equal(readFileSync(path, "utf8"), "333:fresh");
+  assert.deepEqual(readdirSync(dir), ["x.lock"]);
 });
 
 // root can unlink in a read-only directory, so the failure cannot be set up there.

@@ -231,7 +231,9 @@ test("auth logout says when the server has no revocation endpoint", async (t) =>
 test("auth logout without a stored login sends nothing and reports nothing removed", async (t) => {
   isolated(t);
   const { io, data, err } = captureIO();
-  await authLogout(ARGS, resolveConfig({ env: "prod" }), { store: memoryStore().store, transport: async () => assert.fail("no request expected"), io });
+  const { transport, requests } = server();
+  await authLogout(ARGS, resolveConfig({ env: "prod" }), { store: memoryStore().store, transport, io });
+  assert.equal(requests.length, 0);
   assert.deepEqual(data(), { removed: false, env: "prod", revoked: false });
   assert.equal(err(), "");
 });

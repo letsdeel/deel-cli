@@ -4,7 +4,7 @@
 //   logout  revoke the login (best effort) and remove it from the OS keychain
 
 import { defineCommand } from "citty";
-import { resolveToken, requireToken, authFor, accessTokenScope, maskToken, extractIdentity, baseUrlRefused } from "../core/auth.ts";
+import { resolveToken, authFor, accessTokenScope, maskToken, extractIdentity, baseUrlRefused } from "../core/auth.ts";
 import { credentialStore } from "../core/keychain.ts";
 import type { CredentialStore } from "../core/keychain.ts";
 import { browserLogin, logout } from "../core/oauth-login.ts";
@@ -44,7 +44,6 @@ const realDeps = (): AuthDeps => ({ store: credentialStore(), transport: fetchTr
 
 export async function authStatus(args: Args, config: Config, deps: AuthDeps): Promise<void> {
   const resolved = resolveToken({ tokenStdin: Boolean(args["token-stdin"]), config, store: deps.store, transport: deps.transport });
-  requireToken(resolved);
   const ctx = createContext({ config, token: authFor(resolved), io: deps.io, baseTransport: deps.transport });
   const response = await checkToken(ctx, config, "auth status");
   if (response.status >= 400) throw new CliError("auth.invalid", `Token check failed (${response.status})`);

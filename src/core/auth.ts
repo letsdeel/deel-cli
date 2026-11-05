@@ -62,6 +62,14 @@ export function baseUrlRefused(config: Config): CliError {
   const known = ENVIRONMENTS[config.env];
   const host = new URL(config.baseUrl).host;
   const allowed = new URL(known ? known.baseUrl : (config.issuer ?? config.baseUrl)).host;
+  if (known && host === allowed) {
+    // Same host, so the cause is DEEL_OAUTH_ISSUER pointing the login at another server.
+    return new CliError(
+      "auth.base_url",
+      `The "${config.env}" PAT saved by an earlier release is not sent while DEEL_OAUTH_ISSUER points at ${config.issuer ?? "another server"}.`,
+      "Unset DEEL_OAUTH_ISSUER, or use DEEL_TOKEN or --token-stdin with a PAT.",
+    );
+  }
   const next = known
     ? `To use ${host} as its own environment, run without --env ${config.env} or DEEL_ENV. Otherwise use DEEL_TOKEN or --token-stdin with a PAT.`
     : `Use a --base-url on ${allowed}, or unset DEEL_OAUTH_ISSUER.`;
