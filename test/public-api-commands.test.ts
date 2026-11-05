@@ -7,7 +7,10 @@ import { captureIO } from "../src/core/io.ts";
 import { execute } from "../src/core/executor.ts";
 import type { Descriptor } from "../src/types.ts";
 import { EXIT } from "../src/core/errors.ts";
-import { acceptsFlag, argvEnables, argvHasFlag, argvMentionsFlag, flagOf, generatedManifest, selectAlternate, setGeneratedDescriptorsForTests } from "../src/public-api/commands.ts";
+import { RESERVED_COMMANDS } from "../src/core/constants.ts";
+import { staticCommands } from "../src/commands/index.ts";
+import { manifest as handPicked } from "../src/manifest.generated.ts";
+import { generatedManifest, selectAlternate, setGeneratedDescriptorsForTests } from "../src/public-api/commands.ts";
 import { parseDefinitions } from "../scripts/public-api/definitions.ts";
 import { generate } from "../scripts/public-api/generate.ts";
 
@@ -130,24 +133,6 @@ test("a merged command's kebab and camel path flags select the same form when th
   }
 });
 
-test("acceptsFlag follows the parser: written, camelCase and kebab-case spellings, acronyms included", () => {
-  assert.equal(acceptsFlag("widget_id", "widget_id"), true);
-  assert.equal(acceptsFlag("widget_id", "widget-id"), true);
-  assert.equal(acceptsFlag("widget_id", "widgetId"), true);
-  assert.equal(acceptsFlag("userIDs", "user-i-ds"), true);
-  assert.equal(acceptsFlag("userIDs", "userIDs"), true);
-  assert.equal(acceptsFlag("widget_id", "widget"), false);
-  assert.equal(acceptsFlag("widget_id", "widget_idx"), false);
-  assert.equal(acceptsFlag("limit", ""), false);
-});
-
-test("argvHasFlag matches --flag and --flag=value in every spelling, and nothing else", () => {
-  assert.equal(argvHasFlag(["--widget-id", "w1"], "widget_id"), true);
-  assert.equal(argvHasFlag(["--widgetId=w1"], "widget_id"), true);
-  assert.equal(argvHasFlag(["--widget_idx", "w1"], "widget_id"), false);
-  assert.equal(argvHasFlag(["widget_id"], "widget_id"), false);
-});
-
 test("--generate-input works on a merged command without path params", async () => {
   const { code, out } = await capture(["widgets", "notes", "list", "--generate-input"]);
   assert.equal(code, EXIT.OK);
@@ -160,11 +145,6 @@ test("selectAlternate prefers the most specific form whose path params are all g
   assert.equal(selectAlternate(notes, () => false)!.path, "/widgets/notes");
   const deep = notes.filter((descriptor) => descriptor.path.includes("{"));
   assert.equal(selectAlternate(deep, () => false), undefined);
-});
-
-test("flagOf uses the API name unless the param has a flag", () => {
-  assert.equal(flagOf({ name: "limit", in: "query", type: "integer", required: false }), "limit");
-  assert.equal(flagOf({ name: "fields", in: "query", type: "string", required: false, flag: "fields-param" }), "fields-param");
 });
 
 type Sent = { method: string; url: URL; body: unknown };
@@ -337,6 +317,27 @@ test("--generate-input in every spelling prints the skeleton and sends nothing",
     assert.deepEqual(JSON.parse(out), { name: "" }, flag);
     assert.equal(sent.length, 0, flag);
   }
+});
+
+test("the committed manifest doesn't shadow static or hand-picked commands", () => {
+  const taken = new Set([...RESERVED_COMMANDS, ...handPicked.descriptors.map((descriptor) => descriptor.command.join(" "))]);
+  for (const descriptor of generatedManifest.descriptors) {
+    const name = descriptor.command.join(" ");
+    assert.ok(!RESERVED_COMMANDS.has(descriptor.command[0]), `"deel ${name}" shadows a static command`);
+    assert.ok(!taken.has(name), `"deel ${name}" clashes with a hand-picked command`);
+  }
+});
+
+test("every static command is a reserved name, so the generator and the committed-manifest check can see it", () => {
+  assert.deepEqual(Object.keys(staticCommands).sort(), [...RESERVED_COMMANDS].sort());
+});
+
+test("a path-param error names the flag the user types, including the -param rename", async () => {
+  const descriptor = thing([{ name: "file", in: "path", type: "string", required: true, flag: "file-param" }], { method: "DELETE", path: "/things/{file}", command: ["things", "delete"] });
+  const { code, err, sent } = await callApi(["things", "delete", "--file-param", ".."], [descriptor]);
+  assert.notEqual(code, EXIT.OK);
+  assert.match(err, /path parameter --file-param: "\.\."/);
+  assert.equal(sent.length, 0);
 });
 
 test("a path param that is empty, a dot segment or a swallowed flag sends nothing", async () => {
@@ -520,19 +521,6 @@ test("--generate-input in any spelling works on a merged command and on a varian
   const switchedOff = await capture(["things", "change", "--a=false", "--generate-input"], variants);
   assert.notEqual(switchedOff.code, EXIT.OK);
   assert.match(switchedOff.err, /Specify a variant first/);
-});
-
-test("the flag matchers only read flags: a word that merely ends like one is not a match, and --no- negates", () => {
-  assert.equal(argvHasFlag(["xxwidget_id", "w1"], "widget_id"), false);
-  assert.equal(argvHasFlag(["--widget_id=w1"], "widget_id"), true);
-  assert.equal(acceptsFlag("generate-input", "no-generate-input"), false);
-  assert.equal(argvMentionsFlag(["--no-archived"], "archived"), true);
-  assert.equal(argvMentionsFlag(["--archived=false"], "archived"), true);
-  assert.equal(argvMentionsFlag(["--other"], "archived"), false);
-  assert.equal(argvEnables(["--archived"], "archived"), true);
-  assert.equal(argvEnables(["--archived=false"], "archived"), false);
-  assert.equal(argvEnables(["--no-archived"], "archived"), false);
-  assert.equal(argvEnables(["xxarchived"], "archived"), false);
 });
 
 test("a path value of dots is only refused when it is the whole segment, and a blank one never goes out", async () => {

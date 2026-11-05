@@ -9,6 +9,7 @@ import type { Ctx } from "./context.ts";
 import type { OutputOpts } from "./output.ts";
 import { deriveIdempotencyKey } from "./idempotency.ts";
 import { CliError } from "./errors.ts";
+import { flagOf } from "./flags.ts";
 import { envelope, render } from "./output.ts";
 import { HEADER } from "./constants.ts";
 
@@ -62,17 +63,21 @@ function validateMaxItems(descriptor: Descriptor, userBody: unknown): void {
 }
 
 function buildPath(descriptor: Descriptor, flags: ParsedCall["flags"]): string {
+  const flagFor = (name: string) => {
+    const param = descriptor.params.find((p) => p.in === "path" && p.name === name);
+    return param ? flagOf(param) : name;
+  };
   return descriptor.path
     .split("/")
     .map((segment) =>
       segment.replace(/\{([^}]+)\}/g, (_, name: string) => {
         const value = flags[name];
-        if (value == null) throw new CliError("usage.path_param", `Missing required path parameter --${name}`);
+        if (value == null) throw new CliError("usage.path_param", `Missing required path parameter --${flagFor(name)}`);
         const text = String(value); // path params are always scalar
         // An empty value, a dot segment or a swallowed flag would send the request to another endpoint (the collection, or a parent path).
         const dots = segment === `{${name}}` && (text === "." || text === "..");
         if (text.trim() === "" || dots || text.startsWith("--")) {
-          throw new CliError("usage.path_param", `Invalid value for path parameter --${name}: "${text}"`, `Pass the id the endpoint expects; a value that starts with -- is taken for a flag that lost its value.`);
+          throw new CliError("usage.path_param", `Invalid value for path parameter --${flagFor(name)}: "${text}"`, `Pass the id the endpoint expects; a value that starts with -- is taken for a flag that lost its value.`);
         }
         return encodeURIComponent(text);
       }),

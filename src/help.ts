@@ -6,7 +6,7 @@
 import type { CliParam, Descriptor } from "./types.ts";
 import { CLI_VERSION } from "./version.ts";
 import { commonArgs } from "./commands/shared.ts";
-import { flagOf } from "./public-api/commands.ts";
+import { flagOf } from "./core/flags.ts";
 
 // Flattens nested object fields into dotted paths (request.amount, ...) so every
 // field is visible, however deep, without changing the CliParam shape callers rely on.

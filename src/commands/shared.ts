@@ -7,7 +7,7 @@ import type { OutputOpts } from "../core/output.ts";
 import { resolveConfig } from "../core/config.ts";
 import type { Config } from "../core/config.ts";
 import { CliError } from "../core/errors.ts";
-import { acceptsFlag } from "../public-api/commands.ts";
+import { acceptsFlag } from "../core/flags.ts";
 
 export type Args = Record<string, unknown>;
 
