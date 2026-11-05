@@ -106,10 +106,11 @@ export function buildTokenListQuery(flags: TokenListFlags): URLSearchParams {
 export function validateReason(reason: string | undefined): string | undefined {
   if (reason === undefined) return undefined;
   const trimmed = reason.trim();
+  if (!trimmed) throw new CliError(USAGE, "--reason needs a value", "Pass --reason \"text\", or leave it out.");
   if (trimmed.length > MAX_REASON_LENGTH) {
     throw new CliError(USAGE, `--reason must be at most ${MAX_REASON_LENGTH} characters, got ${trimmed.length}`);
   }
-  return trimmed || undefined;
+  return trimmed;
 }
 
 async function getJson(ctx: Ctx, path: string, command: string, params?: URLSearchParams): Promise<any> {

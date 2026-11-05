@@ -32,7 +32,7 @@ export type Confirm = (question: string) => Promise<boolean>;
 const YES = /^y(es)?$/i;
 
 function optionalString(value: unknown): string | undefined {
-  return value === undefined ? undefined : String(value);
+  return typeof value === "string" ? value : undefined;
 }
 
 export function listFlagsFrom(args: Args): TokenListFlags {

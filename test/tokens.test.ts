@@ -6,7 +6,9 @@ import { captureIO } from "../src/core/io.ts";
 import type { HttpRequest, HttpResponse } from "../src/core/http.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
 import { CliError } from "../src/core/errors.ts";
-import { DASH_ID_HINT, buildTokenListQuery, resolveTokenId, validateReason } from "../src/core/api-tokens.ts";
+import { DASH_ID_HINT, TOKENS_MAX_PAGES, buildTokenListQuery, resolveTokenId, validateReason } from "../src/core/api-tokens.ts";
+import { HEADER } from "../src/core/constants.ts";
+import { deriveIdempotencyKey } from "../src/core/idempotency.ts";
 import { isYes, listFlagsFrom, promptConfirm, runGet, runList, runInvalidate, tokensCommand } from "../src/commands/tokens.ts";
 import { staticCommands } from "../src/commands/index.ts";
 
@@ -72,10 +74,13 @@ for (const [name, flags, message] of [
 }
 
 
-test("validateReason trims, drops an empty reason and refuses one over 200 characters", () => {
+test("validateReason trims, refuses an empty reason and one over 200 characters", () => {
   assert.equal(validateReason("  rotated  "), "rotated");
-  assert.equal(validateReason("   "), undefined);
   assert.equal(validateReason(undefined), undefined);
+  // a bare --reason reaches here as "": a usage error, not an invalidation without the reason the user meant to give
+  for (const blank of ["", "   "]) {
+    assert.throws(() => validateReason(blank), (error: unknown) => error instanceof CliError && error.code === "usage.tokens" && /--reason needs a value/.test(error.message));
+  }
   assert.throws(() => validateReason("x".repeat(201)), (error: unknown) => error instanceof CliError && error.message === "--reason must be at most 200 characters, got 201");
 });
 
@@ -94,6 +99,13 @@ test("tokens list fetches one page and prints the next cursor, has_more and tota
   assert.equal(seen[0].url, "https://example.test/rest/api-tokens?token_type=ORGANIZATION");
   assert.deepEqual(stdoutJson(io), { data: [apiToken("a")], meta: { next_cursor: "NEXT", has_more: true, total_count: 7 } });
   assert.equal(io.stderr.join(""), "next page: --cursor NEXT\n");
+});
+
+test("listFlagsFrom keeps only string flag values, so a bare or repeated flag never becomes the text \"true\" or \"a,b\"", () => {
+  const flags = listFlagsFrom({ search: true, owner: ["a", "b"], type: "personal" } as any);
+  assert.equal(flags.search, undefined);
+  assert.equal(flags.owner, undefined);
+  assert.equal(flags.type, "personal");
 });
 
 test("tokens list --all walks every page with the largest page size, keeping the filters", async () => {
@@ -129,6 +141,12 @@ test("tokens list --all fails on a cursor cycle that is not adjacent (A -> B -> 
   });
   await assert.rejects(() => runList(ctx, buildTokenListQuery({ all: true }), true, JSON_OUTPUT), (err: any) => err.code === "tokens.paging_stuck");
   assert.equal(seen.length, 3);
+});
+
+test("tokens list --all stops with tokens.paging_limit when the API keeps returning new cursors", async () => {
+  const { ctx, seen } = ctxWith(() => ok({ data: [apiToken(`t${seen.length}`)], next_cursor: `cursor-${seen.length}`, has_more: true }));
+  await assert.rejects(() => runList(ctx, buildTokenListQuery({ all: true }), true, JSON_OUTPUT), (err: any) => err.code === "tokens.paging_limit");
+  assert.equal(seen.length, TOKENS_MAX_PAGES);
 });
 
 test("promptConfirm answers yes and no from one line of input", async () => {
@@ -211,8 +229,30 @@ test("tokens invalidate --yes sends POST with the reason and an idempotency key,
   assert.equal(seen[0].method, "POST");
   assert.equal(seen[0].url, `https://example.test/rest/api-tokens/${TOKEN_ID}/invalidate`);
   assert.equal(seen[0].body, JSON.stringify({ data: { reason: "rotated" } }));
-  assert.equal(typeof seen[0].headers["idempotency-key"], "string");
+  const body = { data: { reason: "rotated" } };
+  const path = `/api-tokens/${TOKEN_ID}/invalidate`;
+  assert.equal(seen[0].headers[HEADER.idempotencyKey], deriveIdempotencyKey({ method: "POST", path, query: {}, body }));
+  assert.equal(seen[0].retryable, true);
+  assert.equal(seen[0].meta?.command, "tokens invalidate");
   assert.deepEqual(stdoutJson(io).data, { id: TOKEN_ID, status: "INVALIDATED" });
+});
+
+test("tokens invalidate derives the same idempotency key for the same call and a different one for another reason", async () => {
+  const keys: string[] = [];
+  for (const reason of ["rotated", "rotated", "leaked"]) {
+    const { ctx, seen } = ctxWith(() => ok({ data: { id: TOKEN_ID, status: "INVALIDATED" } }));
+    await runInvalidate(ctx, TOKEN_ID, { yes: true, reason }, JSON_OUTPUT);
+    keys.push(seen[0].headers[HEADER.idempotencyKey]);
+  }
+  assert.equal(keys[0], keys[1]);
+  assert.notEqual(keys[0], keys[2]);
+});
+
+test("tokens invalidate sends the --idempotency-key override as is", async () => {
+  const { ctx, seen } = ctxWith(() => ok({ data: { id: TOKEN_ID, status: "INVALIDATED" } }));
+  await runInvalidate(ctx, TOKEN_ID, { yes: true, idempotencyKey: "my-key" }, JSON_OUTPUT);
+  assert.equal(seen[0].headers[HEADER.idempotencyKey], "my-key");
+  assert.equal(seen[0].meta?.idempotency_key, "my-key");
 });
 
 test("tokens invalidate without a reason sends no body", async () => {
