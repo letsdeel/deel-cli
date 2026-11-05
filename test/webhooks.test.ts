@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { resolveConfig } from "../src/core/config.ts";
 import { createContext } from "../src/core/context.ts";
 import { captureIO } from "../src/core/io.ts";
 import { log, setLoggingEnabled, setLogBodiesEnabled } from "../src/core/logging.ts";
@@ -14,7 +15,7 @@ import { staticCommands } from "../src/commands/index.ts";
 import { run } from "../src/cli.ts";
 import { tempDir } from "./stubs.ts";
 
-const CONFIG = { env: "demo", baseUrl: "https://example.test/rest" };
+const CONFIG = resolveConfig({ env: "demo", baseUrl: "https://example.test/rest" });
 const JSON_OUTPUT = { json: true, quiet: false, raw: false };
 const SIGNING_KEY = "whsec_do_not_print";
 

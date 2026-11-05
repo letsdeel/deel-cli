@@ -7,6 +7,9 @@ import type { OutputOpts } from "../core/output.ts";
 import { resolveConfig } from "../core/config.ts";
 import type { Config } from "../core/config.ts";
 import { CliError } from "../core/errors.ts";
+import { authFor, resolveToken } from "../core/auth.ts";
+import type { TokenProvider } from "../core/http.ts";
+import type { CredentialStore } from "../core/keychain.ts";
 
 export type Args = Record<string, unknown>;
 
@@ -77,6 +80,12 @@ export function gatherFiles(rawArgs: string[]): Record<string, string[]> {
 
 export function configFrom(args: Args, rawArgs: string[]): Config {
   return resolveConfig({ env: args.env as string | undefined, baseUrl: readHidden(rawArgs, "base-url"), beta: Boolean(args.beta) });
+}
+
+// The credential an API command sends: --token-stdin, then DEEL_TOKEN, then the stored login, which is refused
+// for a --base-url outside its own environment. `store` is for tests; commands use the OS keychain.
+export function commandToken(args: Args, config: Config, store?: CredentialStore): string | TokenProvider {
+  return authFor(resolveToken({ tokenStdin: Boolean(args["token-stdin"]), config, store }));
 }
 
 // Collect every occurrence of a repeatable flag (`--name v1 --name v2` or

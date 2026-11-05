@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { resolveConfig } from "../src/core/config.ts";
 import { createContext } from "../src/core/context.ts";
 import { captureIO } from "../src/core/io.ts";
 import type { HttpRequest, HttpResponse } from "../src/core/http.ts";
@@ -8,7 +9,7 @@ import { buildSimulateBody } from "../src/core/webhooks.ts";
 import { eventFlag, runSimulate, webhooksCommand } from "../src/commands/webhooks.ts";
 import { run } from "../src/cli.ts";
 
-const CONFIG = { env: "demo", baseUrl: "https://example.test/rest" };
+const CONFIG = resolveConfig({ env: "demo", baseUrl: "https://example.test/rest" });
 const JSON_OUTPUT = { json: true, quiet: false, raw: false };
 const HUMAN_OUTPUT = { json: false, quiet: false, raw: false };
 const RATE_LIMIT_HINT = "10 simulations per hour per event type";
