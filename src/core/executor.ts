@@ -12,6 +12,8 @@ import { CliError } from "./errors.ts";
 import { flagOf } from "./flags.ts";
 import { envelope, render } from "./output.ts";
 import { HEADER } from "./constants.ts";
+import type { VersionChoice, VersionFlags } from "./versions.ts";
+import { BETA_ACCESS_HINT, BETA_ERROR, betaFallback, chooseVersion } from "./versions.ts";
 
 export type ParsedCall = {
   flags: Record<string, string | string[]>; // path + query values (arrays for repeatable query params)
@@ -20,7 +22,7 @@ export type ParsedCall = {
   idempotencyKey?: string; // explicit override
 };
 
-export type ExecOpts = { output: OutputOpts; debug: boolean; form: boolean };
+export type ExecOpts = { output: OutputOpts; debug: boolean; form: boolean; version?: VersionFlags };
 
 // Wrap the user's body under `data` when the operation expects that envelope,
 // unless they already provided it.
@@ -142,9 +144,12 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   const effectiveKind = opts.form && descriptor.supportsMultipart ? "multipart" : descriptor.bodyKind;
   // Generate the request id here so we can surface it (error envelope / meta / debug);
   // the transport's request-id middleware leaves an existing header untouched.
-  const requestId = ctx.newRequestId();
+  let requestId = ctx.newRequestId();
   const headers: Record<string, string> = { [HEADER.accept]: "application/json", [HEADER.requestId]: requestId };
-  if (descriptor.version) headers[HEADER.apiVersion] = descriptor.version;
+  let choice = chooseVersion(descriptor, opts.version ?? {}, ctx.clock(), (line) => {
+    if (!opts.output.quiet) ctx.io.err(line);
+  });
+  setVersionHeaders(headers, choice);
 
   let body: BodyInit | null = null;
   if (effectiveKind === "multipart") {
@@ -169,18 +174,43 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
     if (opts.debug) ctx.io.err(`[debug] idempotency-key: ${idempotencyKey}${call.idempotencyKey ? " (override)" : " (derived)"}\n`);
   }
 
-  const response = await ctx.http({
-    method: descriptor.method,
-    url: url.toString(),
-    headers,
-    body,
-    retryable: !mutating || Boolean(idempotencyKey),
-    meta: { command: descriptor.command.join(" "), idempotency_key: idempotencyKey },
-  });
+  const send = (requestHeaders: Record<string, string>) =>
+    ctx.http({
+      method: descriptor.method,
+      url: url.toString(),
+      headers: requestHeaders,
+      body,
+      retryable: !mutating || Boolean(idempotencyKey),
+      meta: { command: descriptor.command.join(" "), idempotency_key: idempotencyKey },
+    });
+  const debugSent = (status: number) => {
+    if (!opts.debug) return;
+    const version = `x-version=${choice.version ?? "(none)"}${choice.beta ? " x-beta=true" : ""}`;
+    ctx.io.err(`[debug] ${descriptor.method} ${url} -> ${status}  ${version}  x-request-id=${requestId}\n`);
+  };
 
-  if (opts.debug) ctx.io.err(`[debug] ${descriptor.method} ${url} -> ${response.status}  x-request-id=${requestId}\n`);
+  let response = await send(headers);
+  debugSent(response.status);
 
-  if (response.status >= 400) throw errorFromResponse(response.status, response.json, requestId, ctx.config.beta === true);
+  // A beta that graduated (or vanished) since the manifest was generated: the API rejects the request
+  // before any service runs, so one retry is safe even for a POST. It keeps the idempotency key.
+  const code = response.status >= 400 ? errorCode(response.json) : undefined;
+  const fallback = betaFallback(choice, code, descriptor.versions, ctx.clock(), opts.version?.apiVersion !== undefined);
+  if (fallback) {
+    if (opts.debug) ctx.io.err(`[debug] ${code}: ${fallback.reason}; retrying once without x-beta\n`);
+    choice = fallback.choice;
+    requestId = ctx.newRequestId();
+    const retryHeaders = { ...headers, [HEADER.requestId]: requestId };
+    setVersionHeaders(retryHeaders, choice);
+    response = await send(retryHeaders);
+    debugSent(response.status);
+  }
+
+  if (response.status >= 400) {
+    const error = errorFromResponse(response.status, response.json, requestId, choice.beta);
+    if (error.code === BETA_ERROR.required && !choice.beta) error.next = BETA_ACCESS_HINT;
+    throw error;
+  }
 
   const payload = response.json as any;
   const hasDataEnvelope = isPlainObject(payload) && "data" in payload;
@@ -193,6 +223,13 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
+}
+
+function setVersionHeaders(headers: Record<string, string>, choice: VersionChoice): void {
+  if (choice.version) headers[HEADER.apiVersion] = choice.version;
+  else delete headers[HEADER.apiVersion];
+  if (choice.beta) headers[HEADER.beta] = "true";
+  else delete headers[HEADER.beta];
 }
 
 async function multipartFingerprint(descriptor: Descriptor, call: ParsedCall): Promise<unknown> {
@@ -217,6 +254,11 @@ async function multipartFingerprint(descriptor: Descriptor, call: ParsedCall): P
 function errorCodeOf(item: any): string | undefined {
   const code = item?.code ?? item?.error_code;
   return typeof code === "string" && code ? code : undefined;
+}
+
+function errorCode(json: unknown): string | undefined {
+  const body = json as any;
+  return errorCodeOf(Array.isArray(body?.errors) ? body.errors[0] : (body?.error ?? body));
 }
 
 // Map an error response to a CliError. Deel returns errors in one of two shapes:
@@ -247,7 +289,7 @@ export function errorFromResponse(status: number, json: unknown, requestId: stri
     next = payload.next;
   }
 
-  if (code === "BETA_ACCESS_REQUIRED" && !betaSent) next = next ?? "This endpoint is in beta. Re-run with --beta.";
+  if (code === BETA_ERROR.required && !betaSent) next = next ?? "This endpoint is in beta. Re-run with --beta.";
 
   const error = new CliError(code, message, next);
   error.requestId = requestId;
