@@ -1,24 +1,20 @@
-// API version selection: which X-Version / X-Beta a request sends, the one-time fallback when a
-// beta has graduated or is gone, and the --versions listing.
-
 import type { Descriptor, VersionInfo } from "../types.ts";
 import { CliError } from "./errors.ts";
 
 export type VersionFlags = {
-  apiVersion?: string; // --version: YYYY-MM-DD, or "none" to send no X-Version
+  apiVersion?: string;
   beta?: boolean;
 };
 
-// What a request sends: `version` undefined means no X-Version header.
 export type VersionChoice = { version?: string; beta: boolean };
 
 export const API_VERSION_NONE = "none";
 
 // API error codes returned before any service runs, so a retry is always safe.
 export const BETA_ERROR = {
-  graduated: "INVALID_VERSION_BETA", // X-Beta sent for a version that is now stable
-  noBeta: "NO_BETA_VERSION", // X-Beta sent and nothing is in beta
-  required: "BETA_ACCESS_REQUIRED", // a beta version requested without X-Beta
+  graduated: "INVALID_VERSION_BETA",
+  noBeta: "NO_BETA_VERSION",
+  required: "BETA_ACCESS_REQUIRED",
 } as const;
 
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -72,7 +68,6 @@ export function chooseVersion(descriptor: Descriptor, flags: VersionFlags, now: 
     if (versions && !known) {
       warn(`warning: ${requested} is not a known version of '${commandName(descriptor)}' (known: ${versions.map((entry) => entry.version).join(", ") || "none"}); sending it anyway.\n`);
     }
-    // A version the CLI knows to be in beta needs X-Beta, or the API refuses it.
     return { version: requested, beta: Boolean(flags.beta) || (known !== undefined && isBetaAt(known, now)) };
   }
 
@@ -92,14 +87,12 @@ export function chooseVersion(descriptor: Descriptor, flags: VersionFlags, now: 
   return { version: descriptor.version, beta: Boolean(descriptor.beta) };
 }
 
-// After a request sent X-Beta: the one retry the response calls for, if any. INVALID_VERSION_BETA -> same
-// version without X-Beta; NO_BETA_VERSION -> the newest stable version without X-Beta.
-export function betaFallback(sent: VersionChoice, errorCode: string | undefined, versions: VersionInfo[] | undefined, now: number): { choice: VersionChoice; reason: string } | undefined {
+export function betaFallback(sent: VersionChoice, errorCode: string | undefined, versions: VersionInfo[] | undefined, now: number, pinned: boolean): { choice: VersionChoice; reason: string } | undefined {
   if (!sent.beta) return undefined;
   if (errorCode === BETA_ERROR.graduated) {
     return { choice: { version: sent.version, beta: false }, reason: `${sent.version ?? "the requested version"} is no longer in beta` };
   }
-  if (errorCode === BETA_ERROR.noBeta) {
+  if (errorCode === BETA_ERROR.noBeta && !pinned) {
     const stable = versions ? newestStable(versions, now) : undefined;
     if (!stable) return undefined;
     return { choice: { version: stable, beta: false }, reason: `nothing is in beta; using the newest stable version ${stable}` };
@@ -109,12 +102,11 @@ export function betaFallback(sent: VersionChoice, errorCode: string | undefined,
 
 export const BETA_ACCESS_HINT = "This version is in beta: add --beta (or pick a stable version with --version <YYYY-MM-DD>; see --versions).";
 
-
 export type VersionRow = VersionInfo & { beta: boolean; default: boolean };
 
 export type VersionListing = {
   command: string;
-  version: string | null; // what the command sends without --version / --beta
+  version: string | null;
   beta: boolean;
   versions: VersionRow[];
 };

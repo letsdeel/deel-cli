@@ -14,13 +14,13 @@ import { parseInput } from "./core/input.ts";
 import { createContext } from "./core/context.ts";
 import { execute } from "./core/executor.ts";
 import { realIO } from "./core/io.ts";
-import { render } from "./core/output.ts";
+import { envelope, render } from "./core/output.ts";
 import { versionListing, versionTable } from "./core/versions.ts";
 import { setLoggingEnabled, setLogBodiesEnabled } from "./core/logging.ts";
 import { EXIT } from "./core/errors.ts";
 import { CliError } from "./core/errors.ts";
 import { CLI_VERSION } from "./version.ts";
-import { commonArgs, configFrom, gatherFiles, gatherFlagValues, outputOpts, readHidden } from "./commands/shared.ts";
+import { commonArgs, configFrom, gatherFiles, gatherFlagValues, outputOpts } from "./commands/shared.ts";
 import type { Args } from "./commands/shared.ts";
 import { staticCommands } from "./commands/index.ts";
 import {
@@ -252,15 +252,15 @@ function descriptorsFor(positionals: string[], matched: number): Descriptor[] {
   );
 }
 
-// `--versions`: offline, like --generate-input.
 async function printVersions(descriptor: Descriptor, argv: string[]): Promise<void> {
   const listing = versionListing(descriptor, Date.now());
   const io = realIO();
-  if (argv.includes("--no-json")) {
+  const args = parseArgs(argv, commonArgs);
+  if (args.json === false) {
     io.out(versionTable(listing));
     return;
   }
-  await render(io, { data: listing }, { json: true, fields: readHidden(argv, "fields"), jq: readHidden(argv, "jq"), raw: argv.includes("--raw"), quiet: false });
+  await render(io, envelope(listing), outputOpts(args));
 }
 
 // Single descriptor for a resolved path. For variant groups, selects by the variant
@@ -291,18 +291,18 @@ function groupTitle(path: string[], cmd: CommandDef): string {
 }
 
 // `--version <date>` after a command picks the API version, so only a bare `--version` (or -v) prints the CLI's.
-function wantsCliVersion(argv: string[]): boolean {
+function wantsCliVersion(argv: string[], root: CommandDef): boolean {
   const at = argv.indexOf("--version");
-  return argv.includes("-v") || (at !== -1 && argv.slice(0, at).every((token) => token.startsWith("-")));
+  return argv.includes("-v") || (at !== -1 && wordIndexes(argv, root).length === 0);
 }
 
 export async function run(argv: string[]): Promise<number> {
-  if (wantsCliVersion(argv)) {
+  const root = buildRoot();
+  if (wantsCliVersion(argv, root)) {
     printVersion();
     return EXIT.OK;
   }
 
-  const root = buildRoot();
   const words = wordIndexes(argv, root);
   const positionals = words.map((i) => argv[i]);
   const { cmd, parent, matched } = resolve(root, positionals);
@@ -335,7 +335,6 @@ export async function run(argv: string[]): Promise<number> {
     return EXIT.ERROR;
   }
 
-  // --versions on a merged command or a variant group needs the form picked first.
   if (variantCandidates.length > 1 && !descriptor && argv.includes("--versions") && !wantsHelp) {
     const hint = isMerged ? "its path-param flags" : variantCandidates.map((c) => `--${c.variant}`).join(", ");
     throw new CliError("usage.versions", `'deel ${variantCandidates[0].command.join(" ")}' has several forms; pick one with ${hint} to list its versions.`);

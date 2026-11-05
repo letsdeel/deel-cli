@@ -146,7 +146,9 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   // the transport's request-id middleware leaves an existing header untouched.
   let requestId = ctx.newRequestId();
   const headers: Record<string, string> = { [HEADER.accept]: "application/json", [HEADER.requestId]: requestId };
-  let choice = chooseVersion(descriptor, opts.version ?? {}, ctx.clock(), (line) => ctx.io.err(line));
+  let choice = chooseVersion(descriptor, opts.version ?? {}, ctx.clock(), (line) => {
+    if (!opts.output.quiet) ctx.io.err(line);
+  });
   setVersionHeaders(headers, choice);
 
   let body: BodyInit | null = null;
@@ -192,9 +194,10 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
 
   // A beta that graduated (or vanished) since the manifest was generated: the API rejects the request
   // before any service runs, so one retry is safe even for a POST. It keeps the idempotency key.
-  const fallback = response.status >= 400 ? betaFallback(choice, errorCode(response.json), descriptor.versions, ctx.clock()) : undefined;
+  const code = response.status >= 400 ? errorCode(response.json) : undefined;
+  const fallback = betaFallback(choice, code, descriptor.versions, ctx.clock(), opts.version?.apiVersion !== undefined);
   if (fallback) {
-    if (opts.debug) ctx.io.err(`[debug] ${errorCode(response.json)}: ${fallback.reason}; retrying once without x-beta\n`);
+    if (opts.debug) ctx.io.err(`[debug] ${code}: ${fallback.reason}; retrying once without x-beta\n`);
     choice = fallback.choice;
     requestId = ctx.newRequestId();
     const retryHeaders = { ...headers, [HEADER.requestId]: requestId };

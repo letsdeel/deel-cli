@@ -118,7 +118,6 @@ export function printContractJson(descriptor: Descriptor): void {
     usage: buildUsage(descriptor),
     version: descriptor.version,
     beta: Boolean(descriptor.beta),
-    // Every live version, oldest first; null when the command carries no version list.
     versions: descriptor.versions ?? null,
     params: descriptor.params.map((param) => ({ name: param.name, ...(param.flag ? { flag: param.flag } : {}), in: param.in, type: param.type, required: param.required, enum: param.enum, description: param.description })),
     body: {

@@ -66,13 +66,13 @@ function harness(responses: HttpResponse[]) {
   return { ctx, io, seen };
 }
 
-const opts = (version: ExecOpts["version"] = {}, debug = false): ExecOpts => ({ output: { json: true, quiet: false, raw: false }, debug, form: false, version });
+const opts = (version: ExecOpts["version"] = {}, debug = false, quiet = false): ExecOpts => ({ output: { json: true, quiet, raw: false }, debug, form: false, version });
 
-async function call(desc: Descriptor, responses: HttpResponse[], version: ExecOpts["version"] = {}, debug = false) {
+async function call(desc: Descriptor, responses: HttpResponse[], version: ExecOpts["version"] = {}, debug = false, quiet = false) {
   const h = harness(responses);
   let error: any;
   try {
-    await execute(desc, { flags: {}, body: { name: "w" }, files: {} }, h.ctx, opts(version, debug));
+    await execute(desc, { flags: {}, body: { name: "w" }, files: {} }, h.ctx, opts(version, debug, quiet));
   } catch (caught) {
     error = caught;
   }
@@ -81,7 +81,7 @@ async function call(desc: Descriptor, responses: HttpResponse[], version: ExecOp
 
 test("newest beta / newest stable are judged against now, not the generation date", () => {
   assert.equal(newestBeta(VERSIONS, NOW), "2026-09-15");
-  assert.equal(newestStable(VERSIONS, NOW), "2026-04-01"); // its beta ended in September
+  assert.equal(newestStable(VERSIONS, NOW), "2026-04-01");
   assert.equal(newestBeta(VERSIONS.slice(0, 2), NOW), undefined);
 });
 
@@ -105,14 +105,14 @@ test("chooseVersion: --version works without a version list, and --beta adds X-B
   const warnings: string[] = [];
   assert.deepEqual(chooseVersion(handPicked, { apiVersion: "2026-02-02" }, NOW, (line) => warnings.push(line)), { version: "2026-02-02", beta: false });
   assert.deepEqual(chooseVersion(handPicked, { apiVersion: "2026-02-02", beta: true }, NOW, () => {}), { version: "2026-02-02", beta: true });
-  assert.deepEqual(warnings, []); // nothing to compare against, so no warning
+  assert.deepEqual(warnings, []);
 });
 
 test("betaFallback only acts on a request that sent X-Beta", () => {
-  assert.equal(betaFallback({ version: "2026-09-15", beta: false }, "INVALID_VERSION_BETA", VERSIONS, NOW), undefined);
-  assert.equal(betaFallback({ version: "2026-09-15", beta: true }, "SOMETHING_ELSE", VERSIONS, NOW), undefined);
-  assert.equal(betaFallback({ version: "2026-09-15", beta: true }, "NO_BETA_VERSION", undefined, NOW), undefined);
-  assert.deepEqual(betaFallback({ beta: true }, "INVALID_VERSION_BETA", VERSIONS, NOW)?.choice, { version: undefined, beta: false });
+  assert.equal(betaFallback({ version: "2026-09-15", beta: false }, "INVALID_VERSION_BETA", VERSIONS, NOW, false), undefined);
+  assert.equal(betaFallback({ version: "2026-09-15", beta: true }, "SOMETHING_ELSE", VERSIONS, NOW, false), undefined);
+  assert.equal(betaFallback({ version: "2026-09-15", beta: true }, "NO_BETA_VERSION", undefined, NOW, false), undefined);
+  assert.deepEqual(betaFallback({ beta: true }, "INVALID_VERSION_BETA", VERSIONS, NOW, false)?.choice, { version: undefined, beta: false });
 });
 
 test("no flag: sends the descriptor's version and no X-Beta", async () => {
@@ -144,6 +144,12 @@ test("--version with an unknown date warns on stderr but still sends it", async 
   const { seen, stderr } = await call(descriptor(), [ok()], { apiVersion: "2025-05-05" });
   assert.equal(seen[0].headers["x-version"], "2025-05-05");
   assert.match(stderr, /warning: 2025-05-05 is not a known version of 'deel widgets create' \(known: 2026-01-01, 2026-04-01, 2026-09-15\)/);
+});
+
+test("--quiet silences the unknown-version warning", async () => {
+  const { seen, stderr } = await call(descriptor(), [ok()], { apiVersion: "2025-05-05" }, false, true);
+  assert.equal(seen[0].headers["x-version"], "2025-05-05");
+  assert.equal(stderr, "");
 });
 
 test("--version with a malformed date fails before any request", async () => {
@@ -203,6 +209,12 @@ test("NO_BETA_VERSION ({ errors: [...] } shape): retries once with the newest st
   assert.equal(seen[1].headers["x-version"], "2026-04-01");
   assert.equal("x-beta" in seen[1].headers, false);
   assert.equal(seen[1].headers["idempotency-key"], seen[0].headers["idempotency-key"]);
+});
+
+test("NO_BETA_VERSION never swaps a pinned --version for another one", async () => {
+  const { seen, error } = await call(descriptor(), [fail(404, { errors: [{ code: "NO_BETA_VERSION", message: "No beta version" }] }), ok()], { apiVersion: "2026-09-15", beta: true });
+  assert.equal(seen.length, 1);
+  assert.equal(error.code, "NO_BETA_VERSION");
 });
 
 test("NO_BETA_VERSION with no stable version known surfaces the error", async () => {
@@ -316,6 +328,14 @@ test("deel <beta-only command> sends X-Beta; --version and --beta reach the requ
   ]);
 });
 
+test("--version before the command words is a flag value, not a request for the CLI version", async () => {
+  const seen: Headers[] = [];
+  const result = await cli(["--version", "2026-01-01", "widgets", "reports", "list", ...BASE], recordingFetch(seen));
+  assert.equal(result.code, EXIT.OK);
+  assert.equal(seen[0].get("x-version"), "2026-01-01");
+  assert.match((await cli(["--env", "demo", "--version"])).out, /^deel \d+\.\d+\.\d+/);
+});
+
 test("--versions prints the version list without a request (JSON, --jq, table)", async () => {
   const seen: Headers[] = [];
   const json = await cli(["widgets", "reports", "list", "--versions"], recordingFetch(seen));
@@ -327,10 +347,12 @@ test("--versions prints the version list without a request (JSON, --jq, table)",
   const jq = await cli(["widgets", "reports", "list", "--versions", "--jq", ".versions[].version", "--raw"]);
   assert.equal(jq.out, "2026-01-01\n2026-06-01\n");
 
+  const fields = await cli(["widgets", "reports", "list", "--versions", "--fields", "version,beta"]);
+  assert.deepEqual(JSON.parse(fields.out).data, { version: "2026-01-01", beta: false });
+
   const table = await cli(["widgets", "reports", "list", "--versions", "--no-json"]);
   assert.match(table.out, /2026-06-01\s+beta\s+2099-01-01/);
 
-  // Path params aren't needed to list versions.
   const get = await cli(["widgets", "get", "--versions"]);
   assert.equal(get.code, EXIT.OK);
   assert.equal(seen.length, 0);
