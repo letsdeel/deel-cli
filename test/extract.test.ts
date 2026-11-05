@@ -151,3 +151,13 @@ test("responseFrom carries nullable fields, including nested ones, and only thos
   assert.equal(owner!.required, true);
   assert.equal(owner!.properties![0].nullable, true);
 });
+
+test("splitFields carries nullable on request-body fields and leaves it off the others", () => {
+  const { textProps } = splitFields({
+    type: "object",
+    required: ["name"],
+    properties: { name: { type: "string", nullable: true }, note: { type: "string" } },
+  });
+  assert.equal(textProps.find((field) => field.name === "name")?.nullable, true);
+  assert.equal("nullable" in textProps.find((field) => field.name === "note")!, false);
+});

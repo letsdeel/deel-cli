@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { confirmDescriptor, run, variantCommand } from "../src/cli.ts";
+import { confirmDescriptor, isStdinInUse, run, variantCommand } from "../src/cli.ts";
 import { captureIO } from "../src/core/io.ts";
 import { CliError } from "../src/core/errors.ts";
 import { manifest } from "../src/manifest.generated.ts";
@@ -144,4 +144,20 @@ test("oauth2-apps disable with --token-stdin and no --yes refuses before reading
     globalThis.fetch = originalFetch;
   }
   assert.equal(sent, 0);
+});
+
+test("isStdinInUse is true for --input -, --token-stdin and a piped stdin, and false for a terminal", () => {
+  assert.equal(isStdinInUse({ input: "-" }, true), true);
+  assert.equal(isStdinInUse({ "token-stdin": true }, true), true);
+  assert.equal(isStdinInUse({}, false), true);
+  assert.equal(isStdinInUse({ input: "name=x" }, true), false);
+  assert.equal(isStdinInUse({}, true), false);
+});
+
+test("a terminal run with piped stdin and no --yes refuses and names --yes", async () => {
+  const disable = manifest.descriptors.find((d) => d.command.join(" ") === "oauth2-apps disable")!;
+  await assert.rejects(
+    () => confirmDescriptor(disable, { app_id: APP_ID }, false, captureIO({ isTTY: true }), async () => true, isStdinInUse({}, false)),
+    (err: CliError) => err.code === "usage.confirm" && /--yes/.test(err.next ?? ""),
+  );
 });

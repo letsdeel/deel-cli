@@ -71,3 +71,29 @@ test("render --jq --raw prints scalar strings unquoted", async () => {
   await render(io, envelope([{ id: "a" }, { id: "b" }]), opts({ jq: ".[].id", raw: true }));
   assert.equal(io.stdout.join("").trim(), "a\nb");
 });
+
+test("envelope places page next to data only when a page is given", () => {
+  const paged = envelope([{ id: "a" }], { request_id: "r1" }, { cursor: "c2", has_next_page: true });
+  assert.deepEqual(Object.keys(paged), ["data", "page", "meta"]);
+  assert.deepEqual(paged.page, { cursor: "c2", has_next_page: true });
+  assert.ok(!("page" in envelope({ id: "a" }, { request_id: "r1" })));
+});
+
+test("render keeps page in the JSON envelope, also under --fields", async () => {
+  const io = captureIO({});
+  await render(io, envelope([{ id: "a", n: 1 }], { request_id: "r1" }, { cursor: "c2", has_next_page: true }), opts({ json: true, fields: "id" }));
+  const parsed = JSON.parse(io.stdout.join(""));
+  assert.deepEqual(parsed.data, [{ id: "a" }]);
+  assert.deepEqual(parsed.page, { cursor: "c2", has_next_page: true });
+  assert.equal(parsed.meta.request_id, "r1");
+});
+
+test("render --jq and --quiet keep operating on data only (page is not printed)", async () => {
+  const paged = envelope([{ id: "a" }, { id: "b" }], undefined, { cursor: "c2", has_next_page: true });
+  const io1 = captureIO({});
+  await render(io1, paged, opts({ jq: ".[].id", raw: true }));
+  assert.equal(io1.stdout.join("").trim(), "a\nb");
+  const io2 = captureIO({});
+  await render(io2, paged, opts({ quiet: true }));
+  assert.equal(io2.stdout.join("").trim(), "a\nb");
+});
