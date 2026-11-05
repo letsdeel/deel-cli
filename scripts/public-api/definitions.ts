@@ -82,6 +82,7 @@ export function parseDefinitions(json: unknown): Definition[] {
     for (const field of ["api", "method", "path", "version", "operation"]) {
       if (entry?.[field] === undefined) throw new Error(`Definition #${index} is missing "${field}"`);
     }
+    if (!entry.operation || typeof entry.operation !== "object" || Array.isArray(entry.operation)) throw new Error(`Definition #${index} has no operation object`);
     assertValidDefinition(entry, `Definition #${index}`);
     return {
       api: entry.api,
@@ -215,6 +216,10 @@ function versionOf(operation: AnyObj): string | undefined {
 
 // One definition per method and path: the public documents carry only the latest stable version.
 export function definitionsFromOpenApi(doc: AnyObj, api: Api): Definition[] {
+  // Valid JSON that is not an OpenAPI document (an error body, the wrong file) must not read as "no endpoints".
+  if (!doc || typeof doc !== "object" || Array.isArray(doc) || !doc.paths || typeof doc.paths !== "object" || Object.keys(doc.paths).length === 0) {
+    throw new Error("Not an OpenAPI document: expected a non-empty `paths` object");
+  }
   const definitions: Definition[] = [];
   const cache = new Map<string, CachedRef>();
   for (const [rawPath, pathItem] of Object.entries<AnyObj>(doc.paths ?? {})) {

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Generates src/public-api/manifest.json from a definitions file or URL (--from) or from the
-// public OpenAPI documents (--from-openapi; prefix scim= for the SCIM one). Exit 1 on any naming error.
+// public OpenAPI documents (--from-openapi; prefix scim= for the SCIM one). Exit 1 on any naming error,
+// and when the input holds no definitions at all.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -24,11 +25,12 @@ async function main(argv: string[]): Promise<number> {
       "from-openapi": { type: "string", multiple: true },
       out: { type: "string" },
       summary: { type: "string" },
+      previous: { type: "string" },
     },
   });
   const openapi = values["from-openapi"] ?? [];
   if (Boolean(values.from) === openapi.length > 0) {
-    process.stderr.write("Usage: generate-public-api.ts --from <file|url> | --from-openapi <file|url> [--from-openapi scim=<file|url>] [--out <dir>] [--summary <file>]\n");
+    process.stderr.write("Usage: generate-public-api.ts --from <file|url> | --from-openapi <file|url> [--from-openapi scim=<file|url>] [--out <dir>] [--summary <file>] [--previous <manifest>]\n");
     return 1;
   }
 
@@ -43,10 +45,17 @@ async function main(argv: string[]): Promise<number> {
     }
   }
 
+  // An input with nothing in it would otherwise replace the manifest with an empty one and release-remove every command.
+  if (definitions.length === 0) {
+    process.stderr.write("[error] The input holds no definitions; nothing written.\n");
+    return 1;
+  }
+
   const outDir = resolve(process.cwd(), values.out ?? resolve(REPO_ROOT, "src/public-api"));
   const manifestPath = resolve(outDir, "manifest.json");
-  // The released names are the committed manifest's, wherever the new one is written.
-  const lockPath = resolve(REPO_ROOT, "src/public-api/manifest.json");
+  // The released names are the committed manifest's, wherever the new one is written, unless --previous names another.
+  const lockPath = values.previous ? resolve(process.cwd(), values.previous) : resolve(REPO_ROOT, "src/public-api/manifest.json");
+  if (values.previous && !existsSync(lockPath)) throw new Error(`--previous ${values.previous} does not exist`);
   const previous = existsSync(lockPath) ? (JSON.parse(readFileSync(lockPath, "utf8")) as GeneratedManifest) : undefined;
 
   const result = generate(definitions, {

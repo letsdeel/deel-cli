@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { deriveCommand, kebab } from "../scripts/public-api/naming.ts";
-import { definitionsFromOpenApi, deref, loadJson, parseDefinitions } from "../scripts/public-api/definitions.ts";
+import { definitionsFromOpenApi, deref, loadJson, newDerefState, parseDefinitions } from "../scripts/public-api/definitions.ts";
 import { generate, summarize } from "../scripts/public-api/generate.ts";
 import type { GenerateOptions } from "../scripts/public-api/generate.ts";
 import type { Descriptor } from "../src/types.ts";
@@ -376,7 +376,7 @@ test("--from-openapi rejects a path or version that --from would reject", () => 
   assert.equal(definitionsFromOpenApi(doc("/rest/ok"), "rest").length, 1);
 });
 
-test("the OpenAPI bridge expands only parameters, request bodies and success responses", () => {
+test("the OpenAPI bridge leaves error responses and other media types unexpanded", () => {
   const doc = {
     paths: {
       "/rest/things": {
@@ -434,4 +434,104 @@ test("a renamed path param still matches its override, its released name and its
 
   const locked = generate(renamed, options({ previous: released.manifest }));
   assert.match(locked.errors.join("\n"), /Lock: .*released as "deel kinds update"/);
+});
+
+// ---- the OpenAPI bridge builds request bodies, responses and parameters ----
+
+const thingDoc = (): Record<string, any> => ({
+  paths: {
+    "/rest/things/{thing_id}": {
+      parameters: [
+        { name: "thing_id", in: "path", schema: { type: "string" } },
+        { name: "mode", in: "query", schema: { type: "string" } },
+      ],
+      post: {
+        operationId: "createThing-v2026-01-01",
+        parameters: [{ name: "mode", in: "query", required: true, schema: { type: "string", enum: ["fast"] } }],
+        requestBody: { $ref: "#/components/requestBodies/Thing" },
+        responses: { "200": { $ref: "#/components/responses/Ok" } },
+      },
+    },
+  },
+  components: {
+    requestBodies: {
+      Thing: {
+        required: true,
+        content: {
+          "application/json": { schema: { $ref: "#/components/schemas/ThingBody" } },
+          "multipart/form-data": { schema: { type: "object", properties: { file: { type: "string", format: "binary" } } } },
+          "application/xml": { schema: { $ref: "#/components/schemas/Missing" } },
+        },
+      },
+    },
+    responses: { Ok: { description: "ok", content: { "application/json": { schema: { type: "object", properties: { data: { $ref: "#/components/schemas/ThingOut" } } } } } } },
+    schemas: {
+      ThingBody: { type: "object", required: ["name"], properties: { name: { type: "string" } } },
+      ThingOut: { type: "object", required: ["id"], properties: { id: { type: "string" } } },
+    },
+  },
+});
+
+test("the OpenAPI bridge follows a $ref'd request body and success response and merges the parameters", () => {
+  const [definition] = definitionsFromOpenApi(thingDoc(), "rest");
+  const { requestBody, responses, parameters } = definition.operation;
+  assert.equal(requestBody.required, true);
+  assert.deepEqual(Object.keys(requestBody.content), ["application/json", "multipart/form-data"]);
+  assert.deepEqual(requestBody.content["application/json"].schema, { type: "object", required: ["name"], properties: { name: { type: "string" } } });
+  assert.deepEqual(responses["200"].content["application/json"].schema.properties.data, { type: "object", required: ["id"], properties: { id: { type: "string" } } });
+  // The operation's own `mode` replaces the path-level one.
+  assert.deepEqual(parameters.map((param: any) => [param.name, Boolean(param.required)]), [["thing_id", false], ["mode", true]]);
+
+  const { manifest, errors } = generate([definition], options());
+  assert.deepEqual(errors, []);
+  const [descriptor] = manifest.descriptors;
+  assert.deepEqual(
+    [descriptor.bodyKind, descriptor.supportsMultipart, descriptor.fileFields, descriptor.bodyProps.map((prop) => prop.name), descriptor.responseFields.map((field) => field.name)],
+    ["json", true, ["file"], ["name"], ["id"]],
+  );
+});
+
+test("a chain of $ref'd request bodies that never ends is an error", () => {
+  const doc = thingDoc();
+  doc.components.requestBodies = Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`R${i}`, { $ref: `#/components/requestBodies/R${i + 1}` }]));
+  doc.paths["/rest/things/{thing_id}"].post.requestBody = { $ref: "#/components/requestBodies/R0" };
+  assert.throws(() => definitionsFromOpenApi(doc, "rest"), /Too many chained/);
+});
+
+test("the OpenAPI bridge refuses a document that is not an OpenAPI document", () => {
+  for (const doc of [{}, [], null, { paths: {} }, { message: "Forbidden" }]) {
+    assert.throws(() => definitionsFromOpenApi(doc as any, "rest"), /Not an OpenAPI document/);
+  }
+});
+
+test("parseDefinitions refuses an entry without an operation object", () => {
+  const entry = { api: "rest", method: "GET", path: "/x", version: "2026-01-01" };
+  for (const operation of [null, [], "text"]) assert.throws(() => parseDefinitions([{ ...entry, operation }]), /has no operation object/);
+});
+
+// ---- the $ref cache stays correct ----
+
+test("deref does not cache a schema whose expansion cut a cycle that is still open", () => {
+  const root = {
+    components: {
+      schemas: {
+        A: { type: "object", properties: { b: { $ref: "#/components/schemas/B" }, x: { type: "string" } } },
+        B: { type: "object", properties: { a: { $ref: "#/components/schemas/A" } } },
+      },
+    },
+  };
+  const state = newDerefState();
+  deref({ $ref: "#/components/schemas/A" }, root, state);
+  const b = deref({ $ref: "#/components/schemas/B" }, root, state);
+  // B reached on its own still carries all of A, and the cycle is cut only on the way back to B.
+  assert.deepEqual(b.properties.a.properties.x, { type: "string" });
+  assert.notDeepEqual(b.properties.a, { type: "object" });
+  assert.doesNotThrow(() => JSON.stringify(b));
+});
+
+test("the node budget is per operation, not across the document", () => {
+  const { components } = fanOut(14); // about 82,000 nodes each time it is used, 200,000 allowed per operation
+  const operation = { operationId: "x-v2026-01-01", responses: { "200": { description: "ok", content: { "application/json": { schema: { $ref: "#/components/schemas/S0" } } } } } };
+  const doc = { components, paths: { "/rest/a": { get: operation }, "/rest/b": { get: operation }, "/rest/c": { get: operation } } };
+  assert.equal(definitionsFromOpenApi(doc, "rest").length, 3);
 });
