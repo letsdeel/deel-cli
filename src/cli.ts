@@ -4,10 +4,12 @@
 // to the executor. Each handler builds a Context (io + composed transport +
 // clock/rng) and passes it down — no module reaches for process.* or a global.
 
-import { defineCommand, runCommand, showUsage } from "citty";
+import { defineCommand, parseArgs, runCommand, showUsage } from "citty";
 import type { ArgsDef, CommandDef } from "citty";
 import type { Descriptor } from "./types.ts";
 import { manifest } from "./manifest.generated.ts";
+import { generatedDescriptors, selectAlternate } from "./public-api/commands.ts";
+import { argvEnables, argvHasFlag, argvMentionsFlag, flagOf } from "./core/flags.ts";
 import { resolveToken, requireToken } from "./core/auth.ts";
 import { parseInput } from "./core/input.ts";
 import { createContext } from "./core/context.ts";
@@ -19,14 +21,18 @@ import { CLI_VERSION } from "./version.ts";
 import { commonArgs, configFrom, gatherFiles, gatherFlagValues, outputOpts } from "./commands/shared.ts";
 import type { Args } from "./commands/shared.ts";
 import { staticCommands } from "./commands/index.ts";
-import { printActionHelp, printContractJson, printGlobalOptions, printSkeleton, printVariantGroupHelp, printVersion } from "./help.ts";
+import { printActionHelp, printAlternativesHelp, printContractJson, printGlobalOptions, printSkeleton, printVariantGroupHelp, printVersion } from "./help.ts";
+
+function allDescriptors(): Descriptor[] {
+  return [...manifest.descriptors, ...generatedDescriptors()];
+}
 
 // ---------------- generated action commands ----------------
 
 function argsForDescriptor(descriptor: Descriptor): ArgsDef {
   const args: ArgsDef = { ...commonArgs };
   for (const param of descriptor.params) {
-    args[param.name] = {
+    args[flagOf(param)] = {
       type: param.type === "boolean" ? "boolean" : param.enum ? "enum" : "string",
       description: param.description,
       required: param.in === "path" ? true : param.required,
@@ -45,11 +51,11 @@ async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<st
   const flags: Record<string, string | string[]> = {};
   for (const param of descriptor.params) {
     if (param.type === "array") {
-      const values = gatherFlagValues(cittyCtx.rawArgs, param.name);
+      const values = gatherFlagValues(cittyCtx.rawArgs, flagOf(param));
       if (values.length) flags[param.name] = values;
-      else if (args[param.name] !== undefined) flags[param.name] = [String(args[param.name])];
+      else if (args[flagOf(param)] !== undefined) flags[param.name] = [String(args[flagOf(param)])];
     } else {
-      const value = args[param.name];
+      const value = args[flagOf(param)];
       if (value !== undefined) flags[param.name] = String(value);
     }
   }
@@ -88,7 +94,7 @@ function variantCommand(descriptors: Descriptor[]): CommandDef {
     for (const param of d.params) {
       if (seenParams.has(param.name)) continue;
       seenParams.add(param.name);
-      args[param.name] = {
+      args[flagOf(param)] = {
         type: param.type === "boolean" ? "boolean" : param.enum ? "enum" : "string",
         description: param.description,
         required: false, // enforced inside runDescriptor after variant selection
@@ -106,6 +112,30 @@ function variantCommand(descriptors: Descriptor[]): CommandDef {
       if (selected.length > 1) throw new CliError("usage.variant", `Specify exactly one of: ${variants.map((v) => `--${v}`).join(", ")}`);
       const descriptor = descriptors.find((d) => d.variant === selected[0])!;
       await runDescriptor(descriptor, cittyCtx);
+    },
+  });
+}
+
+// A collection and its parent-scoped twin share one name; the path-param flags given pick the endpoint.
+// No flag of the forms is declared here: the path flags only decide which form runs. That form then parses the
+// arguments with its own flag definitions, so a flag's type, enum and required-ness come from it alone.
+function alternativesCommand(descriptors: Descriptor[]): CommandDef {
+  const name = descriptors[0].command[descriptors[0].command.length - 1];
+  const args: ArgsDef = { ...commonArgs };
+  return defineCommand({
+    meta: { name, description: descriptors[0].summary ?? name },
+    args,
+    async run(cittyCtx) {
+      const args = cittyCtx.args as Args;
+      const descriptor = selectAlternate(descriptors, (flag) => args[flag] !== undefined);
+      if (!descriptor) throw new CliError("usage.params", `Missing path parameters for every form of 'deel ${descriptors[0].command.join(" ")}'.`, "Run it with --help to see the forms.");
+      // A flag of another form would otherwise be accepted and dropped without a word.
+      const own = new Set(descriptor.params.map(flagOf));
+      const stray = descriptors.flatMap((d) => d.params.map(flagOf)).find((flag) => !own.has(flag) && argvMentionsFlag(cittyCtx.rawArgs, flag));
+      if (stray) {
+        throw new CliError("usage.params", `--${stray} does not apply to ${descriptor.method} ${descriptor.path}, the form your path parameters select.`, "Run it with --help to see the forms.");
+      }
+      await runDescriptor(descriptor, { ...cittyCtx, args: parseArgs(cittyCtx.rawArgs, argsForDescriptor(descriptor)) });
     },
   });
 }
@@ -136,7 +166,7 @@ function insertIntoTree(tree: CommandTree, descriptor: Descriptor): void {
 }
 
 function treeToCommand(name: string, node: CommandTree | Descriptor | Descriptor[]): CommandDef {
-  if (Array.isArray(node)) return variantCommand(node as Descriptor[]);
+  if (Array.isArray(node)) return node[0].variant ? variantCommand(node) : alternativesCommand(node);
   if (!(node instanceof Map)) return actionCommand(node as Descriptor);
   const subCommands: Record<string, CommandDef> = {};
   for (const [childName, childNode] of node as CommandTree) subCommands[childName] = treeToCommand(childName, childNode);
@@ -147,7 +177,7 @@ function treeToCommand(name: string, node: CommandTree | Descriptor | Descriptor
 
 function buildRoot(): CommandDef {
   const tree: CommandTree = new Map();
-  for (const descriptor of manifest.descriptors) insertIntoTree(tree, descriptor);
+  for (const descriptor of allDescriptors()) insertIntoTree(tree, descriptor);
   const subCommands: Record<string, CommandDef> = { ...staticCommands };
   for (const [name, node] of tree) subCommands[name] = treeToCommand(name, node);
   return defineCommand({
@@ -175,7 +205,7 @@ function resolve(root: CommandDef, argv: string[]): { cmd: CommandDef; parent?: 
 
 // All descriptors matching a resolved command path (may be multiple for variant groups).
 function descriptorsFor(positionals: string[], matched: number): Descriptor[] {
-  return manifest.descriptors.filter(
+  return allDescriptors().filter(
     (entry) => entry.command.length === matched && entry.command.every((token, index) => token === positionals[index]),
   );
 }
@@ -186,8 +216,13 @@ function descriptorFor(positionals: string[], matched: number, argv: string[]): 
   const candidates = descriptorsFor(positionals, matched);
   if (candidates.length === 0) return undefined;
   if (candidates.length === 1) return candidates[0];
+  if (!candidates[0].variant) {
+    const given = (flag: string) => argvHasFlag(argv, flag);
+    const anyPathParam = candidates.some((c) => c.params.some((param) => param.in === "path" && given(flagOf(param))));
+    return anyPathParam ? selectAlternate(candidates, given) : undefined;
+  }
   for (const candidate of candidates) {
-    if (candidate.variant && argv.includes(`--${candidate.variant}`)) return candidate;
+    if (candidate.variant && argvEnables(argv, candidate.variant)) return candidate;
   }
   return undefined;
 }
@@ -213,16 +248,28 @@ export async function run(argv: string[]): Promise<number> {
   const variantCandidates = descriptorsFor(positionals, matched);
   const descriptor = descriptorFor(positionals, matched, argv);
 
+  const isMerged = variantCandidates.length > 1 && !variantCandidates[0].variant;
+
+  if (isMerged && !descriptor && argvEnables(argv, "generate-input")) {
+    printSkeleton(variantCandidates[0]);
+    return EXIT.OK;
+  }
+
   // --generate-input on a variant group without a variant flag → guide the user.
-  if (variantCandidates.length > 1 && !descriptor && argv.includes("--generate-input")) {
+  if (variantCandidates.length > 1 && !descriptor && argvEnables(argv, "generate-input")) {
     const hint = variantCandidates.map((c) => `--${c.variant}`).join(", ");
     process.stderr.write(`Specify a variant first: ${hint}\n`);
     return EXIT.ERROR;
   }
 
   // Offline discovery — handled here so citty's required-arg enforcement is bypassed.
-  if (descriptor && argv.includes("--generate-input")) {
+  if (descriptor && argvEnables(argv, "generate-input")) {
     printSkeleton(descriptor);
+    return EXIT.OK;
+  }
+
+  if (wantsHelp && isMerged && !descriptor) {
+    printAlternativesHelp(variantCandidates);
     return EXIT.OK;
   }
 

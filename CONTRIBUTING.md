@@ -58,6 +58,12 @@ say a minute later.
   skill from the OpenAPI spec (Deel-internal). To expose a new endpoint, add it to
   `src/commands.map.ts` and regenerate; a PR that changes the manifest carries the `script-generated`
   label.
+- `src/public-api/manifest.json` is also **never hand-edited**. It holds one command per documented
+  public API endpoint, written by `npm run generate:public-api -- --from <file|url>` from the public
+  definitions (`scripts/generate-public-api.ts`, rules in `scripts/public-api/`).
+  The generator never touches the hand-picked files; it only reserves their names. A name that clashes,
+  or that a rule gets wrong, is fixed in `src/public-api/overrides.ts`, and a released name never
+  changes. Tests use the made-up endpoints in `test/fixtures/definitions/`.
 
 ## Pull requests
 

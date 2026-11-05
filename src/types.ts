@@ -14,6 +14,7 @@ export type CliParam = {
   description?: string;
   properties?: CliParam[];
   maxItems?: number; // for type "array": max number of items the API accepts for this field
+  flag?: string; // the CLI flag, when the API name clashes with a global flag (e.g. "fields-param")
 };
 
 export type BodyKind = "none" | "json" | "json-array" | "multipart";
@@ -35,9 +36,24 @@ export type Descriptor = {
   fileFields: string[]; // multipart binary field names (become --file)
   responseKind: "object" | "array" | "none"; // shape of the success response's data
   responseFields: CliParam[]; // top-level fields of the response data (the contract)
+  // Generated public API commands only (src/public-api/manifest.json):
+  api?: "rest" | "scim";
+  beta?: boolean;
+  versions?: VersionInfo[]; // every live version of the endpoint, oldest first
+};
+
+export type VersionInfo = {
+  version: string;
+  beta_until: string | null;
+  sunset_at: string | null;
 };
 
 export type Manifest = {
   apiTitle: string;
+  descriptors: Descriptor[];
+};
+
+export type GeneratedManifest = {
+  generator: string;
   descriptors: Descriptor[];
 };

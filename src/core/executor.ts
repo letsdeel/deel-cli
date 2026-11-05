@@ -9,6 +9,7 @@ import type { Ctx } from "./context.ts";
 import type { OutputOpts } from "./output.ts";
 import { deriveIdempotencyKey } from "./idempotency.ts";
 import { CliError } from "./errors.ts";
+import { flagOf } from "./flags.ts";
 import { envelope, render } from "./output.ts";
 import { HEADER } from "./constants.ts";
 
@@ -62,11 +63,26 @@ function validateMaxItems(descriptor: Descriptor, userBody: unknown): void {
 }
 
 function buildPath(descriptor: Descriptor, flags: ParsedCall["flags"]): string {
-  return descriptor.path.replace(/\{([^}]+)\}/g, (_, name: string) => {
-    const value = flags[name];
-    if (value == null) throw new CliError("usage.path_param", `Missing required path parameter --${name}`);
-    return encodeURIComponent(String(value)); // path params are always scalar
-  });
+  const flagFor = (name: string) => {
+    const param = descriptor.params.find((p) => p.in === "path" && p.name === name);
+    return param ? flagOf(param) : name;
+  };
+  return descriptor.path
+    .split("/")
+    .map((segment) =>
+      segment.replace(/\{([^}]+)\}/g, (_, name: string) => {
+        const value = flags[name];
+        if (value == null) throw new CliError("usage.path_param", `Missing required path parameter --${flagFor(name)}`);
+        const text = String(value); // path params are always scalar
+        // An empty value, a dot segment or a swallowed flag would send the request to another endpoint (the collection, or a parent path).
+        const dots = segment === `{${name}}` && (text === "." || text === "..");
+        if (text.trim() === "" || dots || text.startsWith("--")) {
+          throw new CliError("usage.path_param", `Invalid value for path parameter --${flagFor(name)}: "${text}"`, `Pass the id the endpoint expects; a value that starts with -- is taken for a flag that lost its value.`);
+        }
+        return encodeURIComponent(text);
+      }),
+    )
+    .join("/");
 }
 
 // Query values may be a single string or, for array-typed params, several values
@@ -76,7 +92,7 @@ function buildQuery(descriptor: Descriptor, flags: ParsedCall["flags"]): Record<
   for (const param of descriptor.params) {
     if (param.in !== "query") continue;
     if (flags[param.name] != null) query[param.name] = flags[param.name];
-    else if (param.required) throw new CliError("usage.query_param", `Missing required --${param.name}`);
+    else if (param.required) throw new CliError("usage.query_param", `Missing required --${param.flag ?? param.name}`);
   }
   return query;
 }
@@ -111,6 +127,8 @@ async function multipartBody(descriptor: Descriptor, call: ParsedCall): Promise<
 }
 
 export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx, opts: ExecOpts): Promise<void> {
+  // Refused before the request so the bearer token is never sent to the /rest API.
+  if (descriptor.api === "scim") throw new CliError("usage.scim", "SCIM commands are not supported by this version of the CLI.", "Update the CLI.");
   const path = buildPath(descriptor, call.flags);
   const query = buildQuery(descriptor, call.flags);
   const url = new URL(ctx.config.baseUrl + path);

@@ -6,6 +6,7 @@
 import type { CliParam, Descriptor } from "./types.ts";
 import { CLI_VERSION } from "./version.ts";
 import { commonArgs } from "./commands/shared.ts";
+import { flagOf } from "./core/flags.ts";
 
 // Flattens nested object fields into dotted paths (request.amount, ...) so every
 // field is visible, however deep, without changing the CliParam shape callers rely on.
@@ -68,10 +69,21 @@ export function printVariantGroupHelp(descriptors: Descriptor[]): void {
   out(`Help:  deel ${cmd} --<variant> --help\n\n`);
 }
 
+export function printAlternativesHelp(descriptors: Descriptor[]): void {
+  const out = process.stdout.write.bind(process.stdout);
+  const cmd = descriptors[0].command.join(" ");
+  out(`\n${cmd} — the path-param flags pick the endpoint:\n\n`);
+  for (const d of descriptors) {
+    const pathFlags = d.params.filter((param) => param.in === "path").map((param) => `--${flagOf(param)}`).join(" ");
+    out(`  ${(pathFlags || "(no path params)").padEnd(28)}  ${d.method} ${d.path}${d.summary ? `  — ${d.summary}` : ""}\n`);
+  }
+  out(`\nHelp:  deel ${cmd} [--<path-param> ...] --help\n\n`);
+}
+
 // The exact command line a caller should type — shared by the human --help USAGE
 // line and the --json contract's `usage` field, so both stay in sync by construction.
 function buildUsage(descriptor: Descriptor): string {
-  const required = descriptor.params.filter((param) => param.required).map((param) => `--${param.name}=<${param.type}>`).join(" ");
+  const required = descriptor.params.filter((param) => param.required).map((param) => `--${flagOf(param)}=<${param.type}>`).join(" ");
   const bodyHint =
     descriptor.bodyKind === "multipart"
       ? " [--input k=v] [--file f=@path]"
@@ -103,7 +115,7 @@ export function printContractJson(descriptor: Descriptor): void {
     ...(descriptor.variant ? { variant: descriptor.variant } : {}),
     usage: buildUsage(descriptor),
     version: descriptor.version,
-    params: descriptor.params.map((param) => ({ name: param.name, in: param.in, type: param.type, required: param.required, enum: param.enum, description: param.description })),
+    params: descriptor.params.map((param) => ({ name: param.name, ...(param.flag ? { flag: param.flag } : {}), in: param.in, type: param.type, required: param.required, enum: param.enum, description: param.description })),
     body: {
       kind: descriptor.bodyKind,
       fields: fieldsToJson(descriptor.bodyProps),
@@ -130,7 +142,7 @@ export function printActionHelp(descriptor: Descriptor): void {
     for (const param of descriptor.params) {
       const options = param.enum ? `  [${param.enum.join(" | ")}]` : "";
       const requiredTag = param.required ? "  (required)" : "";
-      out(`  --${param.name}=<${param.type}>${requiredTag}${options}${param.description ? `   ${param.description}` : ""}\n`);
+      out(`  --${flagOf(param)}=<${param.type}>${requiredTag}${options}${param.description ? `   ${param.description}` : ""}\n`);
     }
   }
 

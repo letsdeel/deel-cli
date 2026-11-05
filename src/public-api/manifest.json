@@ -1,0 +1,4 @@
+{
+ "generator": "scripts/generate-public-api.ts",
+ "descriptors": []
+}

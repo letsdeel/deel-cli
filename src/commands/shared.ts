@@ -7,6 +7,7 @@ import type { OutputOpts } from "../core/output.ts";
 import { resolveConfig } from "../core/config.ts";
 import type { Config } from "../core/config.ts";
 import { CliError } from "../core/errors.ts";
+import { acceptsFlag } from "../core/flags.ts";
 
 export type Args = Record<string, unknown>;
 
@@ -79,20 +80,23 @@ export function configFrom(args: Args, rawArgs: string[]): Config {
   return resolveConfig({ env: args.env as string | undefined, baseUrl: readHidden(rawArgs, "base-url"), beta: Boolean(args.beta) });
 }
 
-// Collect every occurrence of a repeatable flag (`--name v1 --name v2` or
-// `--name=v`). citty keeps only the last, so array-typed params read raw args.
+// Collect every occurrence of a repeatable flag (`--name v1 --name v2` or `--name=v`), in any spelling the parser
+// accepts. citty keeps only the last, so array-typed params read raw args.
 export function gatherFlagValues(rawArgs: string[], name: string): string[] {
   const values: string[] = [];
-  const prefix = `--${name}`;
   for (let index = 0; index < rawArgs.length; index++) {
     const token = rawArgs[index];
-    if (token === prefix && rawArgs[index + 1] !== undefined) {
+    if (!token.startsWith("--")) continue;
+    const equals = token.indexOf("=");
+    const flag = equals === -1 ? token : token.slice(0, equals);
+    if (!acceptsFlag(name, flag.slice(2))) continue;
+    if (equals !== -1) values.push(token.slice(equals + 1));
+    else if (rawArgs[index + 1] !== undefined) {
       const value = rawArgs[++index];
       // A flag in the value position means the value is missing; --name=--x still passes one that starts with --.
-      if (value.startsWith("--")) throw new CliError("usage.flag_value", `${prefix} needs a value, but the next argument is ${value}.`, `Write ${prefix}=${value} if the value really starts with --.`);
+      if (value.startsWith("--")) throw new CliError("usage.flag_value", `${flag} needs a value, but the next argument is ${value}.`, `Write ${flag}=${value} if the value really starts with --.`);
       values.push(value);
     }
-    else if (token.startsWith(prefix + "=")) values.push(token.slice(prefix.length + 1));
   }
   return values;
 }
