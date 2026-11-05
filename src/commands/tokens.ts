@@ -10,6 +10,7 @@ import type { OutputOpts } from "../core/output.ts";
 import { setLoggingEnabled, setLogBodiesEnabled } from "../core/logging.ts";
 import { CliError } from "../core/errors.ts";
 import {
+  DASH_ID_HINT,
   TOKEN_SIGNALS,
   TOKEN_SORTS,
   TOKEN_TYPES,
@@ -82,6 +83,10 @@ function contextFor(cittyCtx: CittyCtx): Ctx {
 
 // The id of a single-token command: the positional, or --id=<id> for an id that starts with '-'.
 export function requireId(args: Args, rawArgs: string[], usage: string): string {
+  const twoArgIndex = rawArgs.indexOf("--id");
+  if (twoArgIndex >= 0 && rawArgs[twoArgIndex + 1]?.startsWith("--")) {
+    throw new CliError("usage.tokens", `--id needs a value, but the next argument is ${rawArgs[twoArgIndex + 1]}.`, DASH_ID_HINT);
+  }
   return resolveTokenId(args.id, readHidden(rawArgs, "id"), usage);
 }
 

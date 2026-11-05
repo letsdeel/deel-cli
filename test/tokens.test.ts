@@ -9,8 +9,9 @@ import { CliError } from "../src/core/errors.ts";
 import { DASH_ID_HINT, TOKENS_MAX_PAGES, buildTokenListQuery, resolveTokenId, validateReason } from "../src/core/api-tokens.ts";
 import { HEADER } from "../src/core/constants.ts";
 import { deriveIdempotencyKey } from "../src/core/idempotency.ts";
-import { isYes, listFlagsFrom, promptConfirm, runGet, runList, runInvalidate, tokensCommand } from "../src/commands/tokens.ts";
+import { isYes, listFlagsFrom, promptConfirm, requireId, runGet, runList, runInvalidate, tokensCommand } from "../src/commands/tokens.ts";
 import { staticCommands } from "../src/commands/index.ts";
+import { run } from "../src/cli.ts";
 
 const CONFIG = { env: "demo", baseUrl: "https://example.test/rest" };
 const JSON_OUTPUT = { json: true, quiet: false, raw: false };
@@ -106,6 +107,40 @@ test("listFlagsFrom keeps only string flag values, so a bare or repeated flag ne
   assert.equal(flags.search, undefined);
   assert.equal(flags.owner, undefined);
   assert.equal(flags.type, "personal");
+});
+
+test("requireId reads --id=<id> and --id <id> from the raw args, so a leading dash survives the argument parser", () => {
+  assert.equal(requireId({ id: "tok_1" }, ["get", "tok_1"], "u"), "tok_1");
+  assert.equal(requireId({}, ["get", "--id=-WZ1uT2DFF01"], "u"), "-WZ1uT2DFF01");
+  assert.equal(requireId({}, ["get", "--id", "-WZ1uT2DFF01", "--no-log"], "u"), "-WZ1uT2DFF01");
+  // a flag where the id should be is a usage error, not an id; --id=--x stays valid
+  assert.throws(() => requireId({}, ["invalidate", "--id", "--yes"], "u"), (err: any) => err.code === "usage.tokens" && /--yes/.test(err.message) && err.next === DASH_ID_HINT);
+  assert.equal(requireId({}, ["get", "--id=--x"], "u"), "--x");
+});
+
+// run() builds a real context, so these cover the handlers only up to the point where they fail, before any request.
+const TOKENS_USAGE = (err: any) => err.code === "usage.tokens";
+
+test("deel tokens get and invalidate without an id are a usage error that mentions --id=<id>", async () => {
+  for (const sub of ["get", "invalidate"]) {
+    await assert.rejects(() => run(["tokens", sub]), (err: any) => TOKENS_USAGE(err) && err.next === DASH_ID_HINT);
+  }
+});
+
+test("deel tokens get and invalidate refuse a flag in the id position before any request", async () => {
+  await assert.rejects(() => run(["tokens", "get", "--id", "--json"]), (err: any) => TOKENS_USAGE(err) && /--json/.test(err.message));
+  await assert.rejects(() => run(["tokens", "invalidate", "--id", "--yes"]), (err: any) => TOKENS_USAGE(err) && /--yes/.test(err.message));
+});
+
+test("deel tokens invalidate checks --reason before it looks up a token or sends anything", async () => {
+  await assert.rejects(() => run(["tokens", "invalidate", TOKEN_ID, "--reason", "x".repeat(201)]), (err: any) => TOKENS_USAGE(err) && /at most 200 characters/.test(err.message));
+  await assert.rejects(() => run(["tokens", "invalidate", TOKEN_ID, "--reason", "   "]), (err: any) => TOKENS_USAGE(err) && /--reason needs a value/.test(err.message));
+});
+
+test("deel tokens list rejects bad flags before any token lookup", async () => {
+  await assert.rejects(() => run(["tokens", "list", "--all", "--limit", "5"]), (err: any) => TOKENS_USAGE(err) && /--all cannot be combined/.test(err.message));
+  await assert.rejects(() => run(["tokens", "list", "--type", "worker"]), (err: any) => TOKENS_USAGE(err) && /--type must be one of/.test(err.message));
+  await assert.rejects(() => run(["tokens", "list", "--limit", "3"]), TOKENS_USAGE);
 });
 
 test("tokens list --all walks every page with the largest page size, keeping the filters", async () => {
