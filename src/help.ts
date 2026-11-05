@@ -25,8 +25,10 @@ export function printVersion(): void {
 // since the body arrives via --input and responses aren't citty args).
 export function printContract(descriptor: Descriptor): void {
   const out = process.stdout.write.bind(process.stdout);
-  const line = (name: string, type: string, required: boolean, options?: string[], description?: string, nullable?: boolean) =>
-    `  ${name.padEnd(22)} ${type.padEnd(8)} ${[required ? "required" : "", nullable ? "nullable" : ""].filter(Boolean).join(" ").padEnd(9)}${options ? `[${options.join(" | ")}]  ` : ""}${description ? `— ${description}` : ""}\n`;
+  const line = (name: string, type: string, required: boolean, options?: string[], description?: string, nullable?: boolean) => {
+    const flags = [required ? "required" : "", nullable ? "nullable" : ""].filter(Boolean).join(" ");
+    return `  ${name.padEnd(22)} ${type.padEnd(8)} ${flags.padEnd(Math.max(9, flags.length + 1))}${options ? `[${options.join(" | ")}]  ` : ""}${description ? `— ${description}` : ""}\n`;
+  };
 
   if (descriptor.bodyKind === "multipart") {
     out(`\nREQUEST — multipart upload (POST)\n`);
@@ -81,7 +83,8 @@ function buildUsage(descriptor: Descriptor): string {
           ? " [--input <body>]"
           : "";
   const variantFlag = descriptor.variant ? ` --${descriptor.variant}` : "";
-  return `deel ${descriptor.command.join(" ")}${variantFlag} [GLOBAL OPTIONS]${required ? " " + required : ""}${bodyHint}`;
+  const yesHint = descriptor.confirm ? " [--yes]" : "";
+  return `deel ${descriptor.command.join(" ")}${variantFlag} [GLOBAL OPTIONS]${required ? " " + required : ""}${bodyHint}${yesHint}`;
 }
 
 // Machine-readable form of the action contract (same content as `--help`, as JSON)
@@ -104,10 +107,10 @@ export function printContractJson(descriptor: Descriptor): void {
     ...(descriptor.variant ? { variant: descriptor.variant } : {}),
     usage: buildUsage(descriptor),
     version: descriptor.version,
-    ...(descriptor.confirm ? { confirm: { message: descriptor.confirm, flag: "yes", requiredWhenNonInteractive: true } } : {}),
+    ...(descriptor.confirm ? { confirm: { message: descriptor.confirm, flag: "yes", requiredWhenNonInteractive: true, requiredWhenStdinInUse: true } } : {}),
     params: [
       ...descriptor.params.map((param) => ({ name: param.name, in: param.in, type: param.type, required: param.required, enum: param.enum, description: param.description })),
-      ...(descriptor.confirm ? [{ name: "yes", in: "flag", type: "boolean", required: false, description: "Skip the confirmation prompt (required when not running in a terminal)" }] : []),
+      ...(descriptor.confirm ? [{ name: "yes", in: "flag", type: "boolean", required: false, description: "Skip the confirmation prompt (required without a terminal, or when stdin carries the token or the input)" }] : []),
     ],
     body: {
       kind: descriptor.bodyKind,
@@ -139,7 +142,7 @@ export function printActionHelp(descriptor: Descriptor): void {
     }
   }
 
-  if (descriptor.confirm) out(`  --yes   Skip the confirmation prompt (required when not running in a terminal)\n`);
+  if (descriptor.confirm) out(`  --yes   Skip the confirmation prompt (required without a terminal, or when stdin carries the token or the input)\n`);
 
   printContract(descriptor);
   out(`Global options (--json, --jq, --fields, --quiet, --env, ...) — run 'deel --help'.\n`);

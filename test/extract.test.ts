@@ -197,3 +197,13 @@ test("extract turns only the headers a map entry names into flags", () => {
   const without = extract(spec, [{ command: "files status", method: "GET", path: "/files/{file_id}/status" }]);
   assert.deepEqual(without.manifest.descriptors[0].params.map((p) => p.name), ["file_id"]);
 });
+
+test("splitFields carries nullable on request-body fields and leaves it off the others", () => {
+  const { textProps } = splitFields({
+    type: "object",
+    required: ["name"],
+    properties: { name: { type: "string", nullable: true }, note: { type: "string" } },
+  });
+  assert.equal(textProps.find((field) => field.name === "name")?.nullable, true);
+  assert.equal("nullable" in textProps.find((field) => field.name === "note")!, false);
+});

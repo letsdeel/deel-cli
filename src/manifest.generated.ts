@@ -1,4 +1,4 @@
-// GENERATED FILE — DO NOT EDIT. Produced by the deel-cli-extractor skill from ../../Desktop/openapispec.json.
+// GENERATED FILE — DO NOT EDIT. Produced by the deel-cli-extractor skill: adjustments/jobs from the internal Deel REST API spec, logs from https://api.letsdeel.com/openapi/rest/definitions.
 import type { Manifest } from "./types.ts";
 
 export const manifest: Manifest = {
@@ -796,6 +796,388 @@ export const manifest: Manifest = {
     },
     {
       "command": [
+        "app-store",
+        "categories"
+      ],
+      "method": "GET",
+      "path": "/app-store/categories",
+      "summary": "List App Store categories",
+      "async": false,
+      "bodyKind": "none",
+      "supportsMultipart": false,
+      "bodyWrapper": "none",
+      "params": [],
+      "bodyProps": [],
+      "fileFields": [],
+      "responseKind": "array",
+      "responseFields": [
+        {
+          "name": "id",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Unique identifier of the category."
+        },
+        {
+          "name": "name",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Name of the category."
+        }
+      ]
+    },
+    {
+      "command": [
+        "oauth2-apps",
+        "listing",
+        "get"
+      ],
+      "method": "GET",
+      "path": "/oauth2-apps/{app_id}/listing",
+      "summary": "Retrieve the listing of an app",
+      "async": false,
+      "bodyKind": "none",
+      "supportsMultipart": false,
+      "bodyWrapper": "none",
+      "params": [
+        {
+          "name": "app_id",
+          "in": "path",
+          "type": "string",
+          "required": true,
+          "description": "Unique identifier of the app."
+        }
+      ],
+      "bodyProps": [],
+      "fileFields": [],
+      "responseKind": "object",
+      "responseFields": [
+        {
+          "name": "app_id",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Unique identifier of the app the listing belongs to."
+        },
+        {
+          "name": "name",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "description": "Name of the listing in the App Store."
+        },
+        {
+          "name": "status",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "published",
+            "unpublished"
+          ],
+          "description": "Whether the listing is live in the App Store. It stays `published` while a newer revision is reviewed."
+        },
+        {
+          "name": "latest_revision",
+          "in": "body",
+          "type": "object",
+          "required": true,
+          "nullable": true,
+          "description": "The version of the listing you are working on or that is under review. Null until the listing has content.",
+          "properties": [
+            {
+              "name": "status",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "enum": [
+                "draft",
+                "in_review",
+                "published",
+                "rejected"
+              ],
+              "description": "Where the revision stands. Only a draft can be edited and submitted."
+            },
+            {
+              "name": "review_notes",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "nullable": true,
+              "description": "The reviewer\u2019s notes when the revision was rejected."
+            }
+          ]
+        },
+        {
+          "name": "first_published_at",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "nullable": true,
+          "description": "When the listing was first approved. Null until then."
+        },
+        {
+          "name": "short_description",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "Tagline shown on the listing card."
+        },
+        {
+          "name": "product_description",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "What the app does."
+        },
+        {
+          "name": "feature_description",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "Features of the app."
+        },
+        {
+          "name": "setup_description",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "How to set the app up."
+        },
+        {
+          "name": "pricing_description",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "What the app costs."
+        },
+        {
+          "name": "main_description_title",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "Title of the main description on the store page."
+        },
+        {
+          "name": "main_description_body",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "Body of the main description on the store page."
+        },
+        {
+          "name": "how_it_works",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "How the app works."
+        },
+        {
+          "name": "landing_page_url",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "Landing page of the app."
+        },
+        {
+          "name": "help_url",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "Help center of the app."
+        },
+        {
+          "name": "faq_url",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "FAQ of the app."
+        },
+        {
+          "name": "demo_video_url",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "Demo video of the app."
+        },
+        {
+          "name": "support_email",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "Where customers reach your support."
+        },
+        {
+          "name": "escalation_email",
+          "in": "body",
+          "type": "string",
+          "required": false,
+          "nullable": true,
+          "description": "Where Deel escalates urgent issues."
+        },
+        {
+          "name": "highlights",
+          "in": "body",
+          "type": "array",
+          "required": false,
+          "description": "Highlights shown on the store page.",
+          "properties": [
+            {
+              "name": "title",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "nullable": true,
+              "description": "Title of the highlight."
+            },
+            {
+              "name": "text",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "description": "Text of the highlight."
+            }
+          ]
+        },
+        {
+          "name": "support_resources",
+          "in": "body",
+          "type": "array",
+          "required": false,
+          "description": "Support links shown on the store page.",
+          "properties": [
+            {
+              "name": "name",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "description": "Name of the link."
+            },
+            {
+              "name": "url",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "nullable": true,
+              "description": "Address of the link."
+            }
+          ]
+        },
+        {
+          "name": "works_with",
+          "in": "body",
+          "type": "array",
+          "required": false,
+          "description": "Deel products the app works with.",
+          "properties": [
+            {
+              "name": "name",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "description": "Name of the link."
+            },
+            {
+              "name": "url",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "nullable": true,
+              "description": "Address of the link."
+            }
+          ]
+        },
+        {
+          "name": "what_it_syncs",
+          "in": "body",
+          "type": "array",
+          "required": false,
+          "description": "What the app syncs."
+        },
+        {
+          "name": "categories",
+          "in": "body",
+          "type": "array",
+          "required": true,
+          "description": "App Store categories of the revision.",
+          "properties": [
+            {
+              "name": "id",
+              "in": "body",
+              "type": "integer",
+              "required": false,
+              "description": "Unique identifier of the category."
+            },
+            {
+              "name": "name",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "description": "Name of the category."
+            }
+          ]
+        },
+        {
+          "name": "logo_url",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "nullable": true,
+          "description": "Public URL of the logo of the revision in `latest_revision`, as saved. Null only when no logo has been set."
+        },
+        {
+          "name": "media_gallery",
+          "in": "body",
+          "type": "array",
+          "required": true,
+          "description": "Images and videos of the revision in `latest_revision`, as saved. Empty when none has been set.",
+          "properties": [
+            {
+              "name": "url",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "description": "Public URL of the item."
+            },
+            {
+              "name": "type",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "enum": [
+                "image",
+                "video"
+              ],
+              "description": "Whether the item is an image or a video."
+            },
+            {
+              "name": "caption",
+              "in": "body",
+              "type": "string",
+              "required": false,
+              "nullable": true,
+              "description": "Caption of the item."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "command": [
         "oauth2-apps",
         "get"
       ],
@@ -1465,57 +1847,24 @@ export const manifest: Manifest = {
     },
     {
       "command": [
-        "app-store",
-        "categories"
-      ],
-      "method": "GET",
-      "path": "/app-store/categories",
-      "summary": "List App Store categories",
-      "async": false,
-      "bodyKind": "none",
-      "supportsMultipart": false,
-      "bodyWrapper": "none",
-      "params": [],
-      "bodyProps": [],
-      "fileFields": [],
-      "responseKind": "array",
-      "responseFields": [
-        {
-          "name": "id",
-          "in": "body",
-          "type": "integer",
-          "required": true,
-          "description": "Unique identifier of the category."
-        },
-        {
-          "name": "name",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "description": "Name of the category."
-        }
-      ]
-    },
-    {
-      "command": [
-        "oauth2-apps",
-        "listing",
+        "logs",
+        "requests",
         "get"
       ],
       "method": "GET",
-      "path": "/oauth2-apps/{app_id}/listing",
-      "summary": "Retrieve the listing of an app",
+      "path": "/logs/requests/{request_id}",
+      "summary": "Retrieve a request log",
       "async": false,
       "bodyKind": "none",
       "supportsMultipart": false,
       "bodyWrapper": "none",
       "params": [
         {
-          "name": "app_id",
+          "name": "request_id",
           "in": "path",
           "type": "string",
           "required": true,
-          "description": "Unique identifier of the app."
+          "description": "The x-request-id of the request"
         }
       ],
       "bodyProps": [],
@@ -1523,325 +1872,699 @@ export const manifest: Manifest = {
       "responseKind": "object",
       "responseFields": [
         {
-          "name": "app_id",
+          "name": "ip",
           "in": "body",
           "type": "string",
           "required": true,
-          "description": "Unique identifier of the app the listing belongs to."
+          "description": "Client IP address the request came from"
         },
         {
-          "name": "name",
-          "in": "body",
-          "type": "string",
-          "required": false,
-          "description": "Name of the listing in the App Store."
-        },
-        {
-          "name": "status",
+          "name": "hint",
           "in": "body",
           "type": "string",
           "required": true,
-          "enum": [
-            "published",
-            "unpublished"
-          ],
-          "description": "Whether the listing is live in the App Store. It stays `published` while a newer revision is reviewed."
+          "description": "What to do about it"
         },
         {
-          "name": "latest_revision",
+          "name": "path",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Request path without the query string"
+        },
+        {
+          "name": "error",
           "in": "body",
           "type": "object",
           "required": true,
-          "nullable": true,
-          "description": "The version of the listing you are working on or that is under review. Null until the listing has content.",
+          "description": "Gateway-generated error of a failed request; null when the request succeeded or the error came from the service",
           "properties": [
             {
-              "name": "status",
+              "name": "code",
               "in": "body",
               "type": "string",
-              "required": false,
-              "enum": [
-                "draft",
-                "in_review",
-                "published",
-                "rejected"
-              ],
-              "description": "Where the revision stands. Only a draft can be edited and submitted."
+              "required": true,
+              "description": "Machine-readable gateway error code"
             },
             {
-              "name": "review_notes",
+              "name": "message",
               "in": "body",
               "type": "string",
-              "required": false,
-              "nullable": true,
-              "description": "The reviewer’s notes when the revision was rejected."
+              "required": true,
+              "description": "Human-readable gateway error message"
             }
           ]
         },
         {
-          "name": "first_published_at",
+          "name": "route",
           "in": "body",
           "type": "string",
           "required": true,
-          "nullable": true,
-          "description": "When the listing was first approved. Null until then."
+          "description": "Public route template the request matched; null when no endpoint matched (404)"
         },
         {
-          "name": "short_description",
+          "name": "token",
           "in": "body",
-          "type": "string",
-          "required": false,
-          "nullable": true,
-          "description": "Tagline shown on the listing card."
-        },
-        {
-          "name": "product_description",
-          "in": "body",
-          "type": "string",
-          "required": false,
-          "nullable": true,
-          "description": "What the app does."
-        },
-        {
-          "name": "feature_description",
-          "in": "body",
-          "type": "string",
-          "required": false,
-          "nullable": true,
-          "description": "Features of the app."
-        },
-        {
-          "name": "setup_description",
-          "in": "body",
-          "type": "string",
-          "required": false,
-          "nullable": true,
-          "description": "How to set the app up."
-        },
-        {
-          "name": "pricing_description",
-          "in": "body",
-          "type": "string",
-          "required": false,
-          "nullable": true,
-          "description": "What the app costs."
-        },
-        {
-          "name": "main_description_title",
-          "in": "body",
-          "type": "string",
-          "required": false,
-          "nullable": true,
-          "description": "Title of the main description on the store page."
-        },
-        {
-          "name": "main_description_body",
-          "in": "body",
-          "type": "string",
-          "required": false,
-          "nullable": true,
-          "description": "Body of the main description on the store page."
-        },
-        {
-          "name": "how_it_works",
-          "in": "body",
-          "type": "string",
-          "required": false,
-          "nullable": true,
-          "description": "How the app works."
-        },
-        {
-          "name": "landing_page_url",
-          "in": "body",
-          "type": "string",
-          "required": false,
-          "nullable": true,
-          "description": "Landing page of the app."
-        },
-        {
-          "name": "help_url",
-          "in": "body",
-          "type": "string",
-          "required": false,
-          "nullable": true,
-          "description": "Help center of the app."
-        },
-        {
-          "name": "faq_url",
-          "in": "body",
-          "type": "string",
-          "required": false,
-          "nullable": true,
-          "description": "FAQ of the app."
-        },
-        {
-          "name": "demo_video_url",
-          "in": "body",
-          "type": "string",
-          "required": false,
-          "nullable": true,
-          "description": "Demo video of the app."
-        },
-        {
-          "name": "support_email",
-          "in": "body",
-          "type": "string",
-          "required": false,
-          "nullable": true,
-          "description": "Where customers reach your support."
-        },
-        {
-          "name": "escalation_email",
-          "in": "body",
-          "type": "string",
-          "required": false,
-          "nullable": true,
-          "description": "Where Deel escalates urgent issues."
-        },
-        {
-          "name": "highlights",
-          "in": "body",
-          "type": "array",
-          "required": false,
-          "description": "Highlights shown on the store page.",
-          "properties": [
-            {
-              "name": "title",
-              "in": "body",
-              "type": "string",
-              "required": false,
-              "nullable": true,
-              "description": "Title of the highlight."
-            },
-            {
-              "name": "text",
-              "in": "body",
-              "type": "string",
-              "required": false,
-              "description": "Text of the highlight."
-            }
-          ]
-        },
-        {
-          "name": "support_resources",
-          "in": "body",
-          "type": "array",
-          "required": false,
-          "description": "Support links shown on the store page.",
-          "properties": [
-            {
-              "name": "name",
-              "in": "body",
-              "type": "string",
-              "required": false,
-              "description": "Name of the link."
-            },
-            {
-              "name": "url",
-              "in": "body",
-              "type": "string",
-              "required": false,
-              "nullable": true,
-              "description": "Address of the link."
-            }
-          ]
-        },
-        {
-          "name": "works_with",
-          "in": "body",
-          "type": "array",
-          "required": false,
-          "description": "Deel products the app works with.",
-          "properties": [
-            {
-              "name": "name",
-              "in": "body",
-              "type": "string",
-              "required": false,
-              "description": "Name of the link."
-            },
-            {
-              "name": "url",
-              "in": "body",
-              "type": "string",
-              "required": false,
-              "nullable": true,
-              "description": "Address of the link."
-            }
-          ]
-        },
-        {
-          "name": "what_it_syncs",
-          "in": "body",
-          "type": "array",
-          "required": false,
-          "description": "What the app syncs."
-        },
-        {
-          "name": "categories",
-          "in": "body",
-          "type": "array",
+          "type": "object",
           "required": true,
-          "description": "App Store categories of the revision.",
+          "description": "The token that made the request, as the gateway saw it at request time",
           "properties": [
             {
               "name": "id",
               "in": "body",
-              "type": "integer",
-              "required": false,
-              "description": "Unique identifier of the category."
-            },
-            {
-              "name": "name",
-              "in": "body",
               "type": "string",
-              "required": false,
-              "description": "Name of the category."
-            }
-          ]
-        },
-        {
-          "name": "logo_url",
-          "in": "body",
-          "type": "string",
-          "required": true,
-          "nullable": true,
-          "description": "Public URL of the logo of the revision in `latest_revision`, as saved. Null only when no logo has been set."
-        },
-        {
-          "name": "media_gallery",
-          "in": "body",
-          "type": "array",
-          "required": true,
-          "description": "Images and videos of the revision in `latest_revision`, as saved. Empty when none has been set.",
-          "properties": [
-            {
-              "name": "url",
-              "in": "body",
-              "type": "string",
-              "required": false,
-              "description": "Public URL of the item."
+              "required": true,
+              "description": "Token id shown in the Developer Center"
             },
             {
               "name": "type",
               "in": "body",
               "type": "string",
-              "required": false,
+              "required": true,
               "enum": [
-                "image",
-                "video"
+                "pat",
+                "oauth2"
               ],
-              "description": "Whether the item is an image or a video."
+              "description": "Personal access token or OAuth2 access token"
             },
             {
-              "name": "caption",
+              "name": "label",
               "in": "body",
               "type": "string",
-              "required": false,
-              "nullable": true,
-              "description": "Caption of the item."
+              "required": true,
+              "description": "Token label or OAuth2 client name when the request was made"
+            },
+            {
+              "name": "oauth2_client_id",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "OAuth2 client the token belongs to; null for personal access tokens"
             }
           ]
+        },
+        {
+          "name": "method",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "HTTP method"
+        },
+        {
+          "name": "source",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "rest",
+            "scim",
+            "mcp"
+          ],
+          "description": "Where the request came in: REST API, SCIM or an MCP tool call"
+        },
+        {
+          "name": "status",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "HTTP status returned to the caller"
+        },
+        {
+          "name": "timestamp",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "When the response was sent (UTC)"
+        },
+        {
+          "name": "request_id",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "The x-request-id of the request; quote it when contacting support"
+        },
+        {
+          "name": "user_agent",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "User-Agent header, truncated to 512 characters"
+        },
+        {
+          "name": "api_version",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "API version the request resolved to"
+        },
+        {
+          "name": "duration_ms",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Total time from request start to response end, in milliseconds"
+        },
+        {
+          "name": "response_bytes",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Size of the response body in bytes"
+        },
+        {
+          "name": "gateway_message",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "What the status and gateway error code mean, in plain language"
+        },
+        {
+          "name": "upstream_duration_ms",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Time spent in the service behind the gateway, in milliseconds; null when the gateway answered itself"
+        }
+      ]
+    },
+    {
+      "command": [
+        "logs",
+        "requests",
+        "list"
+      ],
+      "method": "GET",
+      "path": "/logs/requests",
+      "summary": "List request logs",
+      "async": false,
+      "bodyKind": "none",
+      "supportsMultipart": false,
+      "bodyWrapper": "none",
+      "params": [
+        {
+          "name": "search",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Only requests whose request id, token label, token id, route or path contains this text (case-insensitive)"
+        },
+        {
+          "name": "request_id",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Only the request with this x-request-id"
+        },
+        {
+          "name": "token_id",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Only requests made with this token"
+        },
+        {
+          "name": "route",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Only requests that matched this route template"
+        },
+        {
+          "name": "path",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Only requests with exactly this path"
+        },
+        {
+          "name": "method",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Only requests with this HTTP method"
+        },
+        {
+          "name": "status",
+          "in": "query",
+          "type": "integer",
+          "required": false,
+          "description": "Only requests that returned exactly this status"
+        },
+        {
+          "name": "status_class",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "2xx",
+            "4xx",
+            "5xx"
+          ],
+          "description": "Only requests whose status is in this class"
+        },
+        {
+          "name": "source",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "enum": [
+            "rest",
+            "scim",
+            "mcp"
+          ],
+          "description": "Only requests that came in through this surface"
+        },
+        {
+          "name": "from",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Start of the window (ISO-8601). Defaults to 24 hours before `to`; a window wider than 15 days is clamped"
+        },
+        {
+          "name": "to",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "End of the window (ISO-8601). Defaults to now"
+        },
+        {
+          "name": "cursor",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Cursor for keyset pagination, taken from a previous response `page.cursor`"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "type": "integer",
+          "required": false,
+          "description": "Page size"
+        }
+      ],
+      "bodyProps": [],
+      "fileFields": [],
+      "responseKind": "array",
+      "responseFields": [
+        {
+          "name": "ip",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Client IP address the request came from"
+        },
+        {
+          "name": "path",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Request path without the query string"
+        },
+        {
+          "name": "error",
+          "in": "body",
+          "type": "object",
+          "required": true,
+          "description": "Gateway-generated error of a failed request; null when the request succeeded or the error came from the service",
+          "properties": [
+            {
+              "name": "code",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Machine-readable gateway error code"
+            },
+            {
+              "name": "message",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Human-readable gateway error message"
+            }
+          ]
+        },
+        {
+          "name": "route",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Public route template the request matched; null when no endpoint matched (404)"
+        },
+        {
+          "name": "token",
+          "in": "body",
+          "type": "object",
+          "required": true,
+          "description": "The token that made the request, as the gateway saw it at request time",
+          "properties": [
+            {
+              "name": "id",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Token id shown in the Developer Center"
+            },
+            {
+              "name": "type",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "enum": [
+                "pat",
+                "oauth2"
+              ],
+              "description": "Personal access token or OAuth2 access token"
+            },
+            {
+              "name": "label",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Token label or OAuth2 client name when the request was made"
+            },
+            {
+              "name": "oauth2_client_id",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "OAuth2 client the token belongs to; null for personal access tokens"
+            }
+          ]
+        },
+        {
+          "name": "method",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "HTTP method"
+        },
+        {
+          "name": "source",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "enum": [
+            "rest",
+            "scim",
+            "mcp"
+          ],
+          "description": "Where the request came in: REST API, SCIM or an MCP tool call"
+        },
+        {
+          "name": "status",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "HTTP status returned to the caller"
+        },
+        {
+          "name": "timestamp",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "When the response was sent (UTC)"
+        },
+        {
+          "name": "request_id",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "The x-request-id of the request; quote it when contacting support"
+        },
+        {
+          "name": "user_agent",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "User-Agent header, truncated to 512 characters"
+        },
+        {
+          "name": "api_version",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "API version the request resolved to"
+        },
+        {
+          "name": "duration_ms",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Total time from request start to response end, in milliseconds"
+        },
+        {
+          "name": "response_bytes",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Size of the response body in bytes"
+        },
+        {
+          "name": "upstream_duration_ms",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Time spent in the service behind the gateway, in milliseconds; null when the gateway answered itself"
+        }
+      ]
+    },
+    {
+      "command": [
+        "logs",
+        "requests",
+        "summary"
+      ],
+      "method": "GET",
+      "path": "/logs/requests/summary",
+      "summary": "Retrieve request logs summary",
+      "async": false,
+      "bodyKind": "none",
+      "supportsMultipart": false,
+      "bodyWrapper": "none",
+      "params": [
+        {
+          "name": "from",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Start of the window (ISO-8601). Defaults to 24 hours before `to`; a window wider than 15 days is clamped"
+        },
+        {
+          "name": "to",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "End of the window (ISO-8601). Defaults to now"
+        }
+      ],
+      "bodyProps": [],
+      "fileFields": [],
+      "responseKind": "object",
+      "responseFields": [
+        {
+          "name": "to",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "End of the window the summary covers (UTC)"
+        },
+        {
+          "name": "from",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Start of the window the summary covers (UTC)"
+        },
+        {
+          "name": "total",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Requests in the window"
+        },
+        {
+          "name": "p50_ms",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Median total latency in milliseconds (bucket upper bound)"
+        },
+        {
+          "name": "p95_ms",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "95th percentile total latency in milliseconds (bucket upper bound)"
+        },
+        {
+          "name": "rate_limited",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Requests rejected with 429 by the rate limiter"
+        },
+        {
+          "name": "active_tokens",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Distinct tokens that made at least one request on the days of the window"
+        },
+        {
+          "name": "by_status_class",
+          "in": "body",
+          "type": "object",
+          "required": true,
+          "description": "Requests per status class, keyed by 2xx, 3xx, 4xx, 5xx"
+        }
+      ]
+    },
+    {
+      "command": [
+        "logs",
+        "tokens",
+        "list"
+      ],
+      "method": "GET",
+      "path": "/logs/tokens",
+      "summary": "List token activity",
+      "async": false,
+      "bodyKind": "none",
+      "supportsMultipart": false,
+      "bodyWrapper": "none",
+      "params": [
+        {
+          "name": "from",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Start of the window (ISO-8601). Defaults to 24 hours before `to`; a window wider than 15 days is clamped"
+        },
+        {
+          "name": "to",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "End of the window (ISO-8601). Defaults to now"
+        },
+        {
+          "name": "search",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Only tokens whose label or id contains this text (case-insensitive)"
+        },
+        {
+          "name": "cursor",
+          "in": "query",
+          "type": "string",
+          "required": false,
+          "description": "Cursor for keyset pagination, taken from a previous response `page.cursor`"
+        },
+        {
+          "name": "limit",
+          "in": "query",
+          "type": "integer",
+          "required": false,
+          "description": "Page size"
+        }
+      ],
+      "bodyProps": [],
+      "fileFields": [],
+      "responseKind": "array",
+      "responseFields": [
+        {
+          "name": "calls",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Requests made with the token in the window"
+        },
+        {
+          "name": "daily",
+          "in": "body",
+          "type": "array",
+          "required": true,
+          "description": "Per-day series over the window, oldest first",
+          "properties": [
+            {
+              "name": "day",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "UTC day"
+            },
+            {
+              "name": "calls",
+              "in": "body",
+              "type": "integer",
+              "required": true,
+              "description": "Requests that day"
+            },
+            {
+              "name": "errors",
+              "in": "body",
+              "type": "integer",
+              "required": true,
+              "description": "Requests that day ending in a 4xx or 5xx status"
+            }
+          ]
+        },
+        {
+          "name": "token",
+          "in": "body",
+          "type": "object",
+          "required": true,
+          "description": "The token",
+          "properties": [
+            {
+              "name": "id",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Token id shown in the Developer Center"
+            },
+            {
+              "name": "type",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "enum": [
+                "pat",
+                "oauth2"
+              ],
+              "description": "Personal access token or OAuth2 access token"
+            },
+            {
+              "name": "label",
+              "in": "body",
+              "type": "string",
+              "required": true,
+              "description": "Token label or OAuth2 client name at its latest use"
+            }
+          ]
+        },
+        {
+          "name": "errors",
+          "in": "body",
+          "type": "integer",
+          "required": true,
+          "description": "Requests that ended in a 4xx or 5xx status"
+        },
+        {
+          "name": "last_ip",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Client IP of that latest request"
+        },
+        {
+          "name": "last_used_at",
+          "in": "body",
+          "type": "string",
+          "required": true,
+          "description": "Latest request made with the token (UTC)"
         }
       ]
     },

@@ -41,7 +41,8 @@ function argsForDescriptor(descriptor: Descriptor): ArgsDef {
   return args;
 }
 
-const YES_ARG = { type: "boolean", description: "Skip the confirmation prompt (required when not running in a terminal)" } as ArgsDef[string];
+const YES_DESCRIPTION = "Skip the confirmation prompt (required without a terminal, or when stdin carries the token or the input)";
+const YES_ARG = { type: "boolean", description: YES_DESCRIPTION } as ArgsDef[string];
 
 // Commands whose map entry sets `confirm` ask before anything is sent. A terminal gets a [y/N] prompt on stderr
 // (only y/yes goes on); --yes skips it; without a terminal (no TTY, CI or an agent) --yes is required, so a
@@ -58,13 +59,18 @@ export async function confirmDescriptor(
   if (!descriptor.confirm || yes) return;
   const name = descriptor.command.join(" ");
   if (stdinInUse) {
-    throw new CliError("usage.confirm", `Refusing to run \`${name}\` without confirmation`, "Pass --yes: stdin carries the token or the input, so there is no prompt to answer.");
+    throw new CliError("usage.confirm", `Refusing to run \`${name}\` without confirmation`, "Pass --yes: stdin carries the token or the input, or is not a terminal, so there is no prompt to answer.");
   }
   if (!io.interactive) {
     throw new CliError("usage.confirm", `Refusing to run \`${name}\` without confirmation`, "Pass --yes to run this non-interactively.");
   }
   const message = descriptor.confirm.replace(/\{([^}]+)\}/g, (match, key: string) => (flags[key] !== undefined ? String(flags[key]) : match));
   if (!(await ask(`${message} [y/N] `))) throw new CliError(`${descriptor.command[0]}.aborted`, `Aborted: \`${name}\` was not run`);
+}
+
+// stdin cannot answer the prompt when it carries the token or the body, or when it is not a terminal (a pipe would be read as the answer).
+export function isStdinInUse(args: Partial<Pick<Args, "input" | "token-stdin">>, stdinIsTTY: boolean): boolean {
+  return args.input === "-" || Boolean(args["token-stdin"]) || !stdinIsTTY;
 }
 
 // Shared execution body extracted so both actionCommand and variantCommand can delegate to it.
@@ -90,7 +96,7 @@ async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<st
     files: gatherFiles(cittyCtx.rawArgs),
     idempotencyKey: args["idempotency-key"] as string | undefined,
   };
-  const stdinInUse = args.input === "-" || Boolean(args["token-stdin"]);
+  const stdinInUse = isStdinInUse(args, process.stdin.isTTY === true);
   await confirmDescriptor(descriptor, flags, args.yes === true, realIO(), promptConfirm, stdinInUse);
   const config = configFrom(args, cittyCtx.rawArgs);
   const token = requireToken(resolveToken({ tokenStdin: Boolean(args["token-stdin"]), env: config.env }));
