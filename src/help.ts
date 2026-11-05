@@ -25,8 +25,10 @@ export function printVersion(): void {
 // since the body arrives via --input and responses aren't citty args).
 export function printContract(descriptor: Descriptor): void {
   const out = process.stdout.write.bind(process.stdout);
-  const line = (name: string, type: string, required: boolean, options?: string[], description?: string, nullable?: boolean) =>
-    `  ${name.padEnd(22)} ${type.padEnd(8)} ${[required ? "required" : "", nullable ? "nullable" : ""].filter(Boolean).join(" ").padEnd(9)}${options ? `[${options.join(" | ")}]  ` : ""}${description ? `— ${description}` : ""}\n`;
+  const line = (name: string, type: string, required: boolean, options?: string[], description?: string, nullable?: boolean) => {
+    const flags = [required ? "required" : "", nullable ? "nullable" : ""].filter(Boolean).join(" ");
+    return `  ${name.padEnd(22)} ${type.padEnd(8)} ${flags.padEnd(Math.max(9, flags.length + 1))}${options ? `[${options.join(" | ")}]  ` : ""}${description ? `— ${description}` : ""}\n`;
+  };
 
   if (descriptor.bodyKind === "multipart") {
     out(`\nREQUEST — multipart upload (POST)\n`);

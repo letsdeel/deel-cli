@@ -5,6 +5,7 @@ import { createContext } from "../src/core/context.ts";
 import { captureIO } from "../src/core/io.ts";
 import { manifest } from "../src/manifest.generated.ts";
 import { run } from "../src/cli.ts";
+import { printContract } from "../src/help.ts";
 import type { HttpRequest, HttpResponse } from "../src/core/http.ts";
 
 const APP_ID = "00000000-0000-0000-0000-000000000000";
@@ -212,4 +213,32 @@ test("only oauth2-apps disable asks for confirmation", () => {
 test("oauth2-apps disable --help documents --yes; enable --help does not", async () => {
   assert.match((await capture(["oauth2-apps", "disable", "--help"])).out, /--yes/);
   assert.doesNotMatch((await capture(["oauth2-apps", "enable", "--help"])).out, /--yes/);
+});
+
+test("oauth2-apps list prints the next-page cursor on stderr in the --jq and --quiet modes", async () => {
+  for (const output of [{ ...OUTPUT, jq: ".[].id" }, { ...OUTPUT, quiet: true }]) {
+    const { ctx, io } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: [{ id: APP_ID }], cursor: "next-1" } }));
+    await execute(descriptor(["oauth2-apps", "list"]), { flags: {}, files: {} }, ctx, { output, debug: false, form: false });
+    assert.deepEqual(io.stderr, ["next page: --cursor next-1\n"]);
+  }
+});
+
+test("oauth2-apps list prints no next-page line on the last page", async () => {
+  const { ctx, io } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: [], cursor: null } }));
+  await execute(descriptor(["oauth2-apps", "list"]), { flags: {}, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
+  assert.deepEqual(io.stderr, []);
+});
+
+test("--help keeps a space between a required nullable body field and its description", async () => {
+  const base = descriptor(["oauth2-apps", "get"]);
+  const withBody = { ...base, bodyKind: "json" as const, bodyProps: [{ name: "name", in: "body" as const, type: "string" as const, required: true, nullable: true, description: "Name" }] };
+  const out: string[] = [];
+  const original = process.stdout.write;
+  process.stdout.write = ((chunk: any) => (out.push(String(chunk)), true)) as typeof process.stdout.write;
+  try {
+    printContract(withBody);
+  } finally {
+    process.stdout.write = original;
+  }
+  assert.match(out.join(""), /required nullable\s+— Name/);
 });
