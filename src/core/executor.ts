@@ -162,10 +162,19 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
 
   if (opts.debug) ctx.io.err(`[debug] ${descriptor.method} ${url} -> ${response.status}  x-request-id=${requestId}\n`);
 
-  if (response.status >= 400) throw errorFromResponse(response.status, response.json, requestId);
+  if (response.status >= 400) throw errorFromResponse(response.status, response.json, requestId, ctx.config.beta === true);
 
-  const data = (response.json as any)?.data ?? response.json ?? null;
-  await render(ctx.io, envelope(data, { request_id: requestId }), opts.output);
+  const payload = response.json as any;
+  const hasDataEnvelope = isPlainObject(payload) && "data" in payload;
+  const data = hasDataEnvelope ? (payload.data ?? null) : (payload ?? null);
+  // Paginated list responses carry `page: { cursor, has_next_page }` next to `data`. Surface it in
+  // the envelope (only when `data` was unwrapped from one) so the caller can page with --cursor.
+  const page = hasDataEnvelope && isPlainObject(payload.page) ? (payload.page as Record<string, unknown>) : undefined;
+  await render(ctx.io, envelope(data, { request_id: requestId }, page), opts.output);
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === "object" && !Array.isArray(value);
 }
 
 async function multipartFingerprint(descriptor: Descriptor, call: ParsedCall): Promise<unknown> {
@@ -186,12 +195,19 @@ async function multipartFingerprint(descriptor: Descriptor, call: ParsedCall): P
   return fingerprint;
 }
 
+// `code`, or the older `error_code` some endpoints document, when `code` is absent.
+function errorCodeOf(item: any): string | undefined {
+  const code = item?.code ?? item?.error_code;
+  return typeof code === "string" && code ? code : undefined;
+}
+
 // Map an error response to a CliError. Deel returns errors in one of two shapes:
 // a single `{ error: { code, message, next } }` object, or the compliant
 // `{ errors: [{ code, message, field }] }` array (per the API style guide). We
 // surface the field-level messages from the array so validation failures are
 // actionable instead of a generic "Request failed with status 400".
-function errorFromResponse(status: number, json: unknown, requestId: string): CliError {
+// `betaSent`: the request already carried X-Beta, so a BETA_ACCESS_REQUIRED answer must not tell the user to add --beta.
+export function errorFromResponse(status: number, json: unknown, requestId: string, betaSent = false): CliError {
   const body = json as any;
   const list: any[] | undefined = Array.isArray(body?.errors) ? body.errors : undefined;
 
@@ -199,7 +215,7 @@ function errorFromResponse(status: number, json: unknown, requestId: string): Cl
   let message: string;
   let next: string | undefined;
   if (list && list.length > 0) {
-    code = list[0]?.code ?? `http.${status}`;
+    code = errorCodeOf(list[0]) ?? `http.${status}`;
     message =
       list
         .map((item) => (item?.field ? `${item.field}: ${item.message ?? item.code ?? "invalid"}` : item?.message ?? item?.code))
@@ -208,10 +224,12 @@ function errorFromResponse(status: number, json: unknown, requestId: string): Cl
     next = list[0]?.next;
   } else {
     const payload = body?.error ?? body ?? {};
-    code = payload.code ?? `http.${status}`;
+    code = errorCodeOf(payload) ?? `http.${status}`;
     message = payload.message ?? `Request failed with status ${status}`;
     next = payload.next;
   }
+
+  if (code === "BETA_ACCESS_REQUIRED" && !betaSent) next = next ?? "This endpoint is in beta. Re-run with --beta.";
 
   const error = new CliError(code, message, next);
   error.requestId = requestId;

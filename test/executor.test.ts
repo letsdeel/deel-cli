@@ -3,18 +3,20 @@ import assert from "node:assert/strict";
 import { writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { execute } from "../src/core/executor.ts";
+import { errorFromResponse, execute } from "../src/core/executor.ts";
 import { createContext } from "../src/core/context.ts";
 import { captureIO } from "../src/core/io.ts";
 import type { Descriptor } from "../src/types.ts";
 import type { HttpRequest, HttpResponse } from "../src/core/http.ts";
+import type { Config } from "../src/core/config.ts";
+import { HEADER } from "../src/core/constants.ts";
 
-const CONFIG = { env: "demo", baseUrl: "https://example.test/rest" };
+const CONFIG: Config = { env: "demo", baseUrl: "https://example.test/rest" };
 
-function ctxWith(handler: (req: HttpRequest) => HttpResponse, io = captureIO({})) {
+function ctxWith(handler: (req: HttpRequest) => HttpResponse, io = captureIO({}), config: Config = CONFIG) {
   const seen: HttpRequest[] = [];
   const ctx = createContext({
-    config: CONFIG,
+    config,
     token: "tok_SECRET",
     io,
     clock: () => 1000,
@@ -284,4 +286,151 @@ test("execute() attaches multiple files to a single multipart field", async () =
   const parts = (body as FormData).getAll("files");
   assert.equal(parts.length, 2);
   assert.deepEqual(parts.map((p) => (p as File).name).sort(), ["a.pdf", "b.pdf"]);
+});
+
+// ---------------- pagination: page next to data, --cursor forwarded ----------------
+
+const JSON_OUT = { output: { json: true, quiet: false, raw: false }, debug: false, form: false };
+
+const logsListDescriptor: Descriptor = {
+  command: ["logs", "requests", "list"],
+  method: "GET",
+  path: "/logs/requests",
+  async: false,
+  bodyKind: "none",
+  supportsMultipart: false,
+  bodyWrapper: "none",
+  params: [
+    { name: "status_class", in: "query", type: "string", required: false, enum: ["2xx", "4xx", "5xx"] },
+    { name: "cursor", in: "query", type: "string", required: false },
+    { name: "limit", in: "query", type: "integer", required: false },
+  ],
+  bodyProps: [],
+  fileFields: [],
+  responseKind: "array",
+  responseFields: [],
+};
+
+const logsGetDescriptor: Descriptor = {
+  command: ["logs", "requests", "get"],
+  method: "GET",
+  path: "/logs/requests/{request_id}",
+  async: false,
+  bodyKind: "none",
+  supportsMultipart: false,
+  bodyWrapper: "none",
+  params: [{ name: "request_id", in: "path", type: "string", required: true }],
+  bodyProps: [],
+  fileFields: [],
+  responseKind: "object",
+  responseFields: [],
+};
+
+test("execute() surfaces the response page (cursor, has_next_page) next to data", async () => {
+  const { ctx, io, seen } = ctxWith(() => ({
+    status: 200,
+    headers: {},
+    text: "",
+    json: { data: [{ request_id: "req_1", status: 404 }], page: { cursor: "eyJ0cyI6IjIwMjYifQ", has_next_page: true } },
+  }));
+
+  await execute(logsListDescriptor, { flags: { status_class: "4xx" }, files: {} }, ctx, JSON_OUT);
+
+  const req = seen[0];
+  assert.equal(req.method, "GET");
+  assert.match(req.url, /\/rest\/logs\/requests\?status_class=4xx$/);
+  assert.ok(!("idempotency-key" in req.headers)); // reads carry no idempotency key
+  const parsed = JSON.parse(io.stdout.join(""));
+  assert.deepEqual(Object.keys(parsed), ["data", "page", "meta"]);
+  assert.equal(parsed.data[0].request_id, "req_1");
+  assert.deepEqual(parsed.page, { cursor: "eyJ0cyI6IjIwMjYifQ", has_next_page: true });
+  assert.equal(parsed.meta.request_id, "req-fixed-id");
+});
+
+test("execute() forwards --cursor and --limit as query params and renders the last page", async () => {
+  const { ctx, io, seen } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: [], page: { cursor: null, has_next_page: false } } }));
+
+  await execute(logsListDescriptor, { flags: { cursor: "eyJ0cyI6IjIwMjYifQ", limit: "100" }, files: {} }, ctx, JSON_OUT);
+
+  const url = new URL(seen[0].url);
+  assert.equal(url.pathname, "/rest/logs/requests");
+  assert.equal(url.searchParams.get("cursor"), "eyJ0cyI6IjIwMjYifQ");
+  assert.equal(url.searchParams.get("limit"), "100");
+  const parsed = JSON.parse(io.stdout.join(""));
+  assert.deepEqual(parsed.data, []);
+  assert.deepEqual(parsed.page, { cursor: null, has_next_page: false });
+});
+
+test("execute() keeps the envelope free of page when the response has none", async () => {
+  const { ctx, io, seen } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { request_id: "req_1", gateway_message: "OK", hint: "" } } }));
+
+  await execute(logsGetDescriptor, { flags: { request_id: "req 1/x" }, files: {} }, ctx, JSON_OUT);
+
+  assert.match(seen[0].url, /\/rest\/logs\/requests\/req%201%2Fx$/); // path param is URL-encoded
+  const parsed = JSON.parse(io.stdout.join(""));
+  assert.ok(!("page" in parsed));
+  assert.deepEqual(Object.keys(parsed), ["data", "meta"]);
+  assert.equal(parsed.data.gateway_message, "OK");
+});
+
+test("execute() keeps page when data is null", async () => {
+  const { ctx, io } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: null, page: { cursor: "c2", has_next_page: true } } }));
+
+  await execute(logsListDescriptor, { flags: {}, files: {} }, ctx, JSON_OUT);
+
+  const parsed = JSON.parse(io.stdout.join(""));
+  assert.equal(parsed.data, null);
+  assert.deepEqual(parsed.page, { cursor: "c2", has_next_page: true });
+});
+
+test("execute() does not split page out of a response that has no data envelope", async () => {
+  const { ctx, io } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { items: [], page: { cursor: "x", has_next_page: false } } }));
+
+  await execute(logsListDescriptor, { flags: {}, files: {} }, ctx, JSON_OUT);
+
+  const parsed = JSON.parse(io.stdout.join(""));
+  assert.ok(!("page" in parsed));
+  assert.deepEqual(parsed.data, { items: [], page: { cursor: "x", has_next_page: false } });
+});
+
+test("execute() maps the public API error envelope of the logs endpoints unchanged", async () => {
+  const { ctx, io } = ctxWith(() => ({
+    status: 403,
+    headers: {},
+    text: "",
+    json: {
+      request: { method: "GET", url: "/rest/logs/requests", status: 403, api_req_id: "req-fixed-id" },
+      errors: [{ code: "INSUFFICIENT_SCOPES", message: "Missing required scope: api-logs:read" }],
+    },
+  }));
+
+  await assert.rejects(
+    () => execute(logsListDescriptor, { flags: {}, files: {} }, ctx, JSON_OUT),
+    (error: any) => {
+      assert.equal(error.code, "INSUFFICIENT_SCOPES");
+      assert.equal(error.message, "Missing required scope: api-logs:read");
+      assert.equal(error.requestId, "req-fixed-id");
+      return true;
+    },
+  );
+  assert.equal(io.stdout.length, 0); // nothing rendered on error
+});
+
+test("--beta sends X-Beta: true on the logs request, and its absence sends no header", async () => {
+  const page = { data: [], page: { cursor: null, has_next_page: false } };
+  const beta = ctxWith(() => ({ status: 200, headers: {}, text: "", json: page }), captureIO({}), { ...CONFIG, beta: true });
+  await execute(logsListDescriptor, { flags: {}, files: {} }, beta.ctx, JSON_OUT);
+  assert.equal(beta.seen[0].headers[HEADER.beta], "true");
+
+  const plain = ctxWith(() => ({ status: 200, headers: {}, text: "", json: page }));
+  await execute(logsListDescriptor, { flags: {}, files: {} }, plain.ctx, JSON_OUT);
+  assert.equal(plain.seen[0].headers[HEADER.beta], undefined);
+});
+
+test("errorFromResponse falls back to error_code when code is absent, and to http.<status> when neither is a string", () => {
+  assert.equal(errorFromResponse(404, { errors: [{ error_code: "NOT_FOUND", message: "Webhook not found" }] }, "r1").code, "NOT_FOUND");
+  assert.equal(errorFromResponse(404, { error_code: "NOT_FOUND", message: "Webhook not found" }, "r1").code, "NOT_FOUND");
+  assert.equal(errorFromResponse(404, { errors: [{ code: "WEBHOOK_NOT_FOUND", error_code: "OTHER", message: "m" }] }, "r1").code, "WEBHOOK_NOT_FOUND");
+  assert.equal(errorFromResponse(404, { errors: [{ message: "Webhook not found" }] }, "r1").code, "http.404");
+  assert.equal(errorFromResponse(500, { errors: [{ error_code: 42, message: "m" }] }, "r1").code, "http.500");
 });
