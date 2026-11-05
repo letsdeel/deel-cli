@@ -173,7 +173,10 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   // Some list responses carry the next-page cursor beside `data` instead; surface it in meta.
   const nextCursor = isPlainObject(payload) ? payload.cursor : undefined;
   const meta: Record<string, unknown> = { request_id: requestId };
-  if (typeof nextCursor === "string" && nextCursor !== "") meta.cursor = nextCursor;
+  if (typeof nextCursor === "string" && nextCursor !== "") {
+    meta.cursor = nextCursor;
+    ctx.io.err(`next page: --cursor ${nextCursor}\n`);
+  }
   await render(ctx.io, envelope(data, meta, page), opts.output);
 }
 
