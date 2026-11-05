@@ -1,12 +1,14 @@
 # Deel CLI
 
-A command-line client for selected endpoints from the [Deel Public API](https://developer.deel.com).
+A command-line client for the [Deel Public API](https://developer.deel.com): curated commands for common
+workflows, and every documented endpoint under `deel api`.
 
 ```bash
 deel auth status --json                              # verify your token and identity
 deel adjustments create --invoice --generate-input  # explore required fields
 deel jobs list --jq '.[] | {job_id, status}'        # filter recent async jobs
 deel logs requests list --status_class 4xx --beta   # your organization's failed API requests
+deel api contracts list --limit 5                   # any documented endpoint: deel api <resource> <action>
 ```
 
 ## Contents
@@ -17,6 +19,7 @@ deel logs requests list --status_class 4xx --beta   # your organization's failed
 - [Quickstart](#quickstart)
 - [Authentication](#authentication)
 - [Discovering commands](#discovering-commands)
+- [Every endpoint: `deel api`](#every-endpoint-deel-api)
 - [Request input (`--input`, `--file`, `--form`)](#request-input)
 - [Output (`--json`, `--fields`, `--jq`, `--quiet`)](#output)
 - [Idempotency](#idempotency)
@@ -165,6 +168,37 @@ deel adjustments create --invoice --generate-input      # JSON body skeleton to 
 ```
 
 `--help` for an action shows what generic `--help` cannot: the request-body fields (which arrive via `--input`, not as flags) and the response fields.
+
+## Every endpoint: `deel api`
+
+Every documented REST endpoint is a command under `deel api`. The top level keeps the curated
+commands (`auth`, `webhooks`, `adjustments`, `logs`, ...); `deel api` is the complete surface, one command
+per endpoint.
+
+A name is the path's words in kebab-case plus one action from the HTTP method. Path parameters become
+required flags, query parameters become flags, and the body goes through `--input`:
+
+| Endpoint | Command |
+|---|---|
+| `GET /contracts` | `deel api contracts list` |
+| `GET /contracts/{contract_id}` | `deel api contracts get --contract_id <id>` |
+| `POST /contracts/{contract_id}/amendments` | `deel api contracts amendments create --contract_id <id> --input ...` |
+| `PATCH /people/{worker_id}/personal` | `deel api people personal update --worker_id <id> --input ...` |
+| `PUT /contracts/{contract_id}/custom_fields` | `deel api contracts custom-fields replace --contract_id <id> --input ...` |
+| `DELETE /adjustments/{id}` | `deel api adjustments delete --id <id>` |
+
+```bash
+deel api --help                                   # every resource
+deel api contracts --help                         # the commands for one resource
+deel api contracts get --help                     # flags, request body and response fields
+deel api contracts get --help --json              # the same contract, machine-readable
+deel api contracts get --contract_id 3m9x2kp --fields id,title,status
+```
+
+A collection and its parent-scoped list share one command; the path flags you pass pick the endpoint
+(`deel api contracts custom-fields list` vs `... --contract_id <id>`). A query parameter named like a global
+flag (for example `fields`) is `--fields-param`. Each command sends the API version it was built from in
+`X-Version`. SCIM endpoints are not under `deel api` yet.
 
 ## Request input
 

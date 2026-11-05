@@ -15,8 +15,12 @@ function options(extra: Partial<GenerateOptions> = {}): GenerateOptions {
   return { reserved: { commands: [], topLevel: new Set(["auth", "job"]) }, overrides: {}, now: NOW, ...extra };
 }
 
+// Every generated command sits under `deel api`; names() checks that and returns the words after it.
 function names(descriptors: Descriptor[]): string[] {
-  return descriptors.map((descriptor) => descriptor.command.join(" "));
+  return descriptors.map((descriptor) => {
+    assert.equal(descriptor.command[0], "api", descriptor.command.join(" "));
+    return descriptor.command.slice(1).join(" ");
+  });
 }
 
 test("kebab-cases path segments", () => {
@@ -78,7 +82,7 @@ test("a beta-only endpoint uses its beta version and is marked beta", () => {
 test("a collection and its parent-scoped twin merge into one command", () => {
   const { manifest, errors } = generate(widgets(), options());
   assert.deepEqual(errors, []);
-  const notes = manifest.descriptors.filter((descriptor) => descriptor.command.join(" ") === "widgets notes list");
+  const notes = manifest.descriptors.filter((descriptor) => descriptor.command.join(" ") === "api widgets notes list");
   assert.deepEqual(notes.map((descriptor) => descriptor.path).sort(), ["/widgets/notes", "/widgets/{widget_id}/notes"]);
 });
 
@@ -86,34 +90,44 @@ test("any other same-name pair is an error", () => {
   const definitions = widgets();
   definitions.push({ ...definitions[0], path: "/widgets/{a}/{b}", method: "GET", operation: { responses: {} } });
   const { errors } = generate(definitions, options());
-  assert.ok(errors.some((error) => /Ambiguous command "deel widgets get"/.test(error)), errors.join("\n"));
+  assert.ok(errors.some((error) => /Ambiguous command "deel api widgets get"/.test(error)), errors.join("\n"));
 });
 
 test("a word can't be both a command and a group", () => {
   const definitions = widgets();
   definitions.push({ ...definitions[0], path: "/widgets/list/extra", method: "GET", operation: { responses: {} } });
   const { errors } = generate(definitions, options());
-  assert.ok(errors.some((error) => /"deel widgets list" is a command and also a group/.test(error)), errors.join("\n"));
+  assert.ok(errors.some((error) => /"deel api widgets list" is a command and also a group/.test(error)), errors.join("\n"));
 });
 
-test("hand-picked names are reserved", () => {
+test("a hand-picked command at the top level never clashes with the generated one under deel api", () => {
   const reserved = { commands: [{ command: ["widgets", "create"], method: "POST", path: "/widgets/special" }], topLevel: new Set(["auth", "job"]) };
-  const { errors } = generate(widgets(), options({ reserved }));
-  assert.ok(errors.some((error) => /"deel widgets create".*clashes with a hand-picked command/.test(error)), errors.join("\n"));
+  const { manifest, errors } = generate(widgets(), options({ reserved }));
+  assert.deepEqual(errors, []);
+  assert.ok(names(manifest.descriptors).includes("widgets create"));
+});
+
+test("deel api is reserved: no static or hand-picked command may use it", () => {
+  const handPicked = generate(widgets(), options({ reserved: { commands: [{ command: ["api", "widgets", "create"], method: "POST", path: "/widgets/special" }], topLevel: new Set() } }));
+  assert.ok(handPicked.errors.some((error) => /"deel api" is reserved for the generated commands/.test(error)), handPicked.errors.join("\n"));
+  assert.ok(handPicked.errors.some((error) => /"deel api widgets create".*clashes with a hand-picked command/.test(error)), handPicked.errors.join("\n"));
+  const static_ = generate(widgets(), options({ reserved: { commands: [], topLevel: new Set(["api"]) } }));
+  assert.ok(static_.errors.some((error) => /"deel api" is reserved for the generated commands/.test(error)), static_.errors.join("\n"));
 });
 
 test("a generated command can't turn a hand-picked command into a group, or the other way round", () => {
-  const leaf = generate(widgets(), options({ reserved: { commands: [{ command: ["widgets", "notes"], method: "GET", path: "/x" }], topLevel: new Set() } }));
-  assert.ok(leaf.errors.some((error) => /turn the hand-picked "deel widgets notes" into a group/.test(error)), leaf.errors.join("\n"));
-  const group = generate(widgets(), options({ reserved: { commands: [{ command: ["gizmos", "list", "all"], method: "GET", path: "/y" }], topLevel: new Set() } }));
-  assert.ok(group.errors.some((error) => /"deel gizmos list" is a group of the hand-picked "deel gizmos list all"/.test(error)), group.errors.join("\n"));
+  const leaf = generate(widgets(), options({ reserved: { commands: [{ command: ["api", "widgets", "notes"], method: "GET", path: "/x" }], topLevel: new Set() } }));
+  assert.ok(leaf.errors.some((error) => /turn the hand-picked "deel api widgets notes" into a group/.test(error)), leaf.errors.join("\n"));
+  const group = generate(widgets(), options({ reserved: { commands: [{ command: ["api", "gizmos", "list", "all"], method: "GET", path: "/y" }], topLevel: new Set() } }));
+  assert.ok(group.errors.some((error) => /"deel api gizmos list" is a group of the hand-picked "deel api gizmos list all"/.test(error)), group.errors.join("\n"));
 });
 
-test("static commands keep their top-level names", () => {
+test("an endpoint named like a static command sits under deel api and leaves the static one alone", () => {
   const definitions = widgets();
   definitions.push({ ...definitions[0], path: "/auth/sessions", operation: { responses: {} } });
-  const { errors } = generate(definitions, options());
-  assert.ok(errors.some((error) => /shadow the static "deel auth"/.test(error)), errors.join("\n"));
+  const { manifest, errors } = generate(definitions, options());
+  assert.deepEqual(errors, []);
+  assert.ok(names(manifest.descriptors).includes("auth sessions list"));
 });
 
 test("an endpoint with a hand-picked command too gets a warning", () => {
@@ -133,12 +147,12 @@ test("overrides rename a command, and an unused override is reported", () => {
 test("released names are locked", () => {
   const first = generate(widgets(), options()).manifest;
   const renamed = generate(widgets(), options({ previous: first, overrides: { "POST /widgets": "widgets add" } }));
-  assert.ok(renamed.errors.some((error) => /Lock: POST \/widgets was released as "deel widgets create"/.test(error)), renamed.errors.join("\n"));
+  assert.ok(renamed.errors.some((error) => /Lock: POST \/widgets was released as "deel api widgets create"/.test(error)), renamed.errors.join("\n"));
 });
 
 test("a param named like a global flag gets a -param flag", () => {
   const { manifest } = generate(widgets(), options());
-  const update = manifest.descriptors.find((descriptor) => descriptor.command.join(" ") === "widgets update")!;
+  const update = manifest.descriptors.find((descriptor) => descriptor.command.join(" ") === "api widgets update")!;
   const fields = update.params.find((param) => param.name === "fields")!;
   assert.equal(fields.flag, "fields-param");
   assert.equal(update.params.find((param) => param.name === "widget_id")!.flag, undefined);
@@ -155,7 +169,7 @@ test("the summary bumps patch for changes, minor for new commands, major for rem
   const base = generate(widgets(), options()).manifest.descriptors;
   assert.equal(summarize(base, base).bump, "none");
   const changed = base.map((descriptor) => (descriptor.path === "/gizmos" ? { ...descriptor, summary: "List all gizmos" } : descriptor));
-  assert.deepEqual(summarize(base, changed), { added: [], changed: [{ command: "gizmos list", method: "GET", path: "/gizmos" }], removed: [], bump: "patch" });
+  assert.deepEqual(summarize(base, changed), { added: [], changed: [{ command: "api gizmos list", method: "GET", path: "/gizmos" }], removed: [], bump: "patch" });
   assert.equal(summarize(base.slice(1), base).bump, "minor");
   const both = summarize(base.slice(1), base.slice(0, -1));
   assert.equal(both.bump, "major");
@@ -213,7 +227,7 @@ test("one operation registered under two spellings of its path keeps the kebab-c
   ]);
   const { manifest, errors, warnings } = generate(definitions, options());
   assert.deepEqual(errors, []);
-  assert.deepEqual(manifest.descriptors.map((d) => [d.command.join(" "), d.path]), [["gadgets gadget-notes list", "/gadgets/{gadget_id}/gadget-notes"]]);
+  assert.deepEqual(manifest.descriptors.map((d) => [d.command.join(" "), d.path]), [["api gadgets gadget-notes list", "/gadgets/{gadget_id}/gadget-notes"]]);
   assert.ok(warnings.some((warning) => /gadget_notes is an alias of GET \/gadgets\/\{gadget_id\}\/gadget-notes/.test(warning)));
 });
 
@@ -223,7 +237,7 @@ test("two different operations behind one name are still an error", () => {
     { api: "rest", method: "get", path: "/gadgets/gadget-notes", version: "2026-09-01", beta_until: null, sunset_at: null, operation: { operationId: "listB-v2026-09-01", responses: {} } },
   ]);
   const { errors } = generate(definitions, options());
-  assert.ok(errors.some((error) => /Ambiguous command "deel gadgets gadget-notes list"/.test(error)), errors.join("\n"));
+  assert.ok(errors.some((error) => /Ambiguous command "deel api gadgets gadget-notes list"/.test(error)), errors.join("\n"));
 });
 
 const def = (method: string, path: string, extra: Record<string, unknown> = {}) => ({
@@ -358,7 +372,7 @@ test("a descriptor carries the param types, enum, body shape and response contra
   assert.deepEqual(errors, []);
   assert.deepEqual(manifest.descriptors, [
     {
-      command: ["gadgets", "parts", "create"],
+      command: ["api", "gadgets", "parts", "create"],
       method: "POST",
       path: "/gadgets/{gadget_id}/parts",
       summary: "S",
@@ -452,7 +466,7 @@ test("a renamed path param still matches its override, its released name and its
   assert.deepEqual([next.summary.added.length, next.summary.removed.length, next.summary.changed.length, next.summary.bump], [0, 0, 1, "patch"]);
 
   const locked = generate(renamed, options({ previous: released.manifest }));
-  assert.match(locked.errors.join("\n"), /Lock: .*released as "deel kinds update"/);
+  assert.match(locked.errors.join("\n"), /Lock: .*released as "deel api kinds update"/);
 });
 
 const thingDoc = (): Record<string, any> => ({

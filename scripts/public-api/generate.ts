@@ -2,6 +2,7 @@ import { bodyFrom, responseFrom } from "../../.claude/skills/deel-cli-extractor/
 import type { CliParam, Descriptor, GeneratedManifest, ScalarType, VersionInfo } from "../../src/types.ts";
 import { commonArgs } from "../../src/commands/shared.ts";
 import type { Definition } from "./definitions.ts";
+import { API_GROUP } from "../../src/core/constants.ts";
 import { deriveCommand, isParamSegment, kebab, pathParams } from "./naming.ts";
 import type { Api } from "./naming.ts";
 
@@ -202,6 +203,7 @@ export function generate(definitions: Definition[], options: GenerateOptions): G
       command = override.words.trim().split(/\s+/);
       usedOverrides.add(override.key);
     }
+    command = [API_GROUP, ...command];
     const released = previousByEndpoint.get(withoutParamNames(key));
     if (released && released.command.join(" ") !== command.join(" ")) {
       errors.push(`Lock: ${key} was released as "deel ${released.command.join(" ")}" and would become "deel ${command.join(" ")}". Released names never change.`);
@@ -259,6 +261,9 @@ export function generate(definitions: Definition[], options: GenerateOptions): G
     }
   }
 
+  if (options.reserved.topLevel.has(API_GROUP) || options.reserved.commands.some((entry) => entry.command[0] === API_GROUP)) {
+    errors.push(`"deel ${API_GROUP}" is reserved for the generated commands; no static or hand-picked command may use it`);
+  }
   const handPicked = new Map(options.reserved.commands.map((entry) => [entry.command.join(" "), entry]));
   const handPickedEndpoints = new Set(options.reserved.commands.map((entry) => overrideKey("rest", entry.method, entry.path)));
   for (const [name, group] of byCommand) {

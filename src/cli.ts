@@ -15,6 +15,7 @@ import { createContext } from "./core/context.ts";
 import { execute } from "./core/executor.ts";
 import { setLoggingEnabled, setLogBodiesEnabled } from "./core/logging.ts";
 import { EXIT } from "./core/errors.ts";
+import { API_GROUP } from "./core/constants.ts";
 import { CliError } from "./core/errors.ts";
 import { CLI_VERSION } from "./version.ts";
 import { commonArgs, configFrom, gatherFiles, gatherFlagValues, outputOpts } from "./commands/shared.ts";
@@ -169,7 +170,8 @@ function treeToCommand(name: string, node: CommandTree | Descriptor | Descriptor
   if (!(node instanceof Map)) return actionCommand(node as Descriptor);
   const subCommands: Record<string, CommandDef> = {};
   for (const [childName, childNode] of node as CommandTree) subCommands[childName] = treeToCommand(childName, childNode);
-  return defineCommand({ meta: { name, description: `${name} operations` }, subCommands });
+  const description = name === API_GROUP ? "Call any documented Deel API endpoint: deel api <resource> <action>" : `${name} operations`;
+  return defineCommand({ meta: { name, description }, subCommands });
 }
 
 // ---------------- root ----------------
