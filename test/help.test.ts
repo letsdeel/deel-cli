@@ -59,7 +59,7 @@ test("root help lists top-level groups under their documentation sections", asyn
   assert.match(out, /^ {2}Gizmos +gizmos +2 commands$/m);
   assert.match(out, /^ {2}SCIM +scim users list +List users$/m);
   assert.match(out, /^ {2}Widgets +widget-reports create +Create a widget report\n +widgets +7 commands$/m);
-  assert.match(out, /^ {2}Other +jobs +2 commands\n +untagged-things list +List untagged things$/m);
+  assert.match(out, /^ {2}Other +jobs +2 commands\n +logs +4 commands\n +untagged-things list +List untagged things$/m);
   const order = ["CLI", "Adjustments", "Gizmos", "SCIM", "Widgets", "Other"].map((section) => out.search(new RegExp(`^ {2}${section} `, "m")));
   assert.deepEqual([...order].sort((a, b) => a - b), order);
   assert.match(out, /GLOBAL OPTIONS/);

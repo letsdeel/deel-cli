@@ -49,7 +49,7 @@ test("deel commands lists every hand-picked, generated and static command", asyn
   assert.match(out, /^auth login +Validate a PAT/m);
   assert.match(out, /^commands +List every command/m);
   const lines = out.trimEnd().split("\n");
-  assert.equal(lines.length, handPicked.descriptors.length + manifest.descriptors.length + 6); // auth x3, job x2, commands
+  assert.equal(lines.length, handPicked.descriptors.length + manifest.descriptors.length + 15); // auth x3, job x2, commands, webhooks x9
   assert.deepEqual([...lines].sort((a, b) => a.localeCompare(b)), lines);
 });
 
