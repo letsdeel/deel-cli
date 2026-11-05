@@ -33,4 +33,9 @@ export const commandMap: CommandEntry[] = [
   { command: "oauth2-apps listing update", method: "PATCH", path: "/oauth2-apps/{app_id}/listing" },
   { command: "oauth2-apps listing submit", method: "POST", path: "/oauth2-apps/{app_id}/listing/submit" },
   { command: "app-store categories", method: "GET", path: "/app-store/categories" },
+
+  { command: "logs requests list",    method: "GET", path: "/logs/requests" },
+  { command: "logs requests get",     method: "GET", path: "/logs/requests/{request_id}" },
+  { command: "logs requests summary", method: "GET", path: "/logs/requests/summary" },
+  { command: "logs tokens list",      method: "GET", path: "/logs/tokens" },
 ];

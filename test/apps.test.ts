@@ -5,6 +5,7 @@ import { createContext } from "../src/core/context.ts";
 import { captureIO } from "../src/core/io.ts";
 import { manifest } from "../src/manifest.generated.ts";
 import { run } from "../src/cli.ts";
+import { printContract } from "../src/help.ts";
 import type { HttpRequest, HttpResponse } from "../src/core/http.ts";
 
 const APP_ID = "00000000-0000-0000-0000-000000000000";
@@ -133,9 +134,12 @@ test("oauth2-apps disable --help --json exposes the confirmation and oauth2-apps
     message: "Disable app {app_id}? This revokes all consents and tokens; enable does not restore them.",
     flag: "yes",
     requiredWhenNonInteractive: true,
+    requiredWhenStdinInUse: true,
   });
+  assert.match(disable.usage, /\[--yes\]$/);
   const enable = JSON.parse((await capture(["oauth2-apps", "enable", "--help", "--json"])).out);
   assert.equal("confirm" in enable, false);
+  assert.doesNotMatch(enable.usage, /--yes/);
 });
 
 test("oauth2-apps disable --help --json lists --yes among its params and oauth2-apps enable does not", async () => {
@@ -145,7 +149,7 @@ test("oauth2-apps disable --help --json lists --yes among its params and oauth2-
     in: "flag",
     type: "boolean",
     required: false,
-    description: "Skip the confirmation prompt (required when not running in a terminal)",
+    description: "Skip the confirmation prompt (required without a terminal, or when stdin carries the token or the input)",
   });
   const enable = JSON.parse((await capture(["oauth2-apps", "enable", "--help", "--json"])).out);
   assert.equal(enable.params.some((param: { name: string }) => param.name === "yes"), false);
@@ -274,4 +278,32 @@ test("oauth2-apps listing update describes the store page fields and requires bo
   assert.ok(!props.some((p) => p.name === "authentication"));
   const logo = props.find((p) => p.name === "logo");
   assert.deepEqual(logo?.properties?.map((p) => [p.name, p.required]), [["file_id", true], ["one_time_secret", true]]);
+});
+
+test("oauth2-apps list prints the next-page cursor on stderr in the --jq and --quiet modes", async () => {
+  for (const output of [{ ...OUTPUT, jq: ".[].id" }, { ...OUTPUT, quiet: true }]) {
+    const { ctx, io } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: [{ id: APP_ID }], cursor: "next-1" } }));
+    await execute(descriptor(["oauth2-apps", "list"]), { flags: {}, files: {} }, ctx, { output, debug: false, form: false });
+    assert.deepEqual(io.stderr, ["next page: --cursor next-1\n"]);
+  }
+});
+
+test("oauth2-apps list prints no next-page line on the last page", async () => {
+  const { ctx, io } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: [], cursor: null } }));
+  await execute(descriptor(["oauth2-apps", "list"]), { flags: {}, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
+  assert.deepEqual(io.stderr, []);
+});
+
+test("--help keeps a space between a required nullable body field and its description", async () => {
+  const base = descriptor(["oauth2-apps", "get"]);
+  const withBody = { ...base, bodyKind: "json" as const, bodyProps: [{ name: "name", in: "body" as const, type: "string" as const, required: true, nullable: true, description: "Name" }] };
+  const out: string[] = [];
+  const original = process.stdout.write;
+  process.stdout.write = ((chunk: any) => (out.push(String(chunk)), true)) as typeof process.stdout.write;
+  try {
+    printContract(withBody);
+  } finally {
+    process.stdout.write = original;
+  }
+  assert.match(out.join(""), /required nullable\s+— Name/);
 });

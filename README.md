@@ -7,6 +7,7 @@ deel auth status --json                              # verify your token and ide
 deel adjustments create --invoice --generate-input  # explore required fields
 deel jobs list --jq '.[] | {job_id, status}'        # filter recent async jobs
 deel oauth2-apps list --api_access enabled                 # list your organization's integration apps
+deel logs requests list --status_class 4xx --beta   # your organization's failed API requests
 ```
 
 ## Contents
@@ -19,6 +20,7 @@ deel oauth2-apps list --api_access enabled                 # list your organizat
 - [Discovering commands](#discovering-commands)
 - [Request input (`--input`, `--file`, `--form`)](#request-input)
 - [Output (`--json`, `--fields`, `--jq`, `--quiet`)](#output)
+- [API tokens](#api-tokens)
 - [Idempotency](#idempotency)
 - [Webhooks](#webhooks)
 - [OAuth2 apps](#oauth2-apps)
@@ -172,7 +174,7 @@ A command can ask for confirmation before it sends anything: an entry in `src/co
 - In a terminal it asks `[y/N]` on stderr. Only `y` or `yes` goes ahead; anything else, an empty answer, end of input or Ctrl-C aborts and sends nothing (exit code 1, error `<group>.aborted`).
 - `--yes` skips the prompt.
 - Without a terminal (no TTY, or `CI` / an agent environment is detected) and without `--yes`, it refuses to run with `usage.confirm`, which names `--yes`. It never goes ahead silently.
-- When stdin carries the token or the body (`--token-stdin`, `--input -`), the prompt could not read an answer, so `--yes` is required there too.
+- When stdin carries the token or the body (`--token-stdin`, `--input -`) or is not a terminal (piped input would be read as the answer), the prompt could not read an answer, so `--yes` is required there too.
 - `--help --json` lists the confirmation under `confirm`, so a script or an agent can see it before running the command.
 
 `deel oauth2-apps disable` is one.
@@ -227,6 +229,19 @@ Output is the JSON envelope by default. Use `--no-json` on a TTY to get a human-
 { "data": { ... }, "meta": { "request_id": "..." } }
 ```
 
+List endpoints that paginate return a `page` object next to `data`; pass its `cursor` back as `--cursor` to fetch the next page (`has_next_page` tells you when to stop):
+
+```json
+{ "data": [ ... ], "page": { "cursor": "eyJ0cyI6...", "has_next_page": true }, "meta": { "request_id": "..." } }
+```
+
+```bash
+deel logs requests list --limit 100 --beta                        # first page; read page.cursor from the envelope
+deel logs requests list --limit 100 --cursor <page.cursor> --beta # next page, until has_next_page is false
+```
+
+`--jq` and `--quiet` see only `data`, so to page read `page.cursor` from the full JSON envelope (or with `--fields`, which keeps `page`).
+
 | Flag              | Effect                                                                 |
 | ----------------- | ---------------------------------------------------------------------- |
 | `--no-json`       | Human-readable view on a TTY (default is always JSON)                  |
@@ -240,6 +255,19 @@ deel jobs list --fields job_id,status
 deel jobs list --jq '.[] | select(.status == "SUCCEEDED") | .job_id' --raw
 deel jobs list --quiet
 ```
+
+## API tokens
+
+`deel tokens` lists, inspects and invalidates the API tokens of your organization, and your own personal tokens. The calling token needs the `tokens:read` scope, plus `tokens:write` to invalidate. The API never returns a token's secret value.
+
+```bash
+deel tokens list                                        # newest first, one page (--all for every page)
+deel tokens list --signal stale                         # tokens that need attention: STALE | EXPIRING | ORPHANED | FULL_ACCESS | ... (any case)
+deel tokens get <id>
+deel tokens invalidate <id> --reason "rotated"              # asks to confirm; --yes when non-interactive
+```
+
+An invalidated token stops working at once and cannot be restored.
 
 ## Idempotency
 
@@ -267,13 +295,13 @@ A webhook id can start with `-`, which the argument parser reads as a flag. Pass
 ```bash
 deel oauth2-apps list --api_access disabled --limit 20      # filter by API access; --limit (1 to 100, default 100) and --cursor page the list
 deel oauth2-apps get --app_id 00000000-0000-0000-0000-000000000000
-deel oauth2-apps update --app_id <id> --input name="Payroll sync"      # changes only the given fields
+deel oauth2-apps update --app_id <id> --input '{"name":"Payroll sync"}'  # changes only the given fields; use JSON for values with spaces
 deel oauth2-apps update --app_id <id> --input '{"redirect_uris":["https://example.com/callback"]}'  # replaces the whole list
 deel oauth2-apps disable --app_id <id>                                 # asks to confirm; --yes skips the prompt
 deel oauth2-apps enable --app_id <id>
 ```
 
-`deel oauth2-apps disable` revokes every consent and token issued to the app; `enable` does not restore them, so people must authorize the app again. It asks `[y/N]` in a terminal. `--yes` skips the prompt and is required when not running in a terminal (no TTY, or `CI` / an agent environment is detected) and when stdin carries the token or the body (`--token-stdin`, `--input -`), since the prompt would read that line as the answer; without it nothing is sent. `deel oauth2-apps disable --help --json` lists the confirmation under `confirm`.
+`deel oauth2-apps disable` revokes every consent and token issued to the app; `enable` does not restore them, so people must authorize the app again. It asks `[y/N]` in a terminal. `--yes` skips the prompt and is required when not running in a terminal (no TTY, or `CI` / an agent environment is detected) and when stdin carries the token or the body (`--token-stdin`, `--input -`) or is piped, since the prompt would read that line as the answer; without it nothing is sent. `deel oauth2-apps disable --help --json` lists the confirmation under `confirm`.
 
 `oauth2-apps list` returns one page at a time. When more results exist, the next-page cursor is printed as `meta.cursor`; pass it back with `--cursor` to get the next page.
 
@@ -316,6 +344,7 @@ An endpoint that is still in beta answers `BETA_ACCESS_REQUIRED` unless the requ
 
 ```bash
 deel webhooks simulate <id> --event contract.created --beta
+deel logs requests list --beta             # the logs commands are beta too
 ```
 
 ## Corporate proxies & custom CAs
@@ -413,7 +442,7 @@ src/
   types.ts                 # shared descriptor/manifest types
   manifest.generated.ts    # command descriptors (generated by the deel-cli-extractor skill — never hand-edited)
   commands.map.ts          # command ↔ API endpoint mapping (optional `confirm` text adds a --yes prompt)
-  commands/                # static commands (auth, job, webhooks)
+  commands/                # static commands (auth, job, webhooks, tokens)
   core/                    # http, auth, keychain, config, tls, input, output, logging, …
 test/                      # automated tests (node --test), one file per module
 ```
