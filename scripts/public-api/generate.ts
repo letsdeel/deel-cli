@@ -268,7 +268,6 @@ export function generate(definitions: Definition[], options: GenerateOptions): G
   const handPickedEndpoints = new Set(options.reserved.commands.map((entry) => overrideKey("rest", entry.method, entry.path)));
   for (const [name, group] of byCommand) {
     const words = name.split(" ");
-    if (options.reserved.topLevel.has(words[0])) errors.push(`"deel ${name}" would shadow the static "deel ${words[0]}" command`);
     if (handPicked.has(name)) {
       errors.push(`"deel ${name}" (${group.map(endpointKey).join(", ")}) clashes with a hand-picked command. Add an override in src/public-api/overrides.ts.`);
     }

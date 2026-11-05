@@ -576,3 +576,14 @@ test("a committed deel api command sends its endpoint and pinned version, and th
   assert.equal(help.code, EXIT.OK);
   assert.match(help.out, /Webhook subscriptions|webhooks/);
 });
+
+test("a word under deel api that names no command is an error, not the group's help", async () => {
+  const resource = await capture(["api", "widgts", "list"]);
+  assert.equal(resource.code, EXIT.ERROR);
+  assert.match(resource.err, /Unknown command 'widgts' under 'deel api'/);
+  const action = await capture(["api", "widgets", "lst"]);
+  assert.equal(action.code, EXIT.ERROR);
+  assert.match(action.err, /Unknown command 'lst' under 'deel api widgets'/);
+  assert.equal((await capture(["api", "widgets"])).code, EXIT.OK);
+  assert.equal((await capture(["api", "widgts", "--help"])).code, EXIT.OK);
+});
