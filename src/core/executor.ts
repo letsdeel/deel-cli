@@ -164,8 +164,17 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
 
   if (response.status >= 400) throw errorFromResponse(response.status, response.json, requestId, ctx.config.beta === true);
 
-  const data = (response.json as any)?.data ?? response.json ?? null;
-  await render(ctx.io, envelope(data, { request_id: requestId }), opts.output);
+  const payload = response.json as any;
+  const hasDataEnvelope = isPlainObject(payload) && "data" in payload;
+  const data = hasDataEnvelope ? (payload.data ?? null) : (payload ?? null);
+  // Paginated list responses carry `page: { cursor, has_next_page }` next to `data`. Surface it in
+  // the envelope (only when `data` was unwrapped from one) so the caller can page with --cursor.
+  const page = hasDataEnvelope && isPlainObject(payload.page) ? (payload.page as Record<string, unknown>) : undefined;
+  await render(ctx.io, envelope(data, { request_id: requestId }, page), opts.output);
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === "object" && !Array.isArray(value);
 }
 
 async function multipartFingerprint(descriptor: Descriptor, call: ParsedCall): Promise<unknown> {
