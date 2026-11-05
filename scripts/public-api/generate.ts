@@ -259,21 +259,9 @@ export function generate(definitions: Definition[], options: GenerateOptions): G
     }
   }
 
-  const handPicked = new Map(options.reserved.commands.map((entry) => [entry.command.join(" "), entry]));
   const handPickedEndpoints = new Set(options.reserved.commands.map((entry) => overrideKey("rest", entry.method, entry.path)));
+  errors.push(...reservedClashes(byCommand.keys(), options.reserved, (name) => ` (${byCommand.get(name)!.map(endpointKey).join(", ")})`));
   for (const [name, group] of byCommand) {
-    const words = name.split(" ");
-    if (options.reserved.topLevel.has(words[0])) errors.push(`"deel ${name}" would shadow the static "deel ${words[0]}" command`);
-    if (handPicked.has(name)) {
-      errors.push(`"deel ${name}" (${group.map(endpointKey).join(", ")}) clashes with a hand-picked command. Add an override in src/public-api/overrides.ts.`);
-    }
-    for (let i = 1; i < words.length; i++) {
-      const prefix = words.slice(0, i).join(" ");
-      if (handPicked.has(prefix)) errors.push(`"deel ${name}" would turn the hand-picked "deel ${prefix}" into a group`);
-    }
-    for (const handName of handPicked.keys()) {
-      if (handName.startsWith(`${name} `)) errors.push(`"deel ${name}" is a group of the hand-picked "deel ${handName}"`);
-    }
     for (const descriptor of group) {
       if (handPickedEndpoints.has(endpointKey(descriptor))) {
         warnings.push(`${endpointKey(descriptor)} has a hand-picked command and a generated one ("deel ${name}")`);
@@ -284,6 +272,26 @@ export function generate(definitions: Definition[], options: GenerateOptions): G
   descriptors.sort(compareDescriptors);
   const manifest: GeneratedManifest = { generator: GENERATOR, descriptors };
   return { manifest, errors, warnings, summary: summarize(options.previous?.descriptors ?? [], descriptors) };
+}
+
+// Generated command names that would shadow a static command, replace a hand-picked one, or turn one into
+// (or out of) a command group. `via` adds the endpoints behind a name to the message.
+export function reservedClashes(names: Iterable<string>, reserved: Reserved, via: (name: string) => string = () => ""): string[] {
+  const errors: string[] = [];
+  const handPicked = new Set(reserved.commands.map((entry) => entry.command.join(" ")));
+  for (const name of names) {
+    const words = name.split(" ");
+    if (reserved.topLevel.has(words[0])) errors.push(`"deel ${name}" would shadow the static "deel ${words[0]}" command`);
+    if (handPicked.has(name)) errors.push(`"deel ${name}"${via(name)} clashes with a hand-picked command. Add an override in src/public-api/overrides.ts.`);
+    for (let i = 1; i < words.length; i++) {
+      const prefix = words.slice(0, i).join(" ");
+      if (handPicked.has(prefix)) errors.push(`"deel ${name}" would turn the hand-picked "deel ${prefix}" into a group`);
+    }
+    for (const handName of handPicked) {
+      if (handName.startsWith(`${name} `)) errors.push(`"deel ${name}" is a group of the hand-picked "deel ${handName}"`);
+    }
+  }
+  return errors;
 }
 
 export function summarize(before: Descriptor[], after: Descriptor[]): Summary {

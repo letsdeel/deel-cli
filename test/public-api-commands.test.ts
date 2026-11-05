@@ -12,7 +12,7 @@ import { staticCommands } from "../src/commands/index.ts";
 import { manifest as handPicked } from "../src/manifest.generated.ts";
 import { generatedManifest, selectAlternate, setGeneratedDescriptorsForTests } from "../src/public-api/commands.ts";
 import { parseDefinitions } from "../scripts/public-api/definitions.ts";
-import { generate } from "../scripts/public-api/generate.ts";
+import { generate, reservedClashes } from "../scripts/public-api/generate.ts";
 
 const definitions = parseDefinitions(JSON.parse(readFileSync(new URL("./fixtures/definitions/widgets.json", import.meta.url), "utf8")));
 const { manifest } = generate(definitions, {
@@ -320,12 +320,17 @@ test("--generate-input in every spelling prints the skeleton and sends nothing",
 });
 
 test("the committed manifest doesn't shadow static or hand-picked commands", () => {
-  const taken = new Set([...RESERVED_COMMANDS, ...handPicked.descriptors.map((descriptor) => descriptor.command.join(" "))]);
-  for (const descriptor of generatedManifest.descriptors) {
-    const name = descriptor.command.join(" ");
-    assert.ok(!RESERVED_COMMANDS.has(descriptor.command[0]), `"deel ${name}" shadows a static command`);
-    assert.ok(!taken.has(name), `"deel ${name}" clashes with a hand-picked command`);
-  }
+  const names = generatedManifest.descriptors.map((descriptor) => descriptor.command.join(" "));
+  assert.deepEqual(reservedClashes(names, { commands: handPicked.descriptors, topLevel: RESERVED_COMMANDS }), []);
+});
+
+test("reservedClashes finds a name that shadows, replaces, groups or is grouped by a reserved command", () => {
+  const reserved = { commands: [{ command: ["gizmos", "list"], method: "GET", path: "/gizmos" }, { command: ["gadgets", "show", "all"], method: "GET", path: "/gadgets" }], topLevel: new Set(["auth"]) };
+  assert.equal(reservedClashes(["auth sessions list"], reserved).length, 1);
+  assert.match(reservedClashes(["gizmos list"], reserved, () => " (GET /x)")[0], /"deel gizmos list" \(GET \/x\) clashes with a hand-picked command/);
+  assert.match(reservedClashes(["gizmos list all"], reserved)[0], /turn the hand-picked "deel gizmos list" into a group/);
+  assert.match(reservedClashes(["gadgets show"], reserved)[0], /is a group of the hand-picked "deel gadgets show all"/);
+  assert.deepEqual(reservedClashes(["gizmos get", "widgets list"], reserved), []);
 });
 
 test("every static command is a reserved name, so the generator and the committed-manifest check can see it", () => {
@@ -338,6 +343,18 @@ test("a path-param error names the flag the user types, including the -param ren
   assert.notEqual(code, EXIT.OK);
   assert.match(err, /path parameter --file-param: "\.\."/);
   assert.equal(sent.length, 0);
+});
+
+test("a missing path param names the flag the user types, including the -param rename", async () => {
+  const descriptor = thing([{ name: "file", in: "path", type: "string", required: true, flag: "file-param" }], { method: "DELETE", path: "/things/{file}", command: ["things", "delete"] });
+  const ctx = createContext({
+    config: { env: "demo", baseUrl: "https://example.test/rest" }, token: "tok_test", io: captureIO({}), logger: () => {},
+    baseTransport: async () => { throw new Error("no request expected"); },
+  });
+  await assert.rejects(
+    execute(descriptor, { flags: {}, files: {} }, ctx, { output: {} as any, debug: false, form: false }),
+    (error: any) => error.code === "usage.path_param" && /Missing required path parameter --file-param$/.test(error.message),
+  );
 });
 
 test("a path param that is empty, a dot segment or a swallowed flag sends nothing", async () => {
