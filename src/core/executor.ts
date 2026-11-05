@@ -206,7 +206,11 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
     debugSent(response.status);
   }
 
-  if (response.status >= 400) throw errorFromResponse(response.status, response.json, requestId, choice.beta);
+  if (response.status >= 400) {
+    const error = errorFromResponse(response.status, response.json, requestId, choice.beta);
+    if (error.code === BETA_ERROR.required && !choice.beta) error.next = BETA_ACCESS_HINT;
+    throw error;
+  }
 
   const payload = response.json as any;
   const hasDataEnvelope = isPlainObject(payload) && "data" in payload;
@@ -285,7 +289,7 @@ export function errorFromResponse(status: number, json: unknown, requestId: stri
     next = payload.next;
   }
 
-  if (code === BETA_ERROR.required && !betaSent) next = BETA_ACCESS_HINT;
+  if (code === BETA_ERROR.required && !betaSent) next = next ?? "This endpoint is in beta. Re-run with --beta.";
 
   const error = new CliError(code, message, next);
   error.requestId = requestId;
