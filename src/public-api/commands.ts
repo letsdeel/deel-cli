@@ -1,5 +1,6 @@
 // Generated public API commands, and how a merged command picks its endpoint.
 
+import { parseArgs } from "citty";
 import type { CliParam, Descriptor, GeneratedManifest } from "../types.ts";
 import generated from "./manifest.json" with { type: "json" };
 
@@ -19,17 +20,24 @@ export function flagOf(param: CliParam): string {
   return param.flag ?? param.name;
 }
 
-// The spellings the parser accepts for one flag: as written, camelCase and kebab-case (--widget_id, --widgetId, --widget-id).
-export function flagSpellings(flag: string): string[] {
-  const words = flag.split(/[-_\s]+|(?<=[a-z0-9])(?=[A-Z])/).filter(Boolean);
-  const camel = words.map((word, index) => (index === 0 ? word.toLowerCase() : word[0].toUpperCase() + word.slice(1).toLowerCase())).join("");
-  const kebab = words.map((word) => word.toLowerCase()).join("-");
-  return [...new Set([flag, camel, kebab])];
+// Whether the parser reads `--<key>` as the flag `flag`. It asks citty itself, so the spellings it accepts
+// (--a_b, --a-b, --aB, acronyms such as userIDs) can never drift from a copy of its rules kept here.
+export function acceptsFlag(flag: string, key: string): boolean {
+  return (parseArgs([`--${key}`, "1"], { [flag]: { type: "string" } }) as Record<string, unknown>)[flag] === "1";
 }
 
 export function argvHasFlag(argv: string[], flag: string): boolean {
-  const spellings = flagSpellings(flag);
-  return argv.some((token) => spellings.some((spelling) => token === `--${spelling}` || token.startsWith(`--${spelling}=`)));
+  return argv.some((token) => token.startsWith("--") && acceptsFlag(flag, token.slice(2).split("=")[0]));
+}
+
+// Whether argv typed the flag at all: with a value, or negated as --no-<flag>.
+export function argvMentionsFlag(argv: string[], flag: string): boolean {
+  return argvHasFlag(argv, flag) || argvHasFlag(argv.map((token) => (token.startsWith("--no-") ? `--${token.slice(5)}` : token)), flag);
+}
+
+// Whether a boolean flag is switched on in argv, so `--flag=false` and `--no-flag` do not count.
+export function argvEnables(argv: string[], flag: string): boolean {
+  return (parseArgs(argv, { [flag]: { type: "boolean" } }) as Record<string, unknown>)[flag] === true;
 }
 
 function pathParamsOf(descriptor: Descriptor): CliParam[] {

@@ -144,9 +144,11 @@ test("a param named like a global flag gets a -param flag", () => {
   assert.equal(update.params.find((param) => param.name === "widget_id")!.flag, undefined);
 });
 
-test("nothing outside the operation allowlist reaches the manifest", () => {
-  const { manifest } = generate(widgets(), options());
-  assert.doesNotMatch(JSON.stringify(manifest), /team-that-must-not-leak|x-owner-team/);
+test("only the allowlisted operation fields are kept from a definition", () => {
+  const [definition] = parseDefinitions([
+    gadget({ operation: gadgetOp({ operationId: "x", description: "d", tags: ["t"], deprecated: true, "x-owner-team": "team-that-must-not-leak", servers: [{ url: "http://internal" }], callbacks: {}, security: [{ k: [] }] }) }),
+  ]);
+  assert.deepEqual(Object.keys(definition.operation).sort(), ["deprecated", "description", "operationId", "responses", "summary", "tags"]);
 });
 
 test("the summary bumps patch for changes, minor for new commands, major for removed ones", () => {
@@ -288,6 +290,31 @@ test("loadJson only fetches https, never follows a redirect and reads at most th
   } finally {
     globalThis.fetch = realFetch;
   }
+});
+
+test("loadJson rejects an HTTP error status, an empty body and a failed request instead of reading them as definitions", async () => {
+  const realFetch = globalThis.fetch;
+  try {
+    for (const status of [401, 403, 500]) {
+      globalThis.fetch = (async () => new Response('{"message":"no"}', { status })) as typeof fetch;
+      await assert.rejects(loadJson("https://example.test/defs"), new RegExp(`HTTP ${status}`));
+    }
+    globalThis.fetch = (async () => new Response(null, { status: 200 })) as typeof fetch;
+    await assert.rejects(loadJson("https://example.test/defs"), /sent no body/);
+    globalThis.fetch = (async () => new Response("not json", { status: 200 })) as typeof fetch;
+    await assert.rejects(loadJson("https://example.test/defs"), SyntaxError);
+    globalThis.fetch = (async () => { throw new TypeError("fetch failed"); }) as typeof fetch;
+    await assert.rejects(loadJson("https://example.test/defs"), /fetch failed/);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+});
+
+test("loadJson reads a local file, and a missing or malformed one is an error", async () => {
+  const widgets = await loadJson(new URL("./fixtures/definitions/widgets.json", import.meta.url).pathname);
+  assert.ok(Array.isArray(widgets) && widgets.length > 0);
+  await assert.rejects(loadJson(new URL("./fixtures/definitions/missing.json", import.meta.url).pathname), /ENOENT/);
+  await assert.rejects(loadJson(new URL("./public-api-generate.test.ts", import.meta.url).pathname), SyntaxError);
 });
 
 const gadgetOp = (extra: Record<string, any> = {}) => ({ summary: "S", responses: { "200": { description: "ok" } }, ...extra });
@@ -528,4 +555,61 @@ test("the node budget is per operation, not across the document", () => {
   const operation = { operationId: "x-v2026-01-01", responses: { "200": { description: "ok", content: { "application/json": { schema: { $ref: "#/components/schemas/S0" } } } } } };
   const doc = { components, paths: { "/rest/a": { get: operation }, "/rest/b": { get: operation }, "/rest/c": { get: operation } } };
   assert.equal(definitionsFromOpenApi(doc, "rest").length, 3);
+});
+
+test("a param named like a global flag in any spelling the parser knows gets the -param flag", () => {
+  for (const name of ["help", "h", "version", "v", "base-url", "base_url", "beta", "versions", "json", "fields"]) {
+    const { manifest, errors } = generate(parseDefinitions([gadget({ operation: gadgetOp({ parameters: [{ name, in: "query", schema: { type: "string" } }] }) })]), options());
+    assert.deepEqual(errors, [], name);
+    assert.equal(manifest.descriptors[0].params.find((param) => param.name === name)!.flag, `${name}-param`, name);
+  }
+});
+
+test("the primary version is the newest stable one however the definitions are ordered", () => {
+  const versions = ["2026-08-10", "2026-01-01", "2026-04-02"];
+  for (const order of [versions, [...versions].reverse(), [...versions].sort()]) {
+    const { manifest, errors } = generate(parseDefinitions(order.map((version) => gadget({ version }))), options());
+    assert.deepEqual(errors, []);
+    assert.equal(manifest.descriptors[0].version, "2026-08-10");
+    assert.deepEqual(manifest.descriptors[0].versions!.map((entry) => entry.version), ["2026-01-01", "2026-04-02", "2026-08-10"]);
+  }
+});
+
+test("header and cookie params never become flags", () => {
+  const { manifest } = generate(
+    parseDefinitions([gadget({ operation: gadgetOp({ parameters: [{ name: "x-trace", in: "header", schema: { type: "string" } }, { name: "sid", in: "cookie", schema: { type: "string" } }, { name: "q", in: "query", schema: { type: "string" } }] }) })]),
+    options(),
+  );
+  assert.deepEqual(manifest.descriptors[0].params.map((param) => param.name), ["q"]);
+});
+
+test("kebab and deriveCommand drop separators, repeated dashes and empty segments", () => {
+  assert.equal(kebab("a.b"), "a-b");
+  assert.equal(kebab("a__b"), "a-b");
+  assert.equal(kebab("-x-"), "x");
+  assert.equal(kebab("A B"), "a-b");
+  assert.equal(kebab("v2Items"), "v2-items");
+  assert.equal(kebab("a--b"), "a-b");
+  assert.equal(kebab("a_-b"), "a-b");
+  assert.deepEqual(deriveCommand("rest", "GET", "/_/things"), ["things", "list"]);
+  assert.deepEqual(deriveCommand("rest", "GET", "/a.b//c_d"), ["a-b", "c-d", "list"]);
+});
+
+test("deref keeps a schema out of the cache while a longer cycle through it is still open", () => {
+  const root = {
+    components: {
+      schemas: {
+        A: { type: "object", properties: { b: { $ref: "#/components/schemas/B" }, x: { type: "string" } } },
+        B: { type: "object", properties: { c: { $ref: "#/components/schemas/C" } } },
+        C: { type: "object", properties: { a: { $ref: "#/components/schemas/A" } } },
+      },
+    },
+  };
+  const state = newDerefState();
+  deref({ $ref: "#/components/schemas/A" }, root, state);
+  const b = deref({ $ref: "#/components/schemas/B" }, root, state);
+  assert.deepEqual(b.properties.c.properties.a.properties.x, { type: "string" });
+  const c = deref({ $ref: "#/components/schemas/C" }, root, state);
+  assert.deepEqual(c.properties.a.properties.x, { type: "string" });
+  assert.doesNotThrow(() => JSON.stringify([b, c]));
 });

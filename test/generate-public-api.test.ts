@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdtempSync, readFileSync, symlinkSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -133,4 +133,55 @@ test("--from-openapi tags a scim= document as SCIM and an unprefixed or rest= on
     descriptors.map((descriptor: { api: string; command: string[] }) => [descriptor.api, descriptor.command.join(" ")]),
     [["rest", "contracts list"], ["rest", "people list"], ["scim", "scim users list"]],
   );
+});
+
+const definitionsFile = (definitions: Array<{ method: string; path: string }>) => {
+  const file = join(mkdtempSync(join(tmpdir(), "generate-public-api-defs-")), "definitions.json");
+  writeFileSync(file, JSON.stringify(definitions.map(({ method, path }) => ({
+    api: "rest", method, path, version: "2026-01-01", beta_until: null, sunset_at: null,
+    operation: { summary: "S", responses: { "200": { description: "ok" } } },
+  }))));
+  return file;
+};
+
+test("a definition that would take a static command's name is an error, and one with a reviewed override is named by it", () => {
+  const clash = generate(["--from", definitionsFile([{ method: "GET", path: "/auth/things" }]), "--out", mkdtempSync(join(tmpdir(), "generate-public-api-")), "--previous", EMPTY]);
+  assert.equal(clash.code, 1);
+  assert.match(clash.stderr, /would shadow the static "deel auth" command/);
+
+  const dir = mkdtempSync(join(tmpdir(), "generate-public-api-"));
+  const overridden = generate(["--from", definitionsFile([{ method: "POST", path: "/adjustments" }]), "--out", dir, "--previous", EMPTY]);
+  assert.equal(overridden.code, 0, overridden.stderr);
+  assert.deepEqual(JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")).descriptors.map((descriptor: { command: string[] }) => descriptor.command), [["adjustments", "add"]]);
+});
+
+test("a path that has a hand-picked command is reported as a warning on stderr", () => {
+  const { stderr } = generate(["--from", definitionsFile([{ method: "GET", path: "/logs/tokens" }]), "--out", mkdtempSync(join(tmpdir(), "generate-public-api-")), "--previous", EMPTY]);
+  assert.match(stderr, /\[warn\] GET \/logs\/tokens has a hand-picked command/);
+});
+
+test("without --previous the released names come from the manifest committed next to the script", () => {
+  const repo = mkdtempSync(join(tmpdir(), "generate-public-api-repo-"));
+  for (const entry of ["scripts", "src", ".claude/skills/deel-cli-extractor", "package.json"]) cpSync(join(ROOT, entry), join(repo, entry), { recursive: true });
+  symlinkSync(join(ROOT, "node_modules"), join(repo, "node_modules"));
+  const run = (extra: string[] = []) => {
+    const result = spawnSync(process.execPath, ["scripts/generate-public-api.ts", "--from", fixture("widgets.json"), ...extra], { cwd: repo, encoding: "utf8" });
+    return { code: result.status, stderr: result.stderr };
+  };
+
+  const first = run();
+  assert.equal(first.code, 0, first.stderr);
+  assert.match(first.stderr, /9 added/);
+  const again = run();
+  assert.equal(again.code, 0, again.stderr);
+  assert.match(again.stderr, /0 added, 0 changed, 0 removed/);
+  const elsewhere = run(["--out", mkdtempSync(join(tmpdir(), "generate-public-api-"))]);
+  assert.equal(elsewhere.code, 0, elsewhere.stderr);
+  assert.match(elsewhere.stderr, /0 added, 0 changed, 0 removed/);
+
+  const overrides = join(repo, "src/public-api/overrides.ts");
+  writeFileSync(overrides, readFileSync(overrides, "utf8").replace('"POST /adjustments": "adjustments add",', '"POST /adjustments": "adjustments add",\n  "POST /widgets": "widgets add",'));
+  const renamed = run();
+  assert.equal(renamed.code, 1);
+  assert.match(renamed.stderr, /Lock: POST \/widgets was released as "deel widgets create"/);
 });
