@@ -284,7 +284,7 @@ deel <command> --beta
 deel <command> --version 2026-01-01
 ```
 
-If a beta graduates (or ends) after this CLI was released, the API rejects `X-Beta` before running anything; the CLI then retries once, without `X-Beta` (with the same version, or with the newest stable one when nothing is in beta any more) and with the same idempotency key. `--debug` shows the retry.
+If a beta graduates (or ends) after this CLI was released, the API rejects `X-Beta` before running anything; the CLI then retries once, without `X-Beta` (with the same version, or with the newest stable one when nothing is in beta any more and you did not pin a version with `--version`) and with the same idempotency key. `--debug` shows the retry.
 
 ## Environments
 
