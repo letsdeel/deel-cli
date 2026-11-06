@@ -215,6 +215,7 @@ test("execute() rejects a nested array field over its own maxItems", async () =>
     (error: any) => {
       assert.equal(error.code, "usage.max_items");
       assert.match(error.message, /--input\.items has 3 items; this operation accepts at most 2/);
+      assert.equal(error.next, "Send at most 2 items in --input.items.");
       return true;
     },
   );

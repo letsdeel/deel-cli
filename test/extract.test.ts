@@ -29,6 +29,25 @@ test("splitFields recursively expands nested object schemas into properties", ()
   assert.equal(request!.properties!.find((field) => field.name === "amount")!.required, true);
 });
 
+test("splitFields keeps the item fields of an array of objects, so help can show how to build an entry", () => {
+  const { textProps } = splitFields({
+    type: "object",
+    properties: {
+      support_resources: {
+        type: "array",
+        items: { type: "object", required: ["name", "url"], properties: { name: { type: "string" }, url: { type: "string" } } },
+      },
+      what_it_syncs: { type: "array", items: { type: "string" } },
+    },
+  });
+
+  assert.deepEqual(
+    textProps.find((field) => field.name === "support_resources")!.properties?.map((field) => `${field.name}:${field.required}`),
+    ["name:true", "url:true"],
+  );
+  assert.equal(textProps.find((field) => field.name === "what_it_syncs")!.properties, undefined);
+});
+
 test("bodyFrom captures array item fields (including nested objects) for a json-array body", () => {
   const { bodyKind, bodyProps } = bodyFrom({
     requestBody: {

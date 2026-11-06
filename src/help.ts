@@ -170,7 +170,9 @@ function fieldsToSkeleton(fields: CliParam[]): Record<string, unknown> {
     skeleton[field.name] = field.enum
       ? field.enum[0]
       : field.properties?.length
-        ? fieldsToSkeleton(field.properties)
+        ? field.type === "array"
+          ? [fieldsToSkeleton(field.properties)]
+          : fieldsToSkeleton(field.properties)
         : field.type === "number" || field.type === "integer"
           ? 0
           : field.type === "boolean"

@@ -241,6 +241,45 @@ test("oauth2-apps listing get --help shows the response fields and marks the nul
   assert.match(out, /logo_url\s+string\s+nullable/);
 });
 
+test("oauth2-apps listing create wraps the body under data and sends POST to the listing path", async () => {
+  const { ctx, seen, out } = ctxWith(() => ({ status: 201, headers: {}, text: "", json: { data: { app_id: APP_ID, status: "unpublished", latest_revision: null } } }));
+  await execute(descriptor(["oauth2-apps", "listing", "create"]), { flags: { app_id: APP_ID }, body: { name: "Payroll sync" }, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
+  assert.equal(seen[0].method, "POST");
+  assert.equal(new URL(seen[0].url).pathname, `/rest/oauth2-apps/${APP_ID}/listing`);
+  assert.deepEqual(JSON.parse(String(seen[0].body)), { data: { name: "Payroll sync" } });
+  assert.equal(out().data.latest_revision, null);
+});
+
+test("oauth2-apps listing update sends the listing fields and the logo handle under data", async () => {
+  const body = {
+    short_description: "Sync timesheets",
+    categories: [182],
+    highlights: [{ title: "Fast", text: "Quick sync" }],
+    logo: { file_id: "4c1b7a52-3d18-4f69-8e0a-9b6f2d57c314", one_time_secret: "secret-value" },
+  };
+  const { ctx, seen } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { app_id: APP_ID, latest_revision: { status: "draft", review_notes: null } } } }));
+  await execute(descriptor(["oauth2-apps", "listing", "update"]), { flags: { app_id: APP_ID }, body, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
+  assert.equal(seen[0].method, "PATCH");
+  assert.equal(new URL(seen[0].url).pathname, `/rest/oauth2-apps/${APP_ID}/listing`);
+  assert.deepEqual(JSON.parse(String(seen[0].body)), { data: body });
+});
+
+test("oauth2-apps listing submit sends a POST with no body to the submit path", async () => {
+  const { ctx, seen } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { app_id: APP_ID, latest_revision: { status: "in_review", review_notes: null } } } }));
+  await execute(descriptor(["oauth2-apps", "listing", "submit"]), { flags: { app_id: APP_ID }, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
+  assert.equal(seen[0].method, "POST");
+  assert.equal(new URL(seen[0].url).pathname, `/rest/oauth2-apps/${APP_ID}/listing/submit`);
+  assert.equal(seen[0].body, null);
+});
+
+test("oauth2-apps listing update describes the store page fields and requires both parts of the logo handle", () => {
+  const props = descriptor(["oauth2-apps", "listing", "update"]).bodyProps;
+  assert.ok(props.some((p) => p.name === "test_account_details"));
+  assert.ok(!props.some((p) => p.name === "authentication"));
+  const logo = props.find((p) => p.name === "logo");
+  assert.deepEqual(logo?.properties?.map((p) => [p.name, p.required]), [["file_id", true], ["one_time_secret", true]]);
+});
+
 test("oauth2-apps list prints the next-page cursor on stderr in the --jq and --quiet modes", async () => {
   for (const output of [{ ...OUTPUT, jq: ".[].id" }, { ...OUTPUT, quiet: true }]) {
     const { ctx, io } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: [{ id: APP_ID }], cursor: "next-1" } }));
@@ -267,4 +306,13 @@ test("--help keeps a space between a required nullable body field and its descri
     process.stdout.write = original;
   }
   assert.match(out.join(""), /required nullable\s+— Name/);
+});
+
+test("oauth2-apps listing update --generate-input prints a list of objects for the list fields and an object for the logo handle", async () => {
+  const { code, out } = await capture(["oauth2-apps", "listing", "update", "--generate-input"]);
+  assert.equal(code, 0);
+  const skeleton = JSON.parse(out);
+  assert.deepEqual(skeleton.highlights, [{ title: "", text: "" }]);
+  assert.deepEqual(skeleton.support_resources, [{ name: "", url: "" }]);
+  assert.deepEqual(skeleton.logo, { file_id: "", one_time_secret: "" });
 });

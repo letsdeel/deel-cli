@@ -54,7 +54,7 @@ function validateMaxItems(descriptor: Descriptor, userBody: unknown): void {
         throw new CliError(
           "usage.max_items",
           `--input.${field.name} has ${value.length} items; this operation accepts at most ${field.maxItems} per request.`,
-          `Split the input into batches of ${field.maxItems} or fewer.`,
+          `Send at most ${field.maxItems} items in --input.${field.name}.`,
         );
       }
     }
