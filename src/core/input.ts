@@ -146,6 +146,7 @@ function coerceTopLevel(value: unknown, bodyProps: CliParam[]): unknown {
 }
 
 function coerceScalar(value: unknown, param: CliParam): unknown {
+  if (value === "null" && param.nullable) return null;
   if (typeof value !== "string") return value;
   let coerced: unknown = value;
   if (param.type === "number" || param.type === "integer") {

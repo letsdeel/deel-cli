@@ -10,6 +10,7 @@ export type CliParam = {
   in: ParamLoc;
   type: ScalarType;
   required: boolean;
+  nullable?: true; // the API accepts null for this field; shorthand `field=null` sends it
   enum?: string[];
   description?: string;
   properties?: CliParam[];

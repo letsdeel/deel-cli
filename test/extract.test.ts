@@ -106,3 +106,18 @@ test("responseFrom expands a response field that is an array of objects into ite
   );
   assert.equal(items!.properties!.find((field) => field.name === "status")!.required, true);
 });
+
+test("splitFields flags nullable body fields and leaves the rest unflagged", () => {
+  const { textProps } = splitFields({
+    type: "object",
+    properties: {
+      note: { type: "string", nullable: true },
+      amount: { type: "number", nullable: true },
+      external_id: { type: "string" },
+    },
+  });
+
+  assert.equal(textProps.find((field) => field.name === "note")!.nullable, true);
+  assert.equal(textProps.find((field) => field.name === "amount")!.nullable, true);
+  assert.equal("nullable" in textProps.find((field) => field.name === "external_id")!, false);
+});

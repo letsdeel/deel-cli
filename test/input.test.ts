@@ -45,3 +45,15 @@ test("non-number for a number field errors", () => {
 test("unrecognized input errors", () => {
   assert.throws(() => parseInput("just-a-word", props), /Unrecognized/);
 });
+
+test("shorthand null clears a nullable field of any type, and stays literal otherwise", () => {
+  const nullableProps: CliParam[] = [
+    { name: "note", in: "body", type: "string", required: false, nullable: true },
+    { name: "amount", in: "body", type: "number", required: false, nullable: true },
+    { name: "flag", in: "body", type: "boolean", required: false, nullable: true },
+    { name: "title", in: "body", type: "string", required: false },
+  ];
+  assert.deepEqual(parseInput("note=null,amount=null,flag=null", nullableProps), { note: null, amount: null, flag: null });
+  assert.deepEqual(parseInput("title=null", nullableProps), { title: "null" });
+  assert.deepEqual(parseInput('{"note":null}', nullableProps), { note: null });
+});

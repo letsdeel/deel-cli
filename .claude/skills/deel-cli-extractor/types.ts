@@ -7,6 +7,7 @@ export type CliParam = {
   in: ParamLoc;
   type: ScalarType;
   required: boolean;
+  nullable?: true;
   enum?: string[];
   description?: string;
   properties?: CliParam[];

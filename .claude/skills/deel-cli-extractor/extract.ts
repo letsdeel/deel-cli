@@ -69,6 +69,7 @@ export function splitFields(objSchema: AnyObj | undefined): { textProps: CliPara
         in: "body",
         type,
         required: required.includes(name),
+        ...(schema.nullable === true ? { nullable: true } : {}),
         ...(schema.enum ? { enum: (schema.enum as unknown[]).filter((v): v is string => v !== null) } : {}),
         ...(schema.description ? { description: schema.description } : {}),
         ...(properties?.length ? { properties } : {}),
