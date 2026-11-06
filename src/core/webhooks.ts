@@ -7,7 +7,6 @@ import type { Ctx } from "./context.ts";
 import { CliError } from "./errors.ts";
 import { HEADER } from "./constants.ts";
 import { errorFromResponse } from "./executor.ts";
-import { deriveIdempotencyKey } from "./idempotency.ts";
 
 // Shape of GET /webhooks items and GET /webhooks/{id} `data`.
 export type Webhook = {
@@ -253,21 +252,21 @@ export function simulateErrorFromResponse(status: number, json: unknown, request
   return error;
 }
 
-// `retryable: false` sends the request once; `deriveKey: false` sends an
+// `retryable: false` sends the request once; `autoKey: false` sends an
 // Idempotency-Key only when the caller passes one. `toError` replaces the shared
 // errorFromResponse mapping.
 type SendOpts = {
   idempotencyKey?: string;
   retryable?: boolean;
-  deriveKey?: boolean;
+  autoKey?: boolean;
   toError?: (status: number, json: unknown, requestId: string, betaSent?: boolean) => CliError;
 };
 
 // Mutating call, sent like the generic executor by default: JSON body, an
-// Idempotency-Key (the --idempotency-key override or one derived from the request) and retries.
+// Idempotency-Key (the --idempotency-key override or a new one for this run) and retries.
 async function sendJson(ctx: Ctx, method: string, path: string, body: unknown, command: string, opts: SendOpts = {}): Promise<unknown> {
   const requestId = ctx.newRequestId();
-  const key = opts.idempotencyKey ?? (opts.deriveKey === false ? undefined : deriveIdempotencyKey({ method, path, query: {}, body }));
+  const key = opts.idempotencyKey ?? (opts.autoKey === false ? undefined : ctx.newIdempotencyKey());
   const headers: Record<string, string> = {
     [HEADER.accept]: "application/json",
     [HEADER.requestId]: requestId,
@@ -302,13 +301,13 @@ export async function deleteWebhook(ctx: Ctx, id: string, idempotencyKey?: strin
 }
 
 // Each simulation is meant to be a new delivery: no retry (a 429 retry would burn
-// the hourly quota) and no derived Idempotency-Key (a gateway could replay the
-// previous response for the same {id, event_type}).
+// the hourly quota) and no automatic Idempotency-Key: there is nothing to dedupe
+// when the request is sent once.
 export async function simulateWebhook(ctx: Ctx, id: string, body: SimulateWebhookBody, idempotencyKey?: string): Promise<WebhookSimulation | null> {
   const json = (await sendJson(ctx, "POST", `/webhooks/${encodeURIComponent(id)}/simulate`, body, "webhooks simulate", {
     idempotencyKey,
     retryable: false,
-    deriveKey: false,
+    autoKey: false,
     toError: simulateErrorFromResponse,
   })) as any;
   return json?.data ?? null;
