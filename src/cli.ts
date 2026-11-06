@@ -4,6 +4,7 @@
 // to the executor. Each handler builds a Context (io + composed transport +
 // clock/rng) and passes it down — no module reaches for process.* or a global.
 
+import { isatty } from "node:tty";
 import { defineCommand, runCommand, showUsage } from "citty";
 import type { ArgsDef, CommandDef } from "citty";
 import type { Descriptor } from "./types.ts";
@@ -73,6 +74,12 @@ export function isStdinInUse(args: Partial<Pick<Args, "input" | "token-stdin">>,
   return args.input === "-" || Boolean(args["token-stdin"]) || !stdinIsTTY;
 }
 
+// Only asks the terminal when a prompt could be needed: touching process.stdin on a pipe makes fd 0 non-blocking, which breaks the later --token-stdin read (EAGAIN).
+export function resolveStdinInUse(descriptor: Descriptor, args: Partial<Pick<Args, "input" | "token-stdin" | "yes">>, stdinIsTTY: () => boolean): boolean {
+  if (!descriptor.confirm || args.yes === true) return false;
+  return isStdinInUse(args, stdinIsTTY());
+}
+
 // Shared execution body extracted so both actionCommand and variantCommand can delegate to it.
 async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<string, unknown>; rawArgs: string[] }): Promise<void> {
   const args = cittyCtx.args as Args;
@@ -96,7 +103,7 @@ async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<st
     files: gatherFiles(cittyCtx.rawArgs),
     idempotencyKey: args["idempotency-key"] as string | undefined,
   };
-  const stdinInUse = isStdinInUse(args, process.stdin.isTTY === true);
+  const stdinInUse = resolveStdinInUse(descriptor, args, () => isatty(0));
   await confirmDescriptor(descriptor, flags, args.yes === true, realIO(), promptConfirm, stdinInUse);
   const config = configFrom(args, cittyCtx.rawArgs);
   const token = requireToken(resolveToken({ tokenStdin: Boolean(args["token-stdin"]), env: config.env }));

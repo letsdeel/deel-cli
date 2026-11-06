@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { confirmDescriptor, isStdinInUse, run, variantCommand } from "../src/cli.ts";
+import { confirmDescriptor, isStdinInUse, resolveStdinInUse, run, variantCommand } from "../src/cli.ts";
 import { captureIO } from "../src/core/io.ts";
 import { CliError } from "../src/core/errors.ts";
 import { manifest } from "../src/manifest.generated.ts";
@@ -160,4 +160,28 @@ test("a terminal run with piped stdin and no --yes refuses and names --yes", asy
     () => confirmDescriptor(disable, { app_id: APP_ID }, false, captureIO({ isTTY: true }), async () => true, isStdinInUse({}, false)),
     (err: CliError) => err.code === "usage.confirm" && /--yes/.test(err.next ?? ""),
   );
+});
+
+test("resolveStdinInUse asks the terminal only when a prompt could be needed", () => {
+  const asked = (descriptor: Descriptor, args: Parameters<typeof resolveStdinInUse>[1]) => {
+    let calls = 0;
+    resolveStdinInUse(descriptor, args, () => (calls++, true));
+    return calls;
+  };
+  assert.equal(asked(withoutConfirm, {}), 0);
+  assert.equal(asked(withConfirm, { yes: true }), 0);
+  assert.equal(asked(withConfirm, {}), 1);
+});
+
+test("resolveStdinInUse combines --token-stdin, --input - and the terminal for a confirming command", () => {
+  const cases: Array<[Parameters<typeof resolveStdinInUse>[1], boolean, boolean]> = [
+    [{ "token-stdin": true }, true, true],
+    [{ input: "-" }, true, true],
+    [{ input: "name=x" }, true, false],
+    [{}, true, false],
+    [{}, false, true],
+  ];
+  for (const [args, tty, expected] of cases) {
+    assert.equal(resolveStdinInUse(withConfirm, args, () => tty), expected, JSON.stringify({ args, tty }));
+  }
 });
