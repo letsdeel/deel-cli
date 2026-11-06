@@ -207,3 +207,18 @@ test("splitFields carries nullable on request-body fields and leaves it off the 
   assert.equal(textProps.find((field) => field.name === "name")?.nullable, true);
   assert.equal("nullable" in textProps.find((field) => field.name === "note")!, false);
 });
+
+test("extract fails when a header named in the command map is not on the operation", () => {
+  const spec = {
+    paths: {
+      "/files/{file_id}/status": {
+        get: { parameters: [{ in: "path", name: "file_id", required: true, schema: { type: "string" } }] },
+      },
+    },
+  };
+  const { hardErrors } = extract(spec, [
+    { command: "files status", method: "GET", path: "/files/{file_id}/status", headers: { one_time_secret: "x-one-time-secret" } },
+  ]);
+  assert.equal(hardErrors.length, 1);
+  assert.match(hardErrors[0], /Missing header parameter: x-one-time-secret .*--one_time_secret/);
+});

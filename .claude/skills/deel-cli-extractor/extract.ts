@@ -210,6 +210,11 @@ export function extract(spec: AnyObj, entries: CommandEntry[]): ExtractionResult
     }
 
     const params = paramsFrom(operation, entry.headers);
+    for (const [flag, headerName] of Object.entries(entry.headers ?? {})) {
+      if (!params.some((param) => param.in === "header" && param.name === flag)) {
+        hardErrors.push(`Missing header parameter: ${headerName} (flag --${flag} of "${entry.command}${entry.variant ? ` variant "${entry.variant}"` : ""}") is not on ${entry.method} ${entry.path}`);
+      }
+    }
     const { bodyKind, bodyProps, maxItems, fileFields, supportsMultipart, bodyWrapper } = bodyFrom(operation);
     const { responseKind, responseFields } = responseFrom(operation);
 

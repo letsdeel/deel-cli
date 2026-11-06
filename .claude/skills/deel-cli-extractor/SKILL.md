@@ -34,6 +34,7 @@ The script:
 If the script exits non-zero, it found hard errors. Diagnose each error type before deciding how to proceed:
 
 - **`Missing operation: METHOD /path`** — the spec does not contain that endpoint. This usually means the spec is intentionally scoped (a partial spec). For each missing entry, explain to the user which command loses coverage and what the impact is. Then propose removing those entries from `src/commands.map.ts` and ask for confirmation. Once confirmed, make the edits and re-run the extractor. Treat the removals as BREAKING changes in Step 3.
+- **`Missing header parameter: <header>`** — a command-map entry names a header flag (`headers: { flag: "x-header" }`) that the operation in the spec does not declare as an `in: header` parameter. Check the header name in `src/commands.map.ts` for a typo (the match ignores case) and check the spec still declares it. If the API dropped the header, remove it from the entry and treat the lost flag as a BREAKING change in Step 3. Do not leave it unfixed: the manifest would silently lose the flag.
 
 - **Variant/param collision** — a variant name clashes with a param flag. Explain which command is affected and suggest renaming the variant in `src/commands.map.ts`. Ask the user to confirm the new name, make the edit, and re-run.
 

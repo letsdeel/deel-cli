@@ -5,6 +5,7 @@ import { createContext } from "../src/core/context.ts";
 import { captureIO } from "../src/core/io.ts";
 import { manifest } from "../src/manifest.generated.ts";
 import type { HttpRequest, HttpResponse } from "../src/core/http.ts";
+import type { CliError } from "../src/core/errors.ts";
 
 const FILE_ID = "4c1b7a52-3d18-4f69-8e0a-9b6f2d57c314";
 const OUTPUT = { json: true, quiet: false, raw: false };
@@ -102,4 +103,41 @@ test("files status refuses an empty --one_time_secret as a missing one", async (
     /Missing required --one_time_secret/,
   );
   assert.equal(seen.length, 0);
+});
+
+function withSecretEnv(value: string | undefined, run: () => Promise<void>) {
+  const saved = process.env.DEEL_ONE_TIME_SECRET;
+  if (value === undefined) delete process.env.DEEL_ONE_TIME_SECRET;
+  else process.env.DEEL_ONE_TIME_SECRET = value;
+  return run().finally(() => {
+    if (saved === undefined) delete process.env.DEEL_ONE_TIME_SECRET;
+    else process.env.DEEL_ONE_TIME_SECRET = saved;
+  });
+}
+
+test("files status reads the one-time secret from DEEL_ONE_TIME_SECRET when the flag is not given", async () => {
+  await withSecretEnv("secret-from-env", async () => {
+    const { ctx, seen } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { status: "ready" } } }));
+    await execute(descriptor(["files", "status"]), { flags: { file_id: FILE_ID }, files: {} }, ctx, RUN);
+    assert.equal(seen[0].headers["x-one-time-secret"], "secret-from-env");
+  });
+});
+
+test("the --one_time_secret flag wins over DEEL_ONE_TIME_SECRET", async () => {
+  await withSecretEnv("secret-from-env", async () => {
+    const { ctx, seen } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { status: "ready" } } }));
+    await execute(descriptor(["files", "status"]), { flags: { file_id: FILE_ID, one_time_secret: "secret-from-flag" }, files: {} }, ctx, RUN);
+    assert.equal(seen[0].headers["x-one-time-secret"], "secret-from-flag");
+  });
+});
+
+test("a blank DEEL_ONE_TIME_SECRET counts as missing and the error names the variable", async () => {
+  await withSecretEnv("  ", async () => {
+    const { ctx, seen } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: {} }));
+    await assert.rejects(
+      execute(descriptor(["files", "status"]), { flags: { file_id: FILE_ID }, files: {} }, ctx, RUN),
+      (error: CliError) => /Missing required --one_time_secret/.test(error.message) && /DEEL_ONE_TIME_SECRET/.test(error.next ?? ""),
+    );
+    assert.equal(seen.length, 0);
+  });
 });

@@ -130,10 +130,13 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   const paramHeaders: Record<string, string> = {};
   for (const param of descriptor.params) {
     if (param.in !== "header" || !param.header) continue;
-    const value = call.flags[param.name];
+    // A header flag can also come from DEEL_<FLAG> (DEEL_ONE_TIME_SECRET), so a secret stays out of the process list and shell history.
+    const envName = `DEEL_${param.name.toUpperCase()}`;
+    const fromEnv = process.env[envName]?.trim();
+    const value = call.flags[param.name] ?? (fromEnv || undefined);
     const given = value != null && String(value) !== "";
     if (given) paramHeaders[param.header] = String(value);
-    else if (param.required) throw new CliError("usage.header_param", `Missing required --${param.name}`);
+    else if (param.required) throw new CliError("usage.header_param", `Missing required --${param.name}`, `Pass --${param.name}, or set ${envName} to keep the value out of the process list.`);
   }
   Object.assign(headers, paramHeaders);
 

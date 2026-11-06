@@ -328,7 +328,7 @@ deel oauth2-apps listing submit --app_id <id> --beta                            
 
 ## Files
 
-`deel files create`, `status` and `complete` register a file upload and follow it, so you can attach a file to something that accepts a file handle, such as the logo of an app listing. They are generated from the API spec; the secret of a file is sent as the `x-one-time-secret` header through `--one_time_secret`.
+`deel files create`, `status` and `complete` register a file upload and follow it, so you can attach a file to something that accepts a file handle, such as the logo of an app listing. They are generated from the API spec; the secret of a file is sent as the `x-one-time-secret` header, from `--one_time_secret` or the `DEEL_ONE_TIME_SECRET` environment variable.
 
 ```bash
 deel files create --input '{"filename":"logo.png","size":2048}'      # prints file_id, one_time_secret and the upload target
@@ -337,7 +337,7 @@ deel files status --file_id <file_id> --one_time_secret <secret>     # wait for 
 deel oauth2-apps listing update --app_id <id> --beta --input '{"logo":{"file_id":"<file_id>","one_time_secret":"<secret>"}}'
 ```
 
-Files larger than the server's multipart threshold are uploaded in parts: pass `--upload_method multipart` to `files create`, upload each part with an HTTP PUT, then call `deel files complete --file_id <id> --one_time_secret <secret> --input ...` with the part numbers and ETags. The secret is a single-purpose handle for that one file, but it still appears in your shell history and process list when typed as a flag, so use a variable or a throwaway shell for it.
+Files larger than the server's multipart threshold are uploaded in parts: pass `--upload_method multipart` to `files create`, upload each part with an HTTP PUT, then call `deel files complete --file_id <id> --one_time_secret <secret> --input ...` with the part numbers and ETags. The secret is a single-purpose handle for that one file, but typed as a flag it is visible in the process list (`ps`) and your shell history. Set `DEEL_ONE_TIME_SECRET` instead and leave the flag out: `DEEL_ONE_TIME_SECRET=<secret> deel files status --file_id <file_id>`. Set it from a prompt or a secret store rather than typing the value on the command line, because an inline assignment still lands in the shell history. The flag wins when both are given. Any header flag can be set the same way with `DEEL_` and its name in capitals.
 
 ## Environments
 
