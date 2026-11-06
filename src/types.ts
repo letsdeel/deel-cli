@@ -10,6 +10,7 @@ export type CliParam = {
   in: ParamLoc;
   type: ScalarType;
   required: boolean;
+  nullable?: true; // the spec allows null here; shown in --help. Shorthand `field=null` coerces to null for top-level body fields only (nested flags are not read)
   enum?: string[];
   description?: string;
   properties?: CliParam[];
