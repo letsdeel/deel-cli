@@ -326,6 +326,19 @@ deel oauth2-apps listing submit --app_id <id> --beta                            
 
 `update` saves a draft and changes only the fields you send; each list you send (`highlights`, `support_resources`, `works_with`, `what_it_syncs`, `categories`) replaces the current one. `deel oauth2-apps listing update --help` lists every field. Test account details are accepted and never printed back. A listing in review cannot be changed (409) until the review ends; read `latest_revision.review_notes` after a rejection, edit, and submit again. A draft shows the logo you saved, but the listing goes live in the App Store only once Deel approves it.
 
+## Files
+
+`deel files create`, `status` and `complete` register a file upload and follow it, so you can attach a file to something that accepts a file handle, such as the logo of an app listing. They are generated from the API spec; the secret of a file is sent as the `x-one-time-secret` header, from `--one_time_secret` or the `DEEL_ONE_TIME_SECRET` environment variable.
+
+```bash
+deel files create --input '{"filename":"logo.png","size":2048}'      # prints file_id, one_time_secret and the upload target
+# send the bytes to the upload target yourself: a presigned form POST (url + fields, with the file as the last field)
+deel files status --file_id <file_id> --one_time_secret <secret>     # wait for "ready" (the virus scan is done)
+deel oauth2-apps listing update --app_id <id> --beta --input '{"logo":{"file_id":"<file_id>","one_time_secret":"<secret>"}}'
+```
+
+Files larger than the server's multipart threshold are uploaded in parts: pass `--upload_method multipart` to `files create`, upload each part with an HTTP PUT, then call `deel files complete --file_id <id> --one_time_secret <secret> --input ...` with the part numbers and ETags. The secret is a single-purpose handle for that one file, but typed as a flag it is visible in the process list (`ps`) and your shell history. Set `DEEL_ONE_TIME_SECRET` instead and leave the flag out: `DEEL_ONE_TIME_SECRET=<secret> deel files status --file_id <file_id>`. Set it from a prompt or a secret store rather than typing the value on the command line, because an inline assignment still lands in the shell history. The flag wins when both are given. Any header flag can be set the same way with `DEEL_` and its name in capitals.
+
 ## Environments
 
 | `--env`          | Base URL                                       |

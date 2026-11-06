@@ -1,10 +1,11 @@
-export type ParamLoc = "path" | "query" | "body";
+export type ParamLoc = "path" | "query" | "header" | "body";
 
 export type ScalarType = "string" | "number" | "integer" | "boolean" | "array" | "object";
 
 export type CliParam = {
   name: string;
   in: ParamLoc;
+  header?: string; // for in "header": the HTTP header this flag fills
   type: ScalarType;
   required: boolean;
   nullable?: boolean; // the API may send null for this field (the key is still present when required)
