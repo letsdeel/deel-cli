@@ -78,8 +78,14 @@ function unescape(text: string): string {
   return text.replace(/\\(.)/g, "$1");
 }
 
+// The text each plain value of a shorthand object was written as, so a string field gets it back unchanged
+// (007 stays 007, a b c stays one string). Values written as {..} or [..] have no entry.
+const RAW_TEXT = new WeakMap<object, Map<string, string>>();
+
 function parseShorthandObject(text: string): Record<string, unknown> {
   const result: Record<string, unknown> = {};
+  const raw = new Map<string, string>();
+  RAW_TEXT.set(result, raw);
   for (const pair of splitTopLevel(text, ",")) {
     if (pair.trim() === "") continue;
     const equalsIndex = firstTopLevelEquals(pair);
@@ -87,7 +93,9 @@ function parseShorthandObject(text: string): Record<string, unknown> {
       throw new CliError("input.shorthand", `Malformed shorthand segment (expected key=value): "${pair}"`);
     }
     const key = unescape(pair.slice(0, equalsIndex).trim());
-    result[key] = parseValue(pair.slice(equalsIndex + 1));
+    const valueText = pair.slice(equalsIndex + 1).trim();
+    result[key] = parseValue(valueText);
+    if (!valueText.startsWith("{") && !valueText.startsWith("[")) raw.set(key, unescape(valueText));
   }
   return result;
 }
@@ -107,9 +115,6 @@ function firstTopLevelEquals(text: string): number {
   return -1;
 }
 
-// The text a space-separated list was split from, so a string field gets it back as written (007 stays 007).
-const SPACE_LIST_TEXT = new WeakMap<unknown[], string>();
-
 function parseValue(raw: string): unknown {
   const value = raw.trim();
   if (value.startsWith("{") && value.endsWith("}")) return parseShorthandObject(value.slice(1, -1));
@@ -121,9 +126,7 @@ function parseValue(raw: string): unknown {
   // Space-separated scalar list (e.g. tags=a b c) — spaces not inside braces/brackets.
   const parts = splitTopLevel(value, " ").filter((part) => part.trim() !== "");
   if (parts.length > 1) {
-    const list = parts.map((part) => parseScalar(unescape(part.trim())));
-    SPACE_LIST_TEXT.set(list, unescape(value));
-    return list;
+    return parts.map((part) => parseScalar(unescape(part.trim())));
   }
   return parseScalar(unescape(value));
 }
@@ -143,6 +146,7 @@ function coerceTopLevel(value: unknown, bodyProps: CliParam[]): unknown {
     return value;
   }
   const record = value as Record<string, unknown>;
+  restoreStrings(record, bodyProps);
   const paramsByName = new Map(bodyProps.map((param) => [param.name, param]));
   for (const [key, fieldValue] of Object.entries(record)) {
     const param = paramsByName.get(key);
@@ -152,10 +156,25 @@ function coerceTopLevel(value: unknown, bodyProps: CliParam[]): unknown {
   return record;
 }
 
-function coerceScalar(raw: unknown, param: CliParam): unknown {
-  // A string field written with spaces (reason=a b c) was read as a space-separated list, so put the text back as written.
-  const spaced = Array.isArray(raw) ? SPACE_LIST_TEXT.get(raw) : undefined;
-  const value = param.type === "string" && spaced !== undefined ? spaced : raw;
+// A string field written in shorthand was read with guesses (reason=007 as a number, reason=a b c as a list), so put the
+// text back as written. It goes into nested objects and lists of objects too; values from JSON are left alone.
+function restoreStrings(record: Record<string, unknown>, params: CliParam[]): void {
+  const raw = RAW_TEXT.get(record);
+  for (const param of params) {
+    if (!(param.name in record)) continue;
+    if (param.type === "string") {
+      const text = raw?.get(param.name);
+      if (text !== undefined) record[param.name] = text;
+    } else if (param.properties?.length) {
+      const child = record[param.name];
+      for (const item of Array.isArray(child) ? child : [child]) {
+        if (item !== null && typeof item === "object" && !Array.isArray(item)) restoreStrings(item as Record<string, unknown>, param.properties);
+      }
+    }
+  }
+}
+
+function coerceScalar(value: unknown, param: CliParam): unknown {
   if (typeof value !== "string") return value;
   let coerced: unknown = value;
   if (param.type === "number" || param.type === "integer") {

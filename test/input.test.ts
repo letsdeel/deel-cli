@@ -62,3 +62,34 @@ test("a list shorthand is still a list for an array field", () => {
   const arrayProps: CliParam[] = [{ name: "tags", in: "body", type: "array", required: false }];
   assert.deepEqual(parseInput("tags=a b c", arrayProps), { tags: ["a", "b", "c"] });
 });
+
+test("a single word or number written for a string field stays a string", () => {
+  assert.deepEqual(parseInput("reason=007", props), { reason: "007" });
+  assert.deepEqual(parseInput("reason=true", props), { reason: "true" });
+  assert.deepEqual(parseInput("reason=1.50,amount=2", props), { reason: "1.50", amount: 2 });
+});
+
+test("a string inside a nested object keeps its spaces and numbers", () => {
+  const nested: CliParam[] = [
+    { name: "customer", in: "body", type: "object", required: false, properties: [{ name: "name", in: "body", type: "string", required: false }] },
+  ];
+  assert.deepEqual(parseInput("customer={name=Ada Lovelace}", nested), { customer: { name: "Ada Lovelace" } });
+  assert.deepEqual(parseInput("customer={name=007}", nested), { customer: { name: "007" } });
+});
+
+test("a string inside each item of a list of objects keeps its spaces", () => {
+  const listed: CliParam[] = [
+    { name: "items", in: "body", type: "array", required: false, properties: [{ name: "description", in: "body", type: "string", required: false }] },
+  ];
+  assert.deepEqual(parseInput("items=[{description=Q3 bonus},{description=Year end}]", listed), {
+    items: [{ description: "Q3 bonus" }, { description: "Year end" }],
+  });
+});
+
+test("a value with spaces for an enum string field is checked against the enum", () => {
+  assert.throws(() => parseInput("currency=US D", props), /currency must be one of/);
+});
+
+test("a number sent as JSON for a string field is left as sent", () => {
+  assert.deepEqual(parseInput('{"reason":7}', props), { reason: 7 });
+});
