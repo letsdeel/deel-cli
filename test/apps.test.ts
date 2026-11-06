@@ -218,6 +218,29 @@ test("oauth2-apps disable --help documents --yes; enable --help does not", async
   assert.doesNotMatch((await capture(["oauth2-apps", "enable", "--help"])).out, /--yes/);
 });
 
+test("oauth2-apps listing get puts the app id in the path and prints the listing with its nullable fields", async () => {
+  const listing = { app_id: APP_ID, status: "published", latest_revision: { status: "rejected", review_notes: "Add a demo video." }, logo_url: null };
+  const { ctx, seen, out } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: listing } }));
+  await execute(descriptor(["oauth2-apps", "listing", "get"]), { flags: { app_id: APP_ID }, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
+  assert.equal(seen[0].method, "GET");
+  assert.equal(new URL(seen[0].url).pathname, `/rest/oauth2-apps/${APP_ID}/listing`);
+  assert.deepEqual(out().data, listing);
+});
+
+test("app-store categories lists the categories", async () => {
+  const { ctx, seen, out } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: [{ id: 182, name: "Collaboration" }] } }));
+  await execute(descriptor(["app-store", "categories"]), { flags: {}, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
+  assert.equal(new URL(seen[0].url).pathname, "/rest/app-store/categories");
+  assert.equal(out().data[0].id, 182);
+});
+
+test("oauth2-apps listing get --help shows the response fields and marks the nullable ones", async () => {
+  const { code, out } = await capture(["oauth2-apps", "listing", "get", "--help"]);
+  assert.equal(code, 0);
+  assert.match(out, /latest_revision\s+object\s+nullable/);
+  assert.match(out, /logo_url\s+string\s+nullable/);
+});
+
 test("oauth2-apps list prints the next-page cursor on stderr in the --jq and --quiet modes", async () => {
   for (const output of [{ ...OUTPUT, jq: ".[].id" }, { ...OUTPUT, quiet: true }]) {
     const { ctx, io } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: [{ id: APP_ID }], cursor: "next-1" } }));
