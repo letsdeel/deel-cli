@@ -5,7 +5,6 @@ import type { Ctx } from "./context.ts";
 import { CliError } from "./errors.ts";
 import { HEADER } from "./constants.ts";
 import { errorFromResponse } from "./executor.ts";
-import { deriveIdempotencyKey } from "./idempotency.ts";
 
 export type TokenPerson = { profile_id: string; name: string | null; email: string | null; status: "ACTIVE" | "LEFT" };
 
@@ -172,7 +171,7 @@ export async function invalidateApiToken(ctx: Ctx, id: string, reason: string | 
   const path = `${tokenPath(id)}/invalidate`;
   const body = reason === undefined ? undefined : { data: { reason } };
   const requestId = ctx.newRequestId();
-  const key = idempotencyKey ?? deriveIdempotencyKey({ method: "POST", path, query: {}, body });
+  const key = idempotencyKey ?? ctx.newIdempotencyKey();
   const headers: Record<string, string> = {
     [HEADER.accept]: "application/json",
     [HEADER.requestId]: requestId,

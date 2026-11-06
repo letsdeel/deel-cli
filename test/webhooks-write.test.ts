@@ -5,7 +5,6 @@ import { createContext } from "../src/core/context.ts";
 import { captureIO } from "../src/core/io.ts";
 import type { HttpRequest, HttpResponse } from "../src/core/http.ts";
 import { HEADER } from "../src/core/constants.ts";
-import { deriveIdempotencyKey } from "../src/core/idempotency.ts";
 import { DASH_ID_HINT, SIGNING_KEY_HINT, buildCreateBody, buildUpdateBody } from "../src/core/webhooks.ts";
 import { readBooleanFlag, runCreate, runDelete, runUpdate, webhooksCommand, writeFlagsFrom } from "../src/commands/webhooks.ts";
 import { isYes, promptConfirm } from "../src/core/prompt.ts";
@@ -121,7 +120,7 @@ test("webhooks create POSTs the JSON body with an idempotency key and strips sig
   assert.equal(req.method, "POST");
   assert.equal(req.url, "https://example.test/rest/webhooks");
   assert.equal(req.headers[HEADER.contentType], "application/json");
-  assert.equal(req.headers[HEADER.idempotencyKey], deriveIdempotencyKey({ method: "POST", path: "/webhooks", query: {}, body }));
+  assert.match(req.headers[HEADER.idempotencyKey], /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   assert.equal(req.retryable, true);
   assert.equal(req.meta?.command, "webhooks create");
   assert.deepEqual(bodyOf(req), { name: "Hook", url: "https://x.test/h", events: ["a.b", "c.d"], status: "enabled", api_version: "v2" });

@@ -84,7 +84,7 @@ test("a descriptor's header flags never reach the request path or query", () => 
   assert.deepEqual(d.params.map((p) => [p.name, p.in]), [["file_id", "path"], ["one_time_secret", "header"]]);
 });
 
-test("files create derives a different idempotency key when --upload_method changes", async () => {
+test("files create sends a new idempotency key on each run, whatever the --upload_method", async () => {
   const { ctx, seen } = ctxWith(() => ({ status: 201, headers: {}, text: "", json: { data: { file_id: FILE_ID } } }));
   const body = { filename: "logo.png", size: 2048 };
   await execute(descriptor(["files", "create"]), { flags: {}, body, files: {} }, ctx, RUN);
@@ -92,8 +92,7 @@ test("files create derives a different idempotency key when --upload_method chan
   await execute(descriptor(["files", "create"]), { flags: {}, body, files: {} }, ctx, RUN);
 
   const keys = seen.map((request) => request.headers["idempotency-key"]);
-  assert.notEqual(keys[0], keys[1]);
-  assert.equal(keys[0], keys[2]);
+  assert.equal(new Set(keys).size, 3);
 });
 
 test("files status refuses an empty --one_time_secret as a missing one", async () => {

@@ -53,7 +53,7 @@ test("buildSimulateBody maps --event to data.event_type and requires it", () => 
   assert.throws(() => buildSimulateBody("  "), (err: any) => usage(err) && /--event/.test(err.message));
 });
 
-test("webhooks simulate POSTs {data: {event_type}} to /webhooks/{id}/simulate once, without retry or a derived idempotency key", async () => {
+test("webhooks simulate POSTs {data: {event_type}} to /webhooks/{id}/simulate once, without retry or an automatic idempotency key", async () => {
   const { ctx, io, seen } = ctxWith(() => ok(simulation(true, 200)));
   await runSimulate(ctx, "wh/1", buildSimulateBody("contract.created"), JSON_OUTPUT);
   assert.equal(seen.length, 1);

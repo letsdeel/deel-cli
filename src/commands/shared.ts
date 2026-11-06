@@ -25,7 +25,7 @@ export const commonArgs: ArgsDef = {
   beta: { type: "boolean", description: "Call beta endpoints: sends the X-Beta: true header" },
   "ca-cert": { type: "string", description: "Extra CA certificate (PEM) to trust, on top of the OS store — e.g. an internal/dev root" },
   "token-stdin": { type: "boolean", description: "Read the PAT from stdin" },
-  "idempotency-key": { type: "string", description: "Override the auto-derived idempotency key" },
+  "idempotency-key": { type: "string", description: "Idempotency key to send (default: a new random key per run); reuse a run's key to retry it safely" },
   log: { type: "boolean", default: true, description: "Local logging (--no-log to disable)" },
   "log-bodies": { type: "boolean", description: "Include full response bodies in the local log (off by default; also DEEL_LOG_BODIES=1)" },
   debug: { type: "boolean", description: "Print request diagnostics to stderr" },

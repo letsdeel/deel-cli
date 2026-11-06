@@ -2,12 +2,11 @@
 // transport, error mapping, output. Auth/version/request-id/retry/logging are
 // transport middlewares, so this stays focused on the request.
 
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import type { Descriptor } from "../types.ts";
 import type { Ctx } from "./context.ts";
 import type { OutputOpts } from "./output.ts";
-import { deriveIdempotencyKey } from "./idempotency.ts";
 import { CliError } from "./errors.ts";
 import { envelope, render } from "./output.ts";
 import { HEADER } from "./constants.ts";
@@ -156,11 +155,10 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
 
   let idempotencyKey: string | undefined;
   if (mutating) {
-    idempotencyKey =
-      call.idempotencyKey ??
-      deriveIdempotencyKey({ method: descriptor.method, path, query, headers: paramHeaders, body: effectiveKind === "multipart" ? await multipartFingerprint(descriptor, call) : wrapBody(descriptor, call.body) });
+    // A new key per run (see idempotency.ts); the retries of this request share it through `headers`.
+    idempotencyKey = call.idempotencyKey ?? ctx.newIdempotencyKey();
     headers[HEADER.idempotencyKey] = idempotencyKey;
-    if (opts.debug) ctx.io.err(`[debug] idempotency-key: ${idempotencyKey}${call.idempotencyKey ? " (override)" : " (derived)"}\n`);
+    if (opts.debug) ctx.io.err(`[debug] idempotency-key: ${idempotencyKey}${call.idempotencyKey ? " (override)" : " (generated)"}\n`);
   }
 
   const response = await ctx.http({
@@ -194,24 +192,6 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === "object" && !Array.isArray(value);
-}
-
-async function multipartFingerprint(descriptor: Descriptor, call: ParsedCall): Promise<unknown> {
-  // Bytes are not hashed for multipart; use text fields + filename + size.
-  const fingerprint: Record<string, unknown> = { ...(call.body as object) };
-  for (const fileField of descriptor.fileFields) {
-    const paths = call.files[fileField];
-    if (paths?.length) {
-      fingerprint[`${fileField}__files`] = await Promise.all(paths.map(async (path) => {
-        try {
-          return { name: basename(path), size: (await stat(path)).size };
-        } catch {
-          return { name: basename(path) };
-        }
-      }));
-    }
-  }
-  return fingerprint;
 }
 
 // `code`, or the older `error_code` some endpoints document, when `code` is absent.

@@ -20,10 +20,6 @@ export const SENSITIVE_LOG_KEYS = new Set([
   "signing_key",
 ]);
 
-// --- Idempotency ---
-// Fixed DeelCLI namespace for deterministic UUIDv5 keys.
-export const IDEMPOTENCY_NAMESPACE = "8f4b6c1e-3d2a-4f9c-9a1b-7e5d0c2a1f00";
-
 // --- Environment detection ---
 // Presence of any of these (CI must equal "true") forces non-interactive mode.
 export const AGENT_ENV_SIGNALS = ["CI", "CLAUDE_CODE", "CURSOR", "CODEX"] as const;

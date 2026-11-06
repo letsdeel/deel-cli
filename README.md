@@ -271,7 +271,9 @@ An invalidated token stops working at once and cannot be restored.
 
 ## Idempotency
 
-Every mutating request (`POST`/`PUT`/`PATCH`/`DELETE`) carries an `Idempotency-Key`. By default it is a **deterministic UUIDv5** derived from a canonicalized form of the request (method + path + query + body), so re-running the identical command sends the identical key and the server can dedupe a retry. Override it with `--idempotency-key <value>` when you want a fresh attempt.
+Every mutating request (`POST`/`PUT`/`PATCH`/`DELETE`) carries an `Idempotency-Key`. By default each run of a command gets a **new random key** (UUIDv4), and the CLI's own retries of that request (on `429` or `5xx`) reuse it, so a retried request runs at most once. Running the same command again is a new operation: `disable`, `enable`, `disable` ends disabled, and two identical `create` runs create two resources.
+
+To make a re-run a safe retry of an earlier run, for example after a timeout left you unsure whether it went through, pass the same key both times with `--idempotency-key <value>` (see the key with `--debug`). Within 24 hours the API then answers a repeated `POST`, `PUT` or `PATCH` with the first response instead of running it again. A key reused for a different request (another method, path or body) is rejected with `409 IDEMPOTENCY_KEY_REUSED`.
 
 ## Webhooks
 
@@ -286,7 +288,7 @@ deel webhooks simulate <id> --event contract.created           # Deel delivers a
 
 A webhook id can start with `-`, which the argument parser reads as a flag. Pass such an id as `--id=<id>` on `get`, `update`, `delete` and `simulate`: `deel webhooks get --id=-WZ1uT2DFF01`. `--id` wins over a positional id.
 
-`simulate` runs the delivery from Deel's servers, so the receiver URL must be publicly reachable; it is limited to 10 simulations per hour per event type, is never retried and gets no auto-derived `Idempotency-Key`, and exits 1 when the receiver does not answer 2xx.
+`simulate` runs the delivery from Deel's servers, so the receiver URL must be publicly reachable; it is limited to 10 simulations per hour per event type, is never retried and gets no automatic `Idempotency-Key`, and exits 1 when the receiver does not answer 2xx.
 
 ## OAuth2 apps
 

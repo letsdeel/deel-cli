@@ -8,7 +8,6 @@ import { RESERVED_COMMANDS } from "../src/core/constants.ts";
 import { CliError } from "../src/core/errors.ts";
 import { DASH_ID_HINT, TOKENS_MAX_PAGES, buildTokenListQuery, resolveTokenId, validateReason } from "../src/core/api-tokens.ts";
 import { HEADER } from "../src/core/constants.ts";
-import { deriveIdempotencyKey } from "../src/core/idempotency.ts";
 import { isYes, listFlagsFrom, promptConfirm, requireId, runGet, runList, runInvalidate, tokensCommand } from "../src/commands/tokens.ts";
 import { staticCommands } from "../src/commands/index.ts";
 import { run } from "../src/cli.ts";
@@ -40,6 +39,8 @@ function ctxWith(handler: (req: HttpRequest) => HttpResponse, opts: { isTTY?: bo
   });
   return { ctx, io, seen };
 }
+
+const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
 const stdoutJson = (io: { stdout: string[] }) => JSON.parse(io.stdout.join(""));
 
@@ -264,23 +265,21 @@ test("tokens invalidate --yes sends POST with the reason and an idempotency key,
   assert.equal(seen[0].method, "POST");
   assert.equal(seen[0].url, `https://example.test/rest/api-tokens/${TOKEN_ID}/invalidate`);
   assert.equal(seen[0].body, JSON.stringify({ data: { reason: "rotated" } }));
-  const body = { data: { reason: "rotated" } };
-  const path = `/api-tokens/${TOKEN_ID}/invalidate`;
-  assert.equal(seen[0].headers[HEADER.idempotencyKey], deriveIdempotencyKey({ method: "POST", path, query: {}, body }));
+  assert.match(seen[0].headers[HEADER.idempotencyKey], UUID_V4);
+  assert.equal(seen[0].meta?.idempotency_key, seen[0].headers[HEADER.idempotencyKey]);
   assert.equal(seen[0].retryable, true);
   assert.equal(seen[0].meta?.command, "tokens invalidate");
   assert.deepEqual(stdoutJson(io).data, { id: TOKEN_ID, status: "INVALIDATED" });
 });
 
-test("tokens invalidate derives the same idempotency key for the same call and a different one for another reason", async () => {
+test("tokens invalidate sends a new idempotency key on each run of the same call", async () => {
   const keys: string[] = [];
-  for (const reason of ["rotated", "rotated", "leaked"]) {
+  for (let run = 0; run < 2; run++) {
     const { ctx, seen } = ctxWith(() => ok({ data: { id: TOKEN_ID, status: "INVALIDATED" } }));
-    await runInvalidate(ctx, TOKEN_ID, { yes: true, reason }, JSON_OUTPUT);
+    await runInvalidate(ctx, TOKEN_ID, { yes: true, reason: "rotated" }, JSON_OUTPUT);
     keys.push(seen[0].headers[HEADER.idempotencyKey]);
   }
-  assert.equal(keys[0], keys[1]);
-  assert.notEqual(keys[0], keys[2]);
+  assert.notEqual(keys[0], keys[1]);
 });
 
 test("tokens invalidate sends the --idempotency-key override as is", async () => {
