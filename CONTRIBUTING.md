@@ -59,6 +59,22 @@ say a minute later.
   `src/commands.map.ts` and regenerate; a PR that changes the manifest carries the `script-generated`
   label.
 
+## Commands that destroy or revoke something
+
+A command that deletes, disables or revokes something sets `confirm` on its entry in
+`src/commands.map.ts` (see "Discovering commands" in the README for how the prompt behaves). Before
+you open the PR, check that:
+
+- The question names the resource and says what the action does and whether it can be undone.
+- The prompt only appears in a terminal. Without one, and without `--yes`, the command refuses and
+  names `--yes` in the error. It never proceeds silently.
+- The prompt never reads from a stream that carries data. When the token or the body comes from stdin
+  (`--token-stdin`, `--input -`), `--yes` is required.
+- The prompt always ends: end of input and Ctrl-C count as "no", and a "no" sends nothing.
+- `--help --json` shows the `confirm` entry.
+- Tests cover: no terminal and no `--yes`; a terminal answering yes and answering no; stdin in use;
+  end of input; and the `--help --json` entry. Use the cases in `test/confirm.test.ts` as the model.
+
 ## Pull requests
 
 - Base branch: `dev`. Use a short, descriptive feature-branch name.

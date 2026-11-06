@@ -83,7 +83,8 @@ function buildUsage(descriptor: Descriptor): string {
           ? " [--input <body>]"
           : "";
   const variantFlag = descriptor.variant ? ` --${descriptor.variant}` : "";
-  return `deel ${descriptor.command.join(" ")}${variantFlag} [GLOBAL OPTIONS]${required ? " " + required : ""}${bodyHint}`;
+  const yesHint = descriptor.confirm ? " [--yes]" : "";
+  return `deel ${descriptor.command.join(" ")}${variantFlag} [GLOBAL OPTIONS]${required ? " " + required : ""}${bodyHint}${yesHint}`;
 }
 
 // Machine-readable form of the action contract (same content as `--help`, as JSON)
@@ -106,7 +107,11 @@ export function printContractJson(descriptor: Descriptor): void {
     ...(descriptor.variant ? { variant: descriptor.variant } : {}),
     usage: buildUsage(descriptor),
     version: descriptor.version,
-    params: descriptor.params.map((param) => ({ name: param.name, in: param.in, type: param.type, required: param.required, enum: param.enum, description: param.description })),
+    ...(descriptor.confirm ? { confirm: { message: descriptor.confirm, flag: "yes", requiredWhenNonInteractive: true, requiredWhenStdinInUse: true } } : {}),
+    params: [
+      ...descriptor.params.map((param) => ({ name: param.name, in: param.in, type: param.type, required: param.required, enum: param.enum, description: param.description })),
+      ...(descriptor.confirm ? [{ name: "yes", in: "flag", type: "boolean", required: false, description: "Skip the confirmation prompt (required without a terminal, or when stdin carries the token or the input)" }] : []),
+    ],
     body: {
       kind: descriptor.bodyKind,
       fields: fieldsToJson(descriptor.bodyProps),
@@ -136,6 +141,8 @@ export function printActionHelp(descriptor: Descriptor): void {
       out(`  --${param.name}=<${param.type}>${requiredTag}${options}${param.description ? `   ${param.description}` : ""}\n`);
     }
   }
+
+  if (descriptor.confirm) out(`  --yes   Skip the confirmation prompt (required without a terminal, or when stdin carries the token or the input)\n`);
 
   printContract(descriptor);
   out(`Global options (--json, --jq, --fields, --quiet, --env, ...) — run 'deel --help'.\n`);

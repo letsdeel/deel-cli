@@ -128,6 +128,33 @@ test("oauth2-apps list --help --json describes the filters and the app fields", 
   for (const name of ["api_access", "limit", "cursor", "redirect_uris", "client_type"]) assert.match(contract, new RegExp(name));
 });
 
+test("oauth2-apps disable --help --json exposes the confirmation and oauth2-apps enable does not", async () => {
+  const disable = JSON.parse((await capture(["oauth2-apps", "disable", "--help", "--json"])).out);
+  assert.deepEqual(disable.confirm, {
+    message: "Disable app {app_id}? This revokes all consents and tokens; enable does not restore them.",
+    flag: "yes",
+    requiredWhenNonInteractive: true,
+    requiredWhenStdinInUse: true,
+  });
+  assert.match(disable.usage, /\[--yes\]$/);
+  const enable = JSON.parse((await capture(["oauth2-apps", "enable", "--help", "--json"])).out);
+  assert.equal("confirm" in enable, false);
+  assert.doesNotMatch(enable.usage, /--yes/);
+});
+
+test("oauth2-apps disable --help --json lists --yes among its params and oauth2-apps enable does not", async () => {
+  const disable = JSON.parse((await capture(["oauth2-apps", "disable", "--help", "--json"])).out);
+  assert.deepEqual(disable.params.find((param: { name: string }) => param.name === "yes"), {
+    name: "yes",
+    in: "flag",
+    type: "boolean",
+    required: false,
+    description: "Skip the confirmation prompt (required without a terminal, or when stdin carries the token or the input)",
+  });
+  const enable = JSON.parse((await capture(["oauth2-apps", "enable", "--help", "--json"])).out);
+  assert.equal(enable.params.some((param: { name: string }) => param.name === "yes"), false);
+});
+
 test("oauth2-apps get --help --json marks created_by and its name as required and nullable", async () => {
   const { out } = await capture(["oauth2-apps", "get", "--help", "--json"]);
   const createdBy = JSON.parse(out).response.fields.find((field: { name: string }) => field.name === "created_by");
@@ -149,6 +176,46 @@ test("oauth2-apps get --help lists the --app_id flag", async () => {
   const { code, out } = await capture(["oauth2-apps", "get", "--help"]);
   assert.equal(code, 0);
   assert.match(out, /app_id/);
+});
+
+test("oauth2-apps update wraps the body under data and sends PATCH to the app path", async () => {
+  const { ctx, seen } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { id: APP_ID, name: "New" } } }));
+  await execute(
+    descriptor(["oauth2-apps", "update"]),
+    { flags: { app_id: APP_ID }, body: { name: "New", redirect_uris: ["https://example.com/cb"] }, files: {} },
+    ctx,
+    { output: OUTPUT, debug: false, form: false },
+  );
+  const req = seen[0];
+  assert.equal(req.method, "PATCH");
+  assert.equal(new URL(req.url).pathname, `/rest/oauth2-apps/${APP_ID}`);
+  assert.deepEqual(JSON.parse(String(req.body)), { data: { name: "New", redirect_uris: ["https://example.com/cb"] } });
+  assert.ok(req.headers["idempotency-key"]);
+});
+
+test("oauth2-apps update describes its body fields", () => {
+  const names = descriptor(["oauth2-apps", "update"]).bodyProps.map((p) => p.name);
+  assert.deepEqual(names, ["name", "description", "website_url", "redirect_uris"]);
+});
+
+test("oauth2-apps disable and enable send a POST with no body to their own paths", async () => {
+  for (const action of ["disable", "enable"]) {
+    const { ctx, seen } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { id: APP_ID, api_access: action === "enable" ? "enabled" : "disabled" } } }));
+    await execute(descriptor(["oauth2-apps", action]), { flags: { app_id: APP_ID }, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
+    assert.equal(seen[0].method, "POST");
+    assert.equal(new URL(seen[0].url).pathname, `/rest/oauth2-apps/${APP_ID}/${action}`);
+    assert.equal(seen[0].body, null);
+  }
+});
+
+test("only oauth2-apps disable asks for confirmation", () => {
+  const confirming = manifest.descriptors.filter((d) => d.confirm).map((d) => d.command.join(" "));
+  assert.deepEqual(confirming, ["oauth2-apps disable"]);
+});
+
+test("oauth2-apps disable --help documents --yes; enable --help does not", async () => {
+  assert.match((await capture(["oauth2-apps", "disable", "--help"])).out, /--yes/);
+  assert.doesNotMatch((await capture(["oauth2-apps", "enable", "--help"])).out, /--yes/);
 });
 
 test("oauth2-apps list prints the next-page cursor on stderr in the --jq and --quiet modes", async () => {

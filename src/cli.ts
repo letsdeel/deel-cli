@@ -4,6 +4,7 @@
 // to the executor. Each handler builds a Context (io + composed transport +
 // clock/rng) and passes it down — no module reaches for process.* or a global.
 
+import { isatty } from "node:tty";
 import { defineCommand, runCommand, showUsage } from "citty";
 import type { ArgsDef, CommandDef } from "citty";
 import type { Descriptor } from "./types.ts";
@@ -19,6 +20,10 @@ import { CLI_VERSION } from "./version.ts";
 import { commonArgs, configFrom, gatherFiles, gatherFlagValues, outputOpts } from "./commands/shared.ts";
 import type { Args } from "./commands/shared.ts";
 import { staticCommands } from "./commands/index.ts";
+import { promptConfirm } from "./core/prompt.ts";
+import type { Confirm } from "./core/prompt.ts";
+import { realIO } from "./core/io.ts";
+import type { IOStreams } from "./core/io.ts";
 import { printActionHelp, printContractJson, printGlobalOptions, printSkeleton, printVariantGroupHelp, printVersion } from "./help.ts";
 
 // ---------------- generated action commands ----------------
@@ -33,7 +38,46 @@ function argsForDescriptor(descriptor: Descriptor): ArgsDef {
       ...(param.enum ? { options: param.enum } : {}),
     } as ArgsDef[string];
   }
+  if (descriptor.confirm) args.yes = YES_ARG;
   return args;
+}
+
+const YES_DESCRIPTION = "Skip the confirmation prompt (required without a terminal, or when stdin carries the token or the input)";
+const YES_ARG = { type: "boolean", description: YES_DESCRIPTION } as ArgsDef[string];
+
+// Commands whose map entry sets `confirm` ask before anything is sent. A terminal gets a [y/N] prompt on stderr
+// (only y/yes goes on); --yes skips it; without a terminal (no TTY, CI or an agent) --yes is required, so a
+// script never runs the command by accident. Reading the token or the body from stdin (--token-stdin, --input -)
+// leaves nothing to answer the prompt, so those runs need --yes too. Runs before the token lookup and the request.
+export async function confirmDescriptor(
+  descriptor: Descriptor,
+  flags: Record<string, string | string[]>,
+  yes: boolean,
+  io: IOStreams,
+  ask: Confirm = promptConfirm,
+  stdinInUse = false,
+): Promise<void> {
+  if (!descriptor.confirm || yes) return;
+  const name = descriptor.command.join(" ");
+  if (stdinInUse) {
+    throw new CliError("usage.confirm", `Refusing to run \`${name}\` without confirmation`, "Pass --yes: stdin carries the token or the input, or is not a terminal, so there is no prompt to answer.");
+  }
+  if (!io.interactive) {
+    throw new CliError("usage.confirm", `Refusing to run \`${name}\` without confirmation`, "Pass --yes to run this non-interactively.");
+  }
+  const message = descriptor.confirm.replace(/\{([^}]+)\}/g, (match, key: string) => (flags[key] !== undefined ? String(flags[key]) : match));
+  if (!(await ask(`${message} [y/N] `))) throw new CliError(`${descriptor.command[0]}.aborted`, `Aborted: \`${name}\` was not run`);
+}
+
+// stdin cannot answer the prompt when it carries the token or the body, or when it is not a terminal (a pipe would be read as the answer).
+export function isStdinInUse(args: Partial<Pick<Args, "input" | "token-stdin">>, stdinIsTTY: boolean): boolean {
+  return args.input === "-" || Boolean(args["token-stdin"]) || !stdinIsTTY;
+}
+
+// Only asks the terminal when a prompt could be needed: touching process.stdin on a pipe makes fd 0 non-blocking, which breaks the later --token-stdin read (EAGAIN).
+export function resolveStdinInUse(descriptor: Descriptor, args: Partial<Pick<Args, "input" | "token-stdin" | "yes">>, stdinIsTTY: () => boolean): boolean {
+  if (!descriptor.confirm || args.yes === true) return false;
+  return isStdinInUse(args, stdinIsTTY());
 }
 
 // Shared execution body extracted so both actionCommand and variantCommand can delegate to it.
@@ -59,6 +103,8 @@ async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<st
     files: gatherFiles(cittyCtx.rawArgs),
     idempotencyKey: args["idempotency-key"] as string | undefined,
   };
+  const stdinInUse = resolveStdinInUse(descriptor, args, () => isatty(0));
+  await confirmDescriptor(descriptor, flags, args.yes === true, realIO(), promptConfirm, stdinInUse);
   const config = configFrom(args, cittyCtx.rawArgs);
   const token = requireToken(resolveToken({ tokenStdin: Boolean(args["token-stdin"]), env: config.env }));
   const ctx = createContext({ config, token });
@@ -76,13 +122,14 @@ function actionCommand(descriptor: Descriptor): CommandDef {
 // Variant group: registers one boolean selector per variant. Exactly one must be
 // set; zero or multiple throws usage.variant. Params are the union of all variants'
 // params (all optional at parse time; enforcement happens inside runDescriptor).
-function variantCommand(descriptors: Descriptor[]): CommandDef {
+export function variantCommand(descriptors: Descriptor[]): CommandDef {
   const name = descriptors[0].command[descriptors[0].command.length - 1];
   const variants = descriptors.map((d) => d.variant!);
   const args: ArgsDef = { ...commonArgs };
   for (const variant of variants) {
     args[variant] = { type: "boolean", description: `Use the ${variant} variant` };
   }
+  if (descriptors.some((d) => d.confirm)) args.yes = YES_ARG;
   const seenParams = new Set<string>();
   for (const d of descriptors) {
     for (const param of d.params) {

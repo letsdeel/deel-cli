@@ -3,6 +3,9 @@ export type CommandEntry = {
   variant?: string;
   method: string;
   path: string;
+  // Asks for confirmation before the request is sent (`{param}` placeholders are filled from the flags).
+  // Adds a --yes flag; without it a non-interactive run is refused.
+  confirm?: string;
 };
 
 export const commandMap: CommandEntry[] = [
@@ -16,6 +19,14 @@ export const commandMap: CommandEntry[] = [
 
   { command: "oauth2-apps list", method: "GET", path: "/oauth2-apps" },
   { command: "oauth2-apps get",  method: "GET", path: "/oauth2-apps/{app_id}" },
+  { command: "oauth2-apps update", method: "PATCH", path: "/oauth2-apps/{app_id}" },
+  {
+    command: "oauth2-apps disable",
+    method: "POST",
+    path: "/oauth2-apps/{app_id}/disable",
+    confirm: "Disable app {app_id}? This revokes all consents and tokens; enable does not restore them.",
+  },
+  { command: "oauth2-apps enable", method: "POST", path: "/oauth2-apps/{app_id}/enable" },
 
   { command: "logs requests list",    method: "GET", path: "/logs/requests" },
   { command: "logs requests get",     method: "GET", path: "/logs/requests/{request_id}" },

@@ -7,7 +7,8 @@ import type { HttpRequest, HttpResponse } from "../src/core/http.ts";
 import { HEADER } from "../src/core/constants.ts";
 import { deriveIdempotencyKey } from "../src/core/idempotency.ts";
 import { DASH_ID_HINT, SIGNING_KEY_HINT, buildCreateBody, buildUpdateBody } from "../src/core/webhooks.ts";
-import { isYes, promptConfirm, readBooleanFlag, runCreate, runDelete, runUpdate, webhooksCommand, writeFlagsFrom } from "../src/commands/webhooks.ts";
+import { readBooleanFlag, runCreate, runDelete, runUpdate, webhooksCommand, writeFlagsFrom } from "../src/commands/webhooks.ts";
+import { isYes, promptConfirm } from "../src/core/prompt.ts";
 import { run } from "../src/cli.ts";
 
 const CONFIG = { env: "demo", baseUrl: "https://example.test/rest" };
