@@ -8,7 +8,8 @@ Public repo (letsdeel/deel-cli): keep ticket keys, internal tool names and inter
 - Hand-written commands (`auth`, `tokens`, `job`, `webhooks`) live in `src/commands/`, with their logic in `src/core/`. Flags that repeat or stay hidden are read from `rawArgs`, because citty does not expose them.
 - `src/commands/shared.ts` holds the flag helpers, including the `nullable*` parsers: `--flag null` clears a nullable field, and `--flag=--x` passes a value that starts with `--`.
 - `src/core/executor.ts` sends the request and maps API errors (`errorFromResponse`); `src/core/input.ts` coerces `--input` JSON and `k=v` shorthand.
-- `src/core/config.ts` holds the base URLs. They end in `/rest`; a base URL without it returns 404 on every call. `DEEL_TOKEN` supplies the token.
+- `src/core/config.ts` holds the base URLs. They end in `/rest`; a base URL without it returns 404 on every call.
+- `src/core/auth.ts` resolves the token: `--token-stdin`, then `DEEL_TOKEN`, then the keychain.
 
 ## Before committing
 
