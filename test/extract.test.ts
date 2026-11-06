@@ -121,3 +121,24 @@ test("splitFields flags nullable body fields and leaves the rest unflagged", () 
   assert.equal(textProps.find((field) => field.name === "amount")!.nullable, true);
   assert.equal("nullable" in textProps.find((field) => field.name === "external_id")!, false);
 });
+
+test("splitFields flags nullable fields of nested objects", () => {
+  const { textProps } = splitFields({
+    type: "object",
+    properties: {
+      address: {
+        type: "object",
+        properties: {
+          line2: { type: "string", nullable: true },
+          city: { type: "string" },
+        },
+      },
+    },
+  });
+
+  const address = textProps.find((field) => field.name === "address")!;
+  assert.equal(address.properties!.find((field) => field.name === "line2")!.nullable, true);
+  assert.equal("nullable" in address.properties!.find((field) => field.name === "city")!, false);
+});
+
+// OAS 3.0 only: `nullable: true` is read. OAS 3.1 `type: ["string", "null"]` is not detected.

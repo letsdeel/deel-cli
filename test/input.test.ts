@@ -57,3 +57,18 @@ test("shorthand null clears a nullable field of any type, and stays literal othe
   assert.deepEqual(parseInput("title=null", nullableProps), { title: "null" });
   assert.deepEqual(parseInput('{"note":null}', nullableProps), { note: null });
 });
+
+test("shorthand null clears a nullable enum or integer field without enum or number checks", () => {
+  const props: CliParam[] = [
+    { name: "status", in: "body", type: "string", required: false, nullable: true, enum: ["open", "closed"] },
+    { name: "count", in: "body", type: "integer", required: false, nullable: true },
+  ];
+  assert.deepEqual(parseInput("status=null,count=null", props), { status: null, count: null });
+  assert.throws(() => parseInput("status=pending", props), /must be one of/);
+});
+
+test("a JSON string \"null\" on a nullable field stays text; only shorthand maps the literal", () => {
+  const props: CliParam[] = [{ name: "note", in: "body", type: "string", required: false, nullable: true }];
+  assert.deepEqual(parseInput('{"note":"null"}', props), { note: "null" });
+  assert.deepEqual(parseInput("note=null", props), { note: null });
+});
