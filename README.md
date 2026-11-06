@@ -6,6 +6,7 @@ A command-line client for selected endpoints from the [Deel Public API](https://
 deel auth status --json                              # verify your token and identity
 deel adjustments create --invoice --generate-input  # explore required fields
 deel jobs list --jq '.[] | {job_id, status}'        # filter recent async jobs
+deel oauth2-apps list --api_access enabled                 # list your organization's integration apps
 deel logs requests list --status_class 4xx --beta   # your organization's failed API requests
 ```
 
@@ -22,6 +23,7 @@ deel logs requests list --status_class 4xx --beta   # your organization's failed
 - [API tokens](#api-tokens)
 - [Idempotency](#idempotency)
 - [Webhooks](#webhooks)
+- [OAuth2 apps](#oauth2-apps)
 - [Environments](#environments)
 - [Corporate proxies & custom CAs](#corporate-proxies--custom-cas)
 - [Exit codes](#exit-codes)
@@ -165,7 +167,7 @@ deel adjustments create --help --json                   # machine-readable contr
 deel adjustments create --invoice --generate-input      # JSON body skeleton to fill in
 ```
 
-`--help` for an action shows what generic `--help` cannot: the request-body fields (which arrive via `--input`, not as flags) and the response fields.
+`--help` for an action shows what generic `--help` cannot: the request-body fields (which arrive via `--input`, not as flags) and the response fields. A field the API may send as `null` is marked `nullable` in both views (a `required` field is always present, but its value can still be `null`).
 
 ## Request input
 
@@ -275,6 +277,17 @@ deel webhooks simulate <id> --event contract.created           # Deel delivers a
 A webhook id can start with `-`, which the argument parser reads as a flag. Pass such an id as `--id=<id>` on `get`, `update`, `delete` and `simulate`: `deel webhooks get --id=-WZ1uT2DFF01`. `--id` wins over a positional id.
 
 `simulate` runs the delivery from Deel's servers, so the receiver URL must be publicly reachable; it is limited to 10 simulations per hour per event type, is never retried and gets no auto-derived `Idempotency-Key`, and exits 1 when the receiver does not answer 2xx.
+
+## OAuth2 apps
+
+`deel oauth2-apps list` and `deel oauth2-apps get --app_id <id>` read the integration apps that belong to your organization (the app secret is never returned). The commands are generated from the API spec like the others, so path parameters are flags.
+
+```bash
+deel oauth2-apps list --api_access disabled --limit 20      # filter by API access; --limit (1 to 100, default 100) and --cursor page the list
+deel oauth2-apps get --app_id 00000000-0000-0000-0000-000000000000
+```
+
+`oauth2-apps list` returns one page at a time. When more results exist, the next-page cursor is printed as `meta.cursor`; pass it back with `--cursor` to get the next page.
 
 ## Environments
 

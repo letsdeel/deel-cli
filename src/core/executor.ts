@@ -170,7 +170,14 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   // Paginated list responses carry `page: { cursor, has_next_page }` next to `data`. Surface it in
   // the envelope (only when `data` was unwrapped from one) so the caller can page with --cursor.
   const page = hasDataEnvelope && isPlainObject(payload.page) ? (payload.page as Record<string, unknown>) : undefined;
-  await render(ctx.io, envelope(data, { request_id: requestId }, page), opts.output);
+  // Some list responses carry the next-page cursor beside `data` instead; surface it in meta.
+  const nextCursor = isPlainObject(payload) ? payload.cursor : undefined;
+  const meta: Record<string, unknown> = { request_id: requestId };
+  if (typeof nextCursor === "string" && nextCursor !== "") {
+    meta.cursor = nextCursor;
+    ctx.io.err(`next page: --cursor ${nextCursor}\n`);
+  }
+  await render(ctx.io, envelope(data, meta, page), opts.output);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
