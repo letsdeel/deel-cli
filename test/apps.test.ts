@@ -307,3 +307,12 @@ test("--help keeps a space between a required nullable body field and its descri
   }
   assert.match(out.join(""), /required nullable\s+— Name/);
 });
+
+test("oauth2-apps listing update --generate-input prints a list of objects for the list fields and an object for the logo handle", async () => {
+  const { code, out } = await capture(["oauth2-apps", "listing", "update", "--generate-input"]);
+  assert.equal(code, 0);
+  const skeleton = JSON.parse(out);
+  assert.deepEqual(skeleton.highlights, [{ title: "", text: "" }]);
+  assert.deepEqual(skeleton.support_resources, [{ name: "", url: "" }]);
+  assert.deepEqual(skeleton.logo, { file_id: "", one_time_secret: "" });
+});
