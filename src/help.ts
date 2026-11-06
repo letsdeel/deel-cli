@@ -25,21 +25,23 @@ export function printVersion(): void {
 // since the body arrives via --input and responses aren't citty args).
 export function printContract(descriptor: Descriptor): void {
   const out = process.stdout.write.bind(process.stdout);
-  const line = (name: string, type: string, required: boolean, options?: string[], description?: string) =>
-    `  ${name.padEnd(22)} ${type.padEnd(8)} ${(required ? "required" : "").padEnd(9)}${options ? `[${options.join(" | ")}]  ` : ""}${description ? `— ${description}` : ""}\n`;
+  // Widen the flag column only when a field is nullable, so other contracts print as before.
+  const flagWidth = flattenFields(descriptor.bodyProps).some((field) => field.nullable) ? 18 : 9;
+  const line = (name: string, type: string, required: boolean, options?: string[], description?: string, nullable?: boolean) =>
+    `  ${name.padEnd(22)} ${type.padEnd(8)} ${[required ? "required" : "", nullable ? "nullable" : ""].filter(Boolean).join(", ").padEnd(flagWidth)}${options ? `[${options.join(" | ")}]  ` : ""}${description ? `— ${description}` : ""}\n`;
 
   if (descriptor.bodyKind === "multipart") {
     out(`\nREQUEST — multipart upload (POST)\n`);
     for (const fileField of descriptor.fileFields) out(`  --file ${fileField}=@<path>   (required)\n`);
-    for (const field of flattenFields(descriptor.bodyProps)) out(line(`--input ${field.name}`, field.type, field.required, field.enum, field.description));
+    for (const field of flattenFields(descriptor.bodyProps)) out(line(`--input ${field.name}`, field.type, field.required, field.enum, field.description, field.nullable));
   } else if (descriptor.bodyKind === "json-array") {
     out(`\nREQUEST BODY (--input) — a JSON array, each item:\n`);
     if (descriptor.bodyProps.length === 0) out(`  (free-form JSON object)\n`);
-    for (const field of flattenFields(descriptor.bodyProps)) out(line(field.name, field.type, field.required, field.enum, field.description));
+    for (const field of flattenFields(descriptor.bodyProps)) out(line(field.name, field.type, field.required, field.enum, field.description, field.nullable));
   } else if (descriptor.bodyKind === "json") {
     out(`\nREQUEST BODY (--input)\n`);
     if (descriptor.bodyProps.length === 0) out(`  (free-form JSON object)\n`);
-    for (const field of flattenFields(descriptor.bodyProps)) out(line(field.name, field.type, field.required, field.enum, field.description));
+    for (const field of flattenFields(descriptor.bodyProps)) out(line(field.name, field.type, field.required, field.enum, field.description, field.nullable));
   }
 
   if (descriptor.supportsMultipart && descriptor.bodyKind !== "multipart" && descriptor.fileFields.length) {
@@ -91,6 +93,7 @@ function fieldsToJson(fields: CliParam[]): unknown[] {
     name: field.name,
     type: field.type,
     required: field.required,
+    ...(field.nullable ? { nullable: true } : {}),
     enum: field.enum,
     description: field.description,
     ...(field.properties?.length ? { properties: fieldsToJson(field.properties) } : {}),

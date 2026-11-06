@@ -434,3 +434,37 @@ test("errorFromResponse falls back to error_code when code is absent, and to htt
   assert.equal(errorFromResponse(404, { errors: [{ message: "Webhook not found" }] }, "r1").code, "http.404");
   assert.equal(errorFromResponse(500, { errors: [{ error_code: 42, message: "m" }] }, "r1").code, "http.500");
 });
+
+const nullableDescriptor: Descriptor = {
+  ...createDescriptor,
+  params: [],
+  bodyProps: [
+    { name: "note", in: "body", type: "string", required: false, nullable: true },
+    { name: "amount", in: "body", type: "number", required: true },
+  ],
+};
+const execOpts = (form: boolean) => ({ output: { json: true, quiet: false, raw: false }, debug: false, form });
+
+test("execute() sends a JSON null body field as null", async () => {
+  const { ctx, seen } = ctxWith(() => ({ status: 201, headers: {}, text: "", json: { data: {} } }));
+
+  await execute(nullableDescriptor, { flags: {}, body: { amount: 5, note: null }, files: {} }, ctx, execOpts(false));
+
+  assert.deepEqual(JSON.parse(String(seen[0].body)), { amount: 5, note: null });
+});
+
+test("execute() refuses to send null as a multipart form field", async () => {
+  const { ctx, seen } = ctxWith(() => ({ status: 201, headers: {}, text: "", json: { data: {} } }));
+  const multipart: Descriptor = { ...nullableDescriptor, supportsMultipart: true };
+
+  await assert.rejects(
+    () => execute(multipart, { flags: {}, body: { amount: 5, note: null }, files: {} }, ctx, execOpts(true)),
+    (error: any) => {
+      assert.equal(error.code, "usage.body");
+      assert.match(error.message, /--form cannot send null for note/);
+      assert.match(error.next, /omit --form/);
+      return true;
+    },
+  );
+  assert.equal(seen.length, 0);
+});

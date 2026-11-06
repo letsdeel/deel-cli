@@ -195,7 +195,7 @@ The shorthand grammar supports nested objects, lists, and space-separated scalar
 
 Scalar values are coerced to the type declared in the spec (numbers, booleans, enums) and enum values are validated before the request is sent.
 
-Top-level body fields the spec marks nullable accept the literal `null` in shorthand (`--input note=null`) to clear them; JSON input accepts `null` for them as well. Limit: nested fields (`--input addr={line2=null}`) are not coerced and still receive the text `"null"` (JSON input is unchanged: use a real JSON `null`).
+Top-level body fields the spec marks nullable accept the literal `null` in shorthand (`--input note=null`) to clear them; JSON input accepts `null` for them as well. Limit: nested fields (`--input addr={line2=null}`) are not coerced and still receive the text `"null"` (JSON input is unchanged: use a real JSON `null`). `--help` and `--help --json` mark nullable fields. With `--form`, a multipart form has no null value, so `note=null` is rejected with a pointer to JSON input. The extractor reads OpenAPI 3.0 `nullable: true` as well as 3.1 `type: ["string", "null"]` and `oneOf`/`anyOf` with a null member.
 
 **Array query params** are repeatable — pass the flag once per value:
 
