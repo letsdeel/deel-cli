@@ -118,6 +118,7 @@ export type Finding = { rule: string; entry: string; message: string };
 export type CheckOptions = {
   reserved?: Reserved; // hand-picked and static command names, which the map may not take
   released?: Descriptor[]; // the committed manifest: a released command line never changes
+  domains?: string[]; // the top-level words src/public-api/domains.json places under a lifecycle stage in deel --help
 };
 
 const routeOf = (method: string, path: string, api = "rest") => `${api === "scim" ? "scim " : ""}${method.toUpperCase()} ${path.replace(/\{[^}]+\}/g, "{}")}`;
@@ -221,6 +222,14 @@ export function checkMap(entries: MapEntry[], options: CheckOptions = {}): { fai
     if (!earned) failures.push({ rule: "R7", entry: tagOf(entry), message: "no other endpoint of this resource is unscoped or has another parent, so the path ID is an argument, not a scope flag" });
   });
 
+  // Every domain is placed under a lifecycle stage in deel --help.
+  if (options.domains) {
+    const known = new Set(options.domains);
+    for (const domain of new Set(parsed.map((p) => p.domain))) {
+      if (!known.has(domain)) failures.push({ rule: "domains", entry: domain, message: `'${domain}' is not in src/public-api/domains.json, which gives every domain its stage and description` });
+    }
+  }
+
   // Hand-picked and static names stay theirs, and a released command line never changes.
   if (options.reserved) {
     const names = [...new Set(parsed.map((p) => [p.domain, ...p.words].join(" ")))];
@@ -262,7 +271,9 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const file = resolve(process.cwd(), process.argv[2] ?? resolve(REPO_ROOT, "src/public-api/commands.json"));
   const released = (JSON.parse(readFileSync(resolve(REPO_ROOT, "src/public-api/manifest.json"), "utf8")) as GeneratedManifest).descriptors;
   const reserved = { commands: handPicked.descriptors, topLevel: RESERVED_COMMANDS };
-  const { failures, warnings } = checkMap(JSON.parse(readFileSync(file, "utf8")) as MapEntry[], { reserved, released });
+  const stages = JSON.parse(readFileSync(resolve(REPO_ROOT, "src/public-api/domains.json"), "utf8")) as { domains: { name: string }[] }[];
+  const domains = stages.flatMap((stage) => stage.domains.map((d) => d.name));
+  const { failures, warnings } = checkMap(JSON.parse(readFileSync(file, "utf8")) as MapEntry[], { reserved, released, domains });
   for (const f of failures) process.stderr.write(`FAIL ${f.rule}  ${f.message}\n     ${f.entry}\n`);
   for (const w of warnings) process.stderr.write(`warn ${w.rule}  ${w.message}\n     ${w.entry}\n`);
   process.stderr.write(`command map: ${failures.length} failure(s), ${warnings.length} warning(s)\n`);

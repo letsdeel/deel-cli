@@ -158,14 +158,25 @@ Keychain backends: macOS Keychain (`security`) and Linux libsecret (`secret-tool
 Help is available at three levels, plus a machine-readable form for agents:
 
 ```bash
-deel --help                                             # all commands + global options
-deel adjustments --help                                 # subcommands in a group
-deel adjustments create --help                          # params + request/response contract
-deel adjustments create --help --json                   # machine-readable contract
+deel --help                                             # every domain, under its lifecycle stage, + global options
+deel contracts --help                                   # the commands of a domain, one line per endpoint
+deel contracts get --help                               # the endpoints that share these words
+deel contracts get --worker-type eor --help             # arguments, flags + request/response contract
+deel contracts get --worker-type eor --help --json      # machine-readable contract
 deel adjustments create --invoice --generate-input      # JSON body skeleton to fill in
+deel commands --filter amendment                        # search every command (--json for scripts)
 ```
 
-`--help` for an action shows what generic `--help` cannot: the request-body fields (which arrive via `--input`, not as flags) and the response fields.
+When several endpoints share a command's words, a few flags pick one, and the group help lists each line:
+
+```
+  get <contract>                     Retrieve a single contract
+  get <contract> --worker-type eor   Retrieve EOR Contract Details
+```
+
+`--worker-type <eor|gp|daas|contractor|employee>` names the contract or worker type, `--as worker` is the worker's side of an action, `--file-format pdf|csv` returns a document and `--bulk` acts on many at once. The line without a `--worker-type` calls the endpoint whose path names no type. A mistyped word gets a "did you mean".
+
+`--help` for an action shows what generic `--help` cannot: its arguments, the request-body fields (which arrive via `--input`, not as flags) and the response fields.
 
 ## Request input
 

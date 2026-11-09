@@ -125,7 +125,7 @@ Other keys an entry can carry:
 - **R9 Unique.** Words, flags and flag values are unique together. Two entries may share a command line
   only when they are the same operation and both carry the same `collapse` key; the first is called.
 - **R10 Files.** Upload is `create`, download is `get`, a rendered form is `get --file-format pdf`.
-- **R11 Adding an endpoint.** Pick the domain, name the resource (R5, R6), choose the verb (R2–R4), add
+- **R11 Adding an endpoint.** Pick the domain (a new one also goes in `src/public-api/domains.json` with its stage and description), name the resource (R5, R6), choose the verb (R2–R4), add
   arguments (R7) and variants (R8), check R9 with `npm run check:command-map`. When two rules disagree,
   ask in the PR rather than inventing a verb.
 

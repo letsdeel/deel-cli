@@ -104,3 +104,9 @@ test("names: the map may not take a hand-picked or static name, and a released c
   assert.match(checkMap([entry("GET", "/things/{id}", "deel things show <thing>")], { released }).failures.map((f) => f.message).join(), /released as "deel things get <thing>", the map now says "deel things show <thing>"/);
   assert.match(checkMap([entry("GET", "/other", "deel other list")], { released }).failures.map((f) => f.message).join(), /removed from the map/);
 });
+
+test("every domain of the map has a stage and description in domains.json", () => {
+  const failures = checkMap([entry("GET", "/x", "deel widgets list")], { domains: ["contracts"] }).failures;
+  assert.match(failures.map((f) => f.message).join(), /'widgets' is not in src\/public-api\/domains.json/);
+  assert.deepEqual(checkMap([entry("GET", "/x", "deel contracts list")], { domains: ["contracts"] }).failures, []);
+});

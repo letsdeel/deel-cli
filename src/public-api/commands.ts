@@ -3,6 +3,8 @@
 import type { CommandForm, Descriptor, GeneratedManifest } from "../types.ts";
 import { argvEnables, argvFlagValue, argvMentionsFlag } from "../core/flags.ts";
 import { CliError } from "../core/errors.ts";
+import domainStages from "./domains.json" with { type: "json" };
+import { manifest as handPicked } from "../manifest.generated.ts";
 
 // The manifest is parsed only when a command needs it, so --version and the static commands don't pay for it.
 let descriptors: Descriptor[] | undefined;
@@ -15,6 +17,11 @@ export async function loadGeneratedDescriptors(): Promise<Descriptor[]> {
 // The loaded descriptors; empty until loadGeneratedDescriptors() has run.
 export function generatedDescriptors(): Descriptor[] {
   return descriptors ?? [];
+}
+
+// The hand-picked and the generated commands; the generator guarantees they never share a name.
+export function allDescriptors(): Descriptor[] {
+  return [...handPicked.descriptors, ...generatedDescriptors()];
 }
 
 export function setGeneratedDescriptorsForTests(next: Descriptor[] | undefined): void {
@@ -90,4 +97,19 @@ export function selectForm(candidates: Descriptor[], argv: string[]): Descriptor
     }
   }
   throw new CliError("usage.variant", `The flags given match no single form of 'deel ${words}'.`, `Use one of:\n${lines}`);
+}
+
+// ---------------- domains: the lifecycle stage and description of each top-level word ----------------
+
+type DomainStage = { stage: string; domains: { name: string; description: string }[] };
+const stages = domainStages as DomainStage[];
+
+export const STAGE_ORDER: string[] = stages.map((s) => s.stage);
+
+export function domainOf(word: string): { stage: string; description: string } | undefined {
+  for (const { stage, domains } of stages) {
+    const found = domains.find((d) => d.name === word);
+    if (found) return { stage, description: found.description };
+  }
+  return undefined;
 }
