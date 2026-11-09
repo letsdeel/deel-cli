@@ -191,7 +191,7 @@ export function generate(definitions: Definition[], options: GenerateOptions): G
     const key = endpointKey(primary.api, primary.method, primary.path);
     const mapped = mapByRoute.get(withoutParamNames(key));
     if (!mapped) {
-      errors.push(`${key} has no entry in src/public-api/commands.json. Name it with the rules in CONTRIBUTING.md.`);
+      errors.push(`${key} has no entry in src/public-api/commands.json. Add an entry naming its command.`);
       continue;
     }
     usedMap.add(withoutParamNames(key));

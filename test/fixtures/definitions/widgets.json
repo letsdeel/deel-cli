@@ -5,7 +5,7 @@
       "operationId": "getWidgets-v2026-01-01", "summary": "List widgets",
       "parameters": [{ "name": "limit", "in": "query", "schema": { "type": "integer" } }],
       "responses": { "200": { "content": { "application/json": { "schema": { "type": "object", "properties": { "data": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "string" } } } } } } } } } },
-      "x-owner-team": "team-that-must-not-leak"
+      "x-extension": "dropped"
     }
   },
   {

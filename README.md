@@ -417,7 +417,7 @@ scripts/
   check-pr.ts              # PR requirements (used by CI and by the /ship skill)
   check-doctor.ts          # pre-commit doctor gate; doctor-hashes.json is its ledger
   generate-public-api.ts   # writes src/public-api/manifest.json from the public definitions
-  check-command-map.ts     # checks src/public-api/commands.json against the naming rules in CONTRIBUTING.md
+  check-command-map.ts     # checks every src/public-api/commands.json entry makes a callable command
   public-api/              # the generator: definitions input, command-map parsing, generation checks
 src/
   main.ts                  # entry point + top-level error handling
