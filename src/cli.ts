@@ -13,6 +13,9 @@ import { resolveToken, requireToken } from "./core/auth.ts";
 import { parseInput } from "./core/input.ts";
 import { createContext } from "./core/context.ts";
 import { execute } from "./core/executor.ts";
+import { realIO } from "./core/io.ts";
+import { envelope, render } from "./core/output.ts";
+import { versionListing, versionTable } from "./core/versions.ts";
 import { setLoggingEnabled, setLogBodiesEnabled } from "./core/logging.ts";
 import { EXIT } from "./core/errors.ts";
 import { CliError } from "./core/errors.ts";
@@ -80,10 +83,16 @@ async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<st
     files: gatherFiles(cittyCtx.rawArgs),
     idempotencyKey: args["idempotency-key"] as string | undefined,
   };
-  const config = configFrom(args, cittyCtx.rawArgs);
+  // execute() sends X-Beta itself so it can drop the header on a retry; the transport must not add it back.
+  const config = configFrom({ ...args, beta: false }, cittyCtx.rawArgs);
   const token = requireToken(resolveToken({ tokenStdin: Boolean(args["token-stdin"]), env: config.env }));
   const ctx = createContext({ config, token });
-  await execute(descriptor, call, ctx, { output: outputOpts(args), debug: Boolean(args.debug), form: Boolean(args.form) });
+  await execute(descriptor, call, ctx, {
+    output: outputOpts(args),
+    debug: Boolean(args.debug),
+    form: Boolean(args.form),
+    version: { apiVersion: args.version as string | undefined, beta: args.beta === true },
+  });
 }
 
 function actionCommand(descriptor: Descriptor): CommandDef {
@@ -275,6 +284,17 @@ function descriptorsFor(positionals: string[], matched: number): Descriptor[] {
   );
 }
 
+async function printVersions(descriptor: Descriptor, argv: string[]): Promise<void> {
+  const listing = versionListing(descriptor, Date.now());
+  const io = realIO();
+  const args = parseArgs(argv, commonArgs);
+  if (args.json === false) {
+    io.out(versionTable(listing));
+    return;
+  }
+  await render(io, envelope(listing), outputOpts(args));
+}
+
 // Single descriptor for a resolved path. For variant groups, selects by the variant
 // flag present in argv; returns undefined if no unique match (triggers group help).
 function descriptorFor(positionals: string[], matched: number, argv: string[]): Descriptor | undefined {
@@ -292,19 +312,30 @@ function descriptorFor(positionals: string[], matched: number, argv: string[]): 
   return undefined;
 }
 
+// `--version <date>` after a command picks the API version, so only a bare `--version` (or -v) prints the CLI's.
+function wantsCliVersion(argv: string[], root: CommandDef): boolean {
+  const at = argv.indexOf("--version");
+  return argv.includes("-v") || (at !== -1 && wordIndexes(argv, root).length === 0);
+}
+
 export async function run(argv: string[]): Promise<number> {
   // What follows -- is arguments (an ID may start with -), so the CLI's own options are read before it only.
   const end = argv.indexOf("--");
   const options = end === -1 ? argv : argv.slice(0, end);
-  if (options.includes("--version") || options.includes("-v")) {
+  // A bare --version needs nothing loaded; `--version <date>` after a command picks the API version instead.
+  if (options.includes("-v") || (options.includes("--version") && !options.some((token) => !token.startsWith("-")))) {
     printVersion();
     return EXIT.OK;
   }
 
-  // A static command (auth, job, tokens) never needs the generated manifest.
+  // A static command (auth, job, commands) never needs the generated manifest.
   const first = options.find((token) => !token.startsWith("-"));
   if (!(first && first in staticCommands)) await loadGeneratedDescriptors();
   const root = buildRoot();
+  if (wantsCliVersion(options, root)) {
+    printVersion();
+    return EXIT.OK;
+  }
   const words = wordIndexes(options, root);
   const positionals = words.map((i) => options[i]);
   const { cmd, parent, matched } = resolve(root, positionals);
@@ -332,7 +363,16 @@ export async function run(argv: string[]): Promise<number> {
     return EXIT.ERROR;
   }
 
+  if (variantCandidates.length > 1 && !descriptor && argvEnables(options, "versions") && !wantsHelp) {
+    const hint = isForms ? `the flags of one of:\n${variantCandidates.map((c) => `  ${usageOf(c)}`).join("\n")}` : variantCandidates.map((c) => `--${c.variant}`).join(", ");
+    throw new CliError("usage.versions", `'deel ${variantCandidates[0].command.join(" ")}' has several endpoints; pick one with ${hint}`);
+  }
+
   // Offline discovery — handled here so citty's required-arg enforcement is bypassed.
+  if (descriptor && argvEnables(options, "versions") && !wantsHelp) {
+    await printVersions(descriptor, options);
+    return EXIT.OK;
+  }
   if (descriptor && argvEnables(options, "generate-input")) {
     printSkeleton(descriptor);
     return EXIT.OK;

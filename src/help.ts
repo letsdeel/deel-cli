@@ -9,6 +9,7 @@ import { commonArgs } from "./commands/shared.ts";
 import { flagOf } from "./core/flags.ts";
 import type { CommandDef } from "citty";
 import { domainOf, STAGE_ORDER, usageOf } from "./public-api/commands.ts";
+import { isBetaAt } from "./core/versions.ts";
 
 // Flattens nested object fields into dotted paths (request.amount, ...) so every
 // field is visible, however deep, without changing the CliParam shape callers rely on.
@@ -139,6 +140,8 @@ export function printContractJson(descriptor: Descriptor): void {
           selectors: form.selectors,
         }
       : {}),
+    beta: Boolean(descriptor.beta),
+    versions: descriptor.versions ?? null,
     params: flagParams(descriptor).map((param) => ({ name: param.name, ...(param.flag ? { flag: param.flag } : {}), in: param.in, type: param.type, required: param.required, enum: param.enum, description: param.description })),
     body: {
       kind: descriptor.bodyKind,
@@ -160,6 +163,7 @@ export function printActionHelp(descriptor: Descriptor): void {
 
   out(`\n${descriptor.summary ?? descriptor.command.join(" ")}\n\n`);
   out(`USAGE  ${buildUsage(descriptor)}\n`);
+  printVersionHelp(descriptor);
 
   if (descriptor.form?.positionals.length || descriptor.form?.scopes.length) {
     out(`\nARGUMENTS\n`);
@@ -406,3 +410,19 @@ export function printUnknownCommand(word: string, path: string[], node: CommandD
   process.stderr.write(`Unknown command '${word}'${where}.${hint}\n`);
   process.stderr.write(`Run 'deel ${path.length ? `${path.join(" ")} ` : ""}--help' to see available commands.\n`);
 }
+
+function printVersionHelp(descriptor: Descriptor): void {
+  const out = process.stdout.write.bind(process.stdout);
+  if (!descriptor.version && !descriptor.versions) return;
+  out(`\nAPI VERSION  ${descriptor.version ?? "(none)"}${descriptor.beta ? " (beta)" : ""}   — change with --version <YYYY-MM-DD> | none, or --beta\n`);
+  if (!descriptor.versions?.length) return;
+  const now = Date.now();
+  out(`\nVERSIONS\n`);
+  for (const entry of descriptor.versions) {
+    const notes = [isBetaAt(entry, now) ? `beta until ${entry.beta_until}` : "stable"];
+    if (entry.sunset_at) notes.push(`sunset ${entry.sunset_at}`);
+    if (entry.version === descriptor.version) notes.push("default");
+    out(`  ${entry.version}  ${notes.join(", ")}\n`);
+  }
+}
+

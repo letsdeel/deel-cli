@@ -45,8 +45,8 @@ export const HEADER = {
   contentType: "content-type",
   requestId: "x-request-id",
   cliVersion: "x-deel-cli-version",
-  apiVersion: "x-version",         // API spec version; omitted when descriptor.version is absent
+  apiVersion: "x-version",         // API version; omitted with --version none or when no version is known
+  beta: "x-beta",
   idempotencyKey: "idempotency-key",
-  beta: "x-beta",                  // opt in to a beta API version (--beta)
   retryAfter: "retry-after",
 } as const;
