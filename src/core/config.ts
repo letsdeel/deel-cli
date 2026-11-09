@@ -37,3 +37,10 @@ export function resolveConfig(opts: { env?: string; baseUrl?: string; beta?: boo
   if (opts.beta) config.beta = true;
   return config;
 }
+
+// The base URL for a command's API. REST uses the configured base as is; SCIM swaps a
+// trailing /rest for /scim (or appends /scim to a --base-url without one).
+export function apiBaseUrl(baseUrl: string, api: "rest" | "scim" | undefined): string {
+  if (api !== "scim") return baseUrl;
+  return `${baseUrl.replace(/\/rest$/, "")}/scim`;
+}

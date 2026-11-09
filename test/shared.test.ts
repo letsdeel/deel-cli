@@ -2,6 +2,18 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { gatherFlagValues, gatherFiles, nullableBoolean, nullableNumber, nullableObject, nullableString } from "../src/commands/shared.ts";
 
+test("gatherFlagValues reads a repeatable flag in every spelling the parser accepts, in the order typed", () => {
+  assert.deepEqual(gatherFlagValues(["--job-ids", "a", "--job-ids=b"], "job_ids"), ["a", "b"]);
+  assert.deepEqual(gatherFlagValues(["--jobIds", "a", "--jobIds=b"], "job_ids"), ["a", "b"]);
+  assert.deepEqual(gatherFlagValues(["--job_ids", "a", "--job-ids", "b", "--jobIds=c"], "job_ids"), ["a", "b", "c"]);
+  assert.deepEqual(gatherFlagValues(["--job-ids", "a"], "job-ids"), ["a"]);
+  assert.deepEqual(gatherFlagValues(["--job_idsx", "a", "--job-ids-x=b"], "job_ids"), []);
+  assert.deepEqual(gatherFlagValues(["--user-i-ds", "a", "--userIDs=b"], "userIDs"), ["a", "b"]);
+  assert.deepEqual(gatherFlagValues(["--job_ids"], "job_ids"), []);
+  assert.deepEqual(gatherFlagValues(["--description", "xxevent", "a"], "event"), []);
+  assert.throws(() => gatherFlagValues(["--job-ids", "--x"], "job_ids"), (err: any) => err.code === "usage.flag_value" && /--job-ids needs a value/.test(err.message));
+});
+
 test("gatherFlagValues collects every occurrence of a repeatable flag", () => {
   assert.deepEqual(gatherFlagValues(["--job_ids", "a", "--job_ids=b", "x", "--job_ids", "c"], "job_ids"), ["a", "b", "c"]);
   assert.deepEqual(gatherFlagValues(["--other", "z"], "job_ids"), []);

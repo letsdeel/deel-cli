@@ -468,3 +468,23 @@ test("execute() refuses to send null as a multipart form field", async () => {
   );
   assert.equal(seen.length, 0);
 });
+
+test("a SCIM command calls the /scim base path and renders the unwrapped SCIM body", async () => {
+  const { ctx, io, seen } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { totalResults: 1, Resources: [{ id: "u1" }] } }));
+  const scimDescriptor: Descriptor = {
+    ...createDescriptor,
+    command: ["scim", "users", "list"],
+    method: "GET",
+    path: "/Users",
+    api: "scim",
+    bodyKind: "none",
+    params: [],
+    bodyProps: [],
+  };
+
+  await execute(scimDescriptor, { flags: {}, body: undefined, files: {} }, ctx, { output: { json: true, quiet: false, raw: false }, debug: false, form: false });
+
+  assert.equal(seen[0].url, "https://example.test/scim/Users");
+  const parsed = JSON.parse((io as any).stdout.join(""));
+  assert.equal(parsed.data.Resources[0].id, "u1");
+});

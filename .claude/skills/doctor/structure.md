@@ -9,10 +9,11 @@ with the README "Project layout" section when the layout changes.
 | Path | Role | Rule |
 |------|------|------|
 | `src/main.ts`, `src/cli.ts`, `src/help.ts`, `src/version.ts`, `src/types.ts`, `src/commands.map.ts`, `src/manifest.generated.ts` | entry point, routing, help rendering, version, shared types, command↔endpoint map, generated descriptors | the **only** files allowed directly under `src/`; anything else loose in `src/` is misplaced |
-| `src/core/<concern>.ts` | one flat file per concern: `http`, `auth`, `keychain`, `config`, `tls`, `input`, `output`, `logging`, `jobs`, `idempotency`, `io`, `errors`, `constants`, `context`, `executor` | flat — no sub-directories; a new cross-cutting concern is a new `src/core/<name>.ts` |
+| `src/public-api/` | generated public API commands: `manifest.json` (written by `scripts/generate-public-api.ts` — never hand-edited), `commands.json` (the reviewed command map: every endpoint's name), `commands.ts` (loader) | flat; nothing else goes here |
+| `src/core/<concern>.ts` | one flat file per concern: `http`, `auth`, `keychain`, `config`, `tls`, `input`, `output`, `logging`, `jobs`, `idempotency`, `io`, `errors`, `constants`, `context`, `executor`, `flags` | flat — no sub-directories; a new cross-cutting concern is a new `src/core/<name>.ts` |
 | `src/commands/<name>.ts` | static (non-generated) commands: `auth`, `job`, plus `shared.ts` helpers and `index.ts` registry | flat; a new static command is `src/commands/<name>.ts` **and** a registration in `src/commands/index.ts` |
 | `test/<name>.test.ts` | `node --test` suites, flat, named after the module under test (`src/core/http.ts` → `test/http.test.ts`, `src/commands/shared.ts` → `test/shared.test.ts`, `scripts/check-pr.ts` → `test/check-pr.test.ts`) | tests live **only** here — never co-located under `src/` |
-| `scripts/` | repo tooling run by npm scripts / CI: `check-*.ts`, `check-shell.sh`, `check-doctor.ts`, `build-all.sh`, `sign-darwin.sh`, `install-rcodesign.sh`, `pack-npm.ts`, `doctor-hashes.json` | scripts with real logic get a `test/<name>.test.ts` (see `check-pr`, `check-version`, `check-doctor`) or are exercised by `npm run check` itself |
+| `scripts/` | repo tooling run by npm scripts / CI: `check-*.ts`, `check-shell.sh`, `check-doctor.ts`, `build-all.sh`, `sign-darwin.sh`, `install-rcodesign.sh`, `pack-npm.ts`, `doctor-hashes.json`, `generate-public-api.ts` with its rules in `scripts/public-api/` | scripts with real logic get a `test/<name>.test.ts` (see `check-pr`, `check-version`, `check-doctor`) or are exercised by `npm run check` itself |
 | `packaging/install.sh` | the installer users pipe into `sh` | POSIX sh only; `npm run check:shell` enforces it |
 | `.claude/skills/<skill>/` | agent skills (`deel-cli-extractor`, `doctor`, `ship`) | executable skill code (`extract.ts`) is tested from `test/` like any script |
 | `.github/`, `.husky/` | CI workflow, PR template, Dependabot; git hooks | workflow changes must keep the public-repo rules in the header comment of `pr.yaml` |
@@ -20,7 +21,8 @@ with the README "Project layout" section when the layout changes.
 Flag as **misplaced**:
 - a new top-level directory (anything other than `src/`, `test/`, `scripts/`, `packaging/`, `.claude/`, `.github/`, `.husky/`);
 - a new file loose in `src/` that is not in the first row above;
-- a sub-directory under `src/core/` or `src/commands/`;
+- a sub-directory under `src/core/` or `src/commands/`, or any other new directory under `src/` besides `src/public-api/`;
+- a hand edit to `src/public-api/manifest.json` — it must come from `npm run generate:public-api`;
 - a test file anywhere but `test/`;
 - a hand edit to `src/manifest.generated.ts` — it must come from the `deel-cli-extractor` skill (banner intact, fully expanded JSON) and the PR must carry the `script-generated` label. A new entry in `src/commands.map.ts` without a regenerated manifest fails `npm run check:manifest`.
 

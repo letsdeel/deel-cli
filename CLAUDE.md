@@ -32,14 +32,15 @@ Coverage floor over `src/**` (in `test:coverage`): lines ≥ 80 %, branches ≥ 
 
 ## Architecture
 
-### Two kinds of commands
+### Three kinds of commands
 
-1. **Generated commands** — data-driven from `src/manifest.generated.ts`, an array of `Descriptor`s (`src/types.ts`) describing method, path, params, body props, body encoding, response fields, async-ness, etc.
+1. **Hand-picked generated commands** — data-driven from `src/manifest.generated.ts`, an array of `Descriptor`s (`src/types.ts`) describing method, path, params, body props, body encoding, response fields, async-ness, etc.
    - `src/commands.map.ts` is the hand-authored list of `command ↔ METHOD /path` entries.
    - `src/manifest.generated.ts` is **never hand-edited**. It's regenerated from an OpenAPI spec by the `deel-cli-extractor` skill (`node .claude/skills/deel-cli-extractor/extract.ts <spec>`), which also prints a drift report flagging breaking changes. `npm run check:manifest` enforces map ↔ manifest consistency. A PR changing the manifest needs the `script-generated` label.
    - To expose a new endpoint: add it to `commands.map.ts`, then regenerate.
    - **Variants**: several map entries with the same `command` but different `variant` (e.g. `adjustments create --invoice` / `--payroll`) become one command with mutually exclusive boolean selector flags.
-2. **Static commands** — hand-written in `src/commands/<name>.ts` (`auth`, `job`, `webhooks`, `tokens`) for things that don't map 1:1 to one operation. Registered in `src/commands/index.ts` (`staticCommands`); the keys **must** match `RESERVED_COMMANDS` in `src/core/constants.ts`, which stops a generated command from colliding. The pattern is a thin citty command in `src/commands/` with the API/business logic in a matching `src/core/<concern>.ts` (e.g. `commands/tokens.ts` → `core/api-tokens.ts`, `commands/webhooks.ts` → `core/webhooks.ts`).
+2. **Generated public API commands** — one per documented public endpoint, in `src/public-api/manifest.json` (written by `npm run generate:public-api -- --from <file|url>`, never hand-edited). Names come only from the reviewed command map `src/public-api/commands.json` (rules R1–R11 in CONTRIBUTING.md, checked by `npm run check:command-map`); an endpoint with no entry fails the generator. Path IDs are positional arguments, and fixed selector flags (`--worker-type eor`, `--as worker`, `--file-format pdf`, `--bulk`, `--status <value>`) or scope flags (`--contract <id>`) pick one endpoint among those sharing the words (`src/public-api/commands.ts` `selectForm`).
+3. **Static commands** — hand-written in `src/commands/<name>.ts` (`auth`, `job`, `webhooks`, `tokens`) for things that don't map 1:1 to one operation. Registered in `src/commands/index.ts` (`staticCommands`); the keys **must** match `RESERVED_COMMANDS` in `src/core/constants.ts`, which stops a generated command from colliding. The pattern is a thin citty command in `src/commands/` with the API/business logic in a matching `src/core/<concern>.ts` (e.g. `commands/tokens.ts` → `core/api-tokens.ts`, `commands/webhooks.ts` → `core/webhooks.ts`).
    - `src/commands/shared.ts` holds the global flag set (`commonArgs`) and flag helpers. Repeatable and hidden flags are read from `rawArgs` (`gatherFlagValues`, `gatherFiles`, `readHidden`) because citty doesn't expose them; the `--flag=value` form lets a value start with `-`. The `nullable*` parsers send the literal `null` as JSON null to clear a nullable field.
 
 ### Request flow
