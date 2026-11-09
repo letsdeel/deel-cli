@@ -27,6 +27,7 @@ Each piece on its own:
 | `npm test` | the `node --test` suite in `test/` |
 | `npm run test:coverage` | same suite with a coverage floor over `src/**` — lines ≥ 80 %, branches ≥ 75 %, functions ≥ 70 %. The floor only ever moves up. |
 | `npm run check:manifest` | `src/manifest.generated.ts` ↔ `src/commands.map.ts` stay consistent |
+| `npm run check:command-map` | every `src/public-api/commands.json` entry makes a command the CLI can call, takes no hand-picked or static name, and keeps a released command line unchanged |
 | `npm run check:public-api` | `src/public-api/manifest.json` holds only allowlisted fields and rest/scim endpoints; every endpoint the command map names is in it; no tracked file names a definitions URL; no workflow requests `id-token: write` |
 | `npm run check:lockfile` | `package-lock.json` still carries every bun platform binary (an `npm install` against an existing `node_modules` can silently drop them) |
 | `npm run check:version` | `package.json` and `src/version.ts` agree and are a clean `X.Y.Z` |

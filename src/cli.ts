@@ -218,6 +218,21 @@ function buildRoot(): CommandDef {
   });
 }
 
+// The first word after the `matched` command words, skipping a global string flag's value (`--env demo`), the
+// hidden --base-url's included.
+function strayWord(options: string[], matched: number): string | undefined {
+  const takesValue = (token: string | undefined) =>
+    token !== undefined && token.startsWith("--") && !token.includes("=") &&
+    (token === "--base-url" || (commonArgs as Record<string, { type?: string }>)[token.slice(2)]?.type === "string");
+  let words = 0;
+  for (let index = 0; index < options.length; index++) {
+    const token = options[index];
+    if (token.startsWith("-") || takesValue(options[index - 1])) continue;
+    if (words++ === matched) return token;
+  }
+  return undefined;
+}
+
 // Walk the tree by the leading positional tokens to find the target command.
 function resolve(root: CommandDef, argv: string[]): { cmd: CommandDef; parent?: CommandDef; matched: number } {
   const positionals = argv.filter((token) => !token.startsWith("-"));
@@ -226,7 +241,7 @@ function resolve(root: CommandDef, argv: string[]): { cmd: CommandDef; parent?: 
   let matched = 0;
   for (const token of positionals) {
     const subCommands = cmd.subCommands as Record<string, CommandDef> | undefined;
-    if (subCommands && subCommands[token]) {
+    if (subCommands && Object.hasOwn(subCommands, token)) {
       parent = cmd;
       cmd = subCommands[token];
       matched++;
@@ -270,9 +285,9 @@ export async function run(argv: string[]): Promise<number> {
     return EXIT.OK;
   }
 
-  // A static command (auth, job, tokens) never needs the generated manifest.
+  // A static command (auth, job) never needs the generated manifest.
   const first = options.find((token) => !token.startsWith("-"));
-  if (!(first && first in staticCommands)) await loadGeneratedDescriptors();
+  if (!(first && Object.hasOwn(staticCommands, first))) await loadGeneratedDescriptors();
   const root = buildRoot();
   const { cmd, parent, matched } = resolve(root, options);
   const wantsHelp = options.includes("--help") || options.includes("-h");
@@ -281,6 +296,17 @@ export async function run(argv: string[]): Promise<number> {
 
   if (hasPositional && matched === 0) {
     process.stderr.write(`Unknown command. Run 'deel --help' to see available commands.\n`);
+    return EXIT.ERROR;
+  }
+  // A word after a group that names none of its commands (a removed or mistyped one) fails instead of showing the
+  // group's help and exiting 0.
+  const stray = isGroup ? strayWord(options, matched) : undefined;
+  if (stray !== undefined) {
+    const group = options.filter((token) => !token.startsWith("-")).slice(0, matched).join(" ");
+    const subCommands = cmd.subCommands as Record<string, CommandDef> | undefined;
+    // The word is a command of the group, so an option between the words stopped the walk.
+    if (subCommands && Object.hasOwn(subCommands, stray)) process.stderr.write(`Options go after the command: write 'deel ${group} ${stray} …' with the options at the end.\n`);
+    else process.stderr.write(`Unknown command 'deel ${group} ${stray}'. Run 'deel ${group} --help' to see its commands.\n`);
     return EXIT.ERROR;
   }
 

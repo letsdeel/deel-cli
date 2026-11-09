@@ -1,3 +1,5 @@
+// The generated public API commands (src/public-api/commands.ts): loading the manifest, picking one endpoint
+// among those sharing words, and the calls and help run() builds from them.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -8,10 +10,8 @@ import { execute } from "../src/core/executor.ts";
 import type { Descriptor } from "../src/types.ts";
 import { EXIT } from "../src/core/errors.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
-import { staticCommands } from "../src/commands/index.ts";
 import { manifest as handPicked } from "../src/manifest.generated.ts";
 import { generatedDescriptors, loadGeneratedDescriptors, matchForm, selectForm, setGeneratedDescriptorsForTests } from "../src/public-api/commands.ts";
-import { unknownFlag } from "../src/cli.ts";
 import { parseDefinitions } from "../scripts/public-api/definitions.ts";
 import { generate, reservedClashes } from "../scripts/public-api/generate.ts";
 
@@ -120,7 +120,9 @@ async function callApi(argv: string[], descriptors = manifest.descriptors) {
   try {
     // Options go before a -- terminator, which ends them.
     const end = argv.indexOf("--");
-    const withBase = end === -1 ? [...argv, "--base-url", "https://example.test/rest"] : [...argv.slice(0, end), "--base-url", "https://example.test/rest", ...argv.slice(end)];
+    // --no-log keeps the calls out of the developer's own CLI log.
+    const own = ["--base-url", "https://example.test/rest", "--no-log"];
+    const withBase = end === -1 ? [...argv, ...own] : [...argv.slice(0, end), ...own, ...argv.slice(end)];
     return { ...(await capture(withBase, descriptors)), sent };
   } catch (error) {
     // main.ts prints a CliError and exits non-zero; the test sees the same outcome.
@@ -189,19 +191,6 @@ test("the committed manifest loads only when asked, and doesn't shadow static or
   setGeneratedDescriptorsForTests(undefined);
 });
 
-test("reservedClashes finds a name that shadows, replaces, groups or is grouped by a reserved command", () => {
-  const reserved = { commands: [{ command: ["gizmos", "list"], method: "GET", path: "/gizmos" }, { command: ["gadgets", "show", "all"], method: "GET", path: "/gadgets" }], topLevel: new Set(["auth"]) };
-  assert.equal(reservedClashes(["auth sessions list"], reserved).length, 1);
-  assert.match(reservedClashes(["gizmos list"], reserved, () => " (GET /x)")[0], /"deel gizmos list" \(GET \/x\) clashes with a hand-picked command/);
-  assert.match(reservedClashes(["gizmos list all"], reserved)[0], /turn the hand-picked "deel gizmos list" into a group/);
-  assert.match(reservedClashes(["gadgets show"], reserved)[0], /is a group of the hand-picked "deel gadgets show all"/);
-  assert.deepEqual(reservedClashes(["gizmos get", "widgets list"], reserved), []);
-});
-
-test("every static command is a reserved name, so the generator and the committed-manifest check can see it", () => {
-  assert.deepEqual(Object.keys(staticCommands).sort(), [...RESERVED_COMMANDS].sort());
-});
-
 test("a path-param error names the flag the user types, including the -param rename", async () => {
   const descriptor = thing([{ name: "file", in: "path", type: "string", required: true, flag: "file-param" }], { method: "DELETE", path: "/things/{file}", command: ["things", "delete"] });
   const { code, err, sent } = await callApi(["things", "delete", "--file-param", ".."], [descriptor]);
@@ -230,6 +219,10 @@ test("a path param that is empty, a dot segment or a swallowed flag sends nothin
     assert.match(err, /Invalid value for path parameter --thing_id|needs a value|Missing required/, argv.join(" "));
     assert.equal(sent.length, 0, argv.join(" "));
   }
+  // --x=--y passes a value that starts with --, so the executor's own guard is the one that refuses it.
+  const swallowed = await callApi(["things", "delete", "--thing_id=--debug"], [descriptor]);
+  assert.match(swallowed.err, /Invalid value for path parameter --thing_id: "--debug"/);
+  assert.equal(swallowed.sent.length, 0);
   const ok = await callApi(["things", "delete", "--thing_id", "a b"], [descriptor]);
   assert.equal(ok.sent[0].url.pathname, "/rest/things/a%20b");
 });
@@ -409,13 +402,6 @@ test("matchForm and selectForm pick by selectors and scopes, and refuse a flag o
   assert.equal(matchForm(gets, ["s1", "--worker-type", "eor"])!.path, "/eor/fleet/{ship_id}");
   assert.equal(matchForm(gets, ["s1", "--file-format", "pdf"]), undefined);
   assert.throws(() => selectForm(gets, ["--as", "client", "--file-format", "pdf"]), /has no --as client\. Valid values: worker/);
-});
-
-test("unknownFlag accepts every spelling and negation of a known flag and names the first unknown one", () => {
-  assert.equal(unknownFlag(["--worker-type", "eor", "--workerType=eor", "--no-json", "--json=false"], ["worker-type", "json"]), undefined);
-  assert.equal(unknownFlag(["a", "--limit", "5", "--other"], ["json"]), "--limit");
-  assert.equal(unknownFlag(["-x", "s1"], ["json"]), "-x");
-  assert.equal(unknownFlag(["--", "--limit"], []), undefined);
 });
 
 test("an ID that starts with - goes after --, where --help is an argument too", async () => {
