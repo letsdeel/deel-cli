@@ -1,6 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { checkMap } from "../scripts/check-command-map.ts";
@@ -17,6 +19,15 @@ test("the committed command map passes", () => {
   const run = spawnSync(process.execPath, ["scripts/check-command-map.ts"], { cwd: ROOT, encoding: "utf8" });
   assert.equal(run.status, 0, run.stderr);
   assert.match(run.stderr, /command map: 0 failure\(s\)/);
+});
+
+test("the check exits 1 and names each failure when the map file it is given has one", () => {
+  const map = join(mkdtempSync(join(tmpdir(), "check-command-map-")), "commands.json");
+  writeFileSync(map, JSON.stringify([entry("GET", "/a/{a_id}", "deel things get")]));
+  const run = spawnSync(process.execPath, ["scripts/check-command-map.ts", map], { cwd: ROOT, encoding: "utf8" });
+  assert.equal(run.status, 1, run.stderr);
+  assert.match(run.stderr, /^FAIL {2}path param \{a_id\} of \/a\/\{a_id\} has no argument in the command$/m);
+  assert.match(run.stderr, /^command map: [1-9]\d* failure\(s\)/m);
 });
 
 test("a command line must parse, with lowercase kebab-case words", () => {

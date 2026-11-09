@@ -5,7 +5,7 @@ import { parseDefinitions } from "../scripts/public-api/definitions.ts";
 import type { Definition } from "../scripts/public-api/definitions.ts";
 import { pathParams } from "../scripts/public-api/command-map.ts";
 import type { MapEntry } from "../scripts/public-api/command-map.ts";
-import { generate as generateWith, mergeVariants, summarize } from "../scripts/public-api/generate.ts";
+import { generate as generateWith, mergeVariants, reservedClashes, summarize } from "../scripts/public-api/generate.ts";
 import type { GenerateOptions } from "../scripts/public-api/generate.ts";
 import type { Descriptor } from "../src/types.ts";
 
@@ -396,4 +396,13 @@ test("object variants read as one object: every property, enums joined, required
   // Variants that aren't all objects stay as they are.
   const mixed = { oneOf: [cash, { type: "string" }] };
   assert.deepEqual(mergeVariants(mixed), mixed);
+});
+
+test("reservedClashes finds a name that shadows, replaces, groups or is grouped by a reserved command", () => {
+  const reserved = { commands: [{ command: ["gizmos", "list"], method: "GET", path: "/gizmos" }, { command: ["gadgets", "show", "all"], method: "GET", path: "/gadgets" }], topLevel: new Set(["auth"]) };
+  assert.equal(reservedClashes(["auth sessions list"], reserved).length, 1);
+  assert.match(reservedClashes(["gizmos list"], reserved, () => " (GET /x)")[0], /"deel gizmos list" \(GET \/x\) clashes with a hand-picked command/);
+  assert.match(reservedClashes(["gizmos list all"], reserved)[0], /turn the hand-picked "deel gizmos list" into a group/);
+  assert.match(reservedClashes(["gadgets show"], reserved)[0], /is a group of the hand-picked "deel gadgets show all"/);
+  assert.deepEqual(reservedClashes(["gizmos get", "widgets list"], reserved), []);
 });

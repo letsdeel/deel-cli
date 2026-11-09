@@ -17,7 +17,7 @@ npm test                                # node --test test/*.test.ts
 node --test test/executor.test.ts       # a single test file
 node --test --test-name-pattern="reserved" test/public-api-commands.test.ts   # a single test by name
 npm run typecheck                       # tsc --noEmit, strict
-npm run check                           # everything CI runs: typecheck, tests + coverage gate, manifest/lockfile/version/shell checks
+npm run check                           # everything CI runs: typecheck, tests + coverage gate, manifest/command-map/lockfile/version/shell checks
 npm run build:smoke                     # bun compile to dist/deel, then --version / --help
 npm run doctor                          # check + build:smoke, then clears the pre-commit doctor gate
 ```
@@ -41,7 +41,7 @@ Coverage floor over `src/**` (in `test:coverage`): lines ≥ 80 %, branches ≥ 
    - **Variants**: several map entries with the same `command` but different `variant` (e.g. `adjustments create --invoice` / `--payroll`) become one command with mutually exclusive boolean selector flags.
 2. **Generated public API commands** — one per documented public endpoint, in `src/public-api/manifest.json` (written by `npm run generate:public-api -- --from <file|url>`, never hand-edited). Names come only from the reviewed command map `src/public-api/commands.json` (checked by `npm run check:command-map`, see CONTRIBUTING.md); an endpoint with no entry fails the generator. Path IDs are positional arguments, and fixed selector flags (`--worker-type eor`, `--as worker`, `--file-format pdf`, `--bulk`, `--status <value>`) or scope flags (`--contract <id>`) pick one endpoint among those sharing the words (`src/public-api/commands.ts` `selectForm`).
 3. **Static commands** — hand-written in `src/commands/<name>.ts` (`auth`, `job`) for things that don't map 1:1 to one operation. Registered in `src/commands/index.ts` (`staticCommands`); the keys **must** match `RESERVED_COMMANDS` in `src/core/constants.ts`, which stops a generated command from colliding. The pattern is a thin citty command in `src/commands/` with the API/business logic in a matching `src/core/<concern>.ts` (e.g. `commands/auth.ts` → `core/auth.ts`). A static command is kept only for what a generated one can't do; an endpoint the command map names is generated, not hand-written.
-   - `src/commands/shared.ts` holds the global flag set (`commonArgs`) and flag helpers. Repeatable and hidden flags are read from `rawArgs` (`gatherFlagValues`, `gatherFiles`, `readHidden`) because citty doesn't expose them; the `--flag=value` form lets a value start with `-`. The `nullable*` parsers send the literal `null` as JSON null to clear a nullable field.
+   - `src/commands/shared.ts` holds the global flag set (`commonArgs`) and flag helpers. Repeatable and hidden flags are read from `rawArgs` (`gatherFlagValues`, `gatherFiles`, `readHidden`) because citty doesn't expose them; the `--flag=value` form lets a value start with `-`.
 
 ### Request flow
 
@@ -56,7 +56,7 @@ Coverage floor over `src/**` (in `test:coverage`): lines ≥ 80 %, branches ≥ 
 
 ### Conventions baked into the executor/output
 
-- Every mutating request gets an `Idempotency-Key`: a deterministic UUIDv5 over the canonicalized request (`core/idempotency.ts`), overridable with `--idempotency-key`.
+- Every mutating request gets an `Idempotency-Key`: a deterministic UUIDv5 over the canonicalized request (`core/idempotency.ts`), overridable with `--idempotency-key`. The routes in `SEND_ONCE_ROUTES` (`core/constants.ts`, e.g. `webhooks test`) act on every call, so they get no derived key and no retry.
 - Bodies are wrapped under `{ data: ... }` when the descriptor says `bodyWrapper: "data"` (unless the user already wrapped). Batch-size caps (`maxItems`) are enforced client-side.
 - Output is always a JSON envelope `{ data, meta: { request_id }, page? }` by default; `--fields`, `--jq`, `--raw`, `--quiet`, `--no-json` in `core/output.ts`.
 - **Exit codes are binary (0/1).** Failure detail lives in the stderr envelope `{ error: { code, message, next, request_id } }`; throw `CliError(code, message, next?)` (`core/errors.ts`) with a dotted code like `usage.variant`, `auth.missing`, `http.<status>`.
@@ -65,6 +65,7 @@ Coverage floor over `src/**` (in `test:coverage`): lines ≥ 80 %, branches ≥ 
 - Tunables and header names live in `core/constants.ts`.
 - Base URLs (`core/config.ts`, `--env prod|demo`) end in `/rest`; every REST endpoint, including jobs, goes through that prefix — a base URL without it 404s on every call. SCIM commands swap it for `/scim` (`apiBaseUrl`).
 - Secret response fields (`WITHHELD_RESPONSE_FIELDS` in `core/constants.ts`, e.g. a webhook's `signing_key`) are never printed by generated commands.
+- A route in `OUTCOME_ROUTES` (`core/constants.ts`) reports in its 2xx response whether the call worked (`webhooks test`'s `is_success`); when that field is false the response is printed and the command exits 1 (`api.unsuccessful`).
 
 ### TypeScript constraints
 

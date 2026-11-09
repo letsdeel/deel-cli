@@ -273,7 +273,7 @@ deel dev logs tokens list                              # what each token has bee
 
 ## Idempotency
 
-Every mutating request (`POST`/`PUT`/`PATCH`/`DELETE`) carries an `Idempotency-Key`. By default it is a **deterministic UUIDv5** derived from a canonicalized form of the request (method + path + query + body), so re-running the identical command sends the identical key and the server can dedupe a retry. Override it with `--idempotency-key <value>` when you want a fresh attempt.
+Every mutating request (`POST`/`PUT`/`PATCH`/`DELETE`) carries an `Idempotency-Key`. By default it is a **deterministic UUIDv5** derived from a canonicalized form of the request (method + path + query + body), so re-running the identical command sends the identical key and the server can dedupe a retry. Override it with `--idempotency-key <value>` when you want a fresh attempt. The exception is a call that must act every time it runs, such as `deel webhooks test`: it is sent once, with no retry and no derived key (an explicit `--idempotency-key` is still sent).
 
 ## Webhooks
 
@@ -288,7 +288,7 @@ deel webhooks test <webhook_id> --input event_type=contract.created --beta   # D
 
 A webhook id can start with `-`, which the argument parser reads as a flag. Put it after `--`, which ends the options: `deel webhooks get -- -WZ1uT2DFF01`. The same works for any generated command.
 
-`test` runs the delivery from Deel's servers, so the receiver URL must be publicly reachable; it is limited to 10 simulations per hour per event type, and exits 1 when the receiver does not answer 2xx.
+`test` runs the delivery from Deel's servers, so the receiver URL must be publicly reachable; it is limited to 10 simulations per hour per event type. It prints the delivery, then exits 1 when the response reports `is_success: false`. Each run sends a new event: it is sent once, with no retry and no derived `Idempotency-Key`.
 
 ## Environments
 
@@ -422,7 +422,7 @@ test/                      # automated tests (node --test), one file per module
 npm ci              # install dependencies and the git hooks
 npm test            # run the automated test suite (node --test)
 npm run typecheck   # type-check with tsc (no emit)
-npm run check       # everything CI runs: typecheck, tests + coverage gate, manifest / lockfile / version / shell checks
+npm run check       # everything CI runs: typecheck, tests + coverage gate, manifest / command map / lockfile / version / shell checks
 npm run doctor      # npm run check + build smoke, then clears the pre-commit gate for your changed files
 ```
 

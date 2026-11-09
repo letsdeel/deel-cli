@@ -68,6 +68,8 @@ jobs:
         run: npm run test:coverage
       - name: Manifest ↔ command map consistency
         run: npm run check:manifest
+      - name: Public API command map
+        run: npm run check:command-map
       - name: Lockfile carries every bun platform binary
         run: npm run check:lockfile
       - name: package.json ↔ src/version.ts
