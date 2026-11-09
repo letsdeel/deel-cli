@@ -72,7 +72,7 @@ test("group help lists one line per endpoint, collapses single-child chains and 
   assert.match(out, /^ {2}invite send <contract> {3,}Send contract to worker$/m);
   assert.match(out, /^ {2}amendments {3,}2 commands$/m);
   assert.match(out, /^Flags that pick the endpoint:\n {2}--worker-type <type> /m);
-  assert.match(out, /^Add --help to a line's words for its arguments, flags and request body \(e\.g\. deel contracts list --help\)\.$/m);
+  assert.match(out, /^Add --help to a line's words for its arguments, flags and fields \(e\.g\. deel contracts list --help\)\.$/m);
 });
 
 test("a group without --help prints its help too, and a nested group is titled with its path", async () => {

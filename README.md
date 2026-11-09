@@ -178,11 +178,12 @@ When several endpoints share a command's words, a few flags pick one, and the gr
 
 `--help` for an action shows what generic `--help` cannot: its arguments, the request-body fields (which arrive via `--input`, not as flags) and the response fields.
 
-When several endpoints share a command's words, the flags pick one. `--help` then prints one page with every endpoint's usage line and its full help; the flags before `--help` narrow it to one:
+When several endpoints share a command's words, the flags pick one. `--help` then lists one line per endpoint; the flags before `--help` show one endpoint's full help, and for the line without flags its ID does:
 
 ```bash
-deel contracts get --help                               # every endpoint of 'contracts get', each with its arguments and fields
-deel contracts get --worker-type eor --help             # only the EOR endpoint
+deel contracts get --help                               # one line per endpoint of 'contracts get'
+deel contracts get --worker-type eor --help             # the EOR endpoint's arguments, options and fields
+deel contracts get 12345 --help                         # the endpoint the plain line calls
 ```
 
 ## Request input
