@@ -375,6 +375,19 @@ test("--help lists every endpoint until a selector picks one, then shows that en
   assert.equal(json.usage, "deel ships benefits list --country <country> [GLOBAL OPTIONS]");
 });
 
+test("--help after the arguments shows the endpoint that command line calls, the bare one included", async () => {
+  const bare = await capture(["ships", "get", "s1", "--help"], fleet.manifest.descriptors);
+  assert.equal(bare.code, EXIT.OK);
+  assert.match(bare.out, /USAGE  deel ships get <ship> \[GLOBAL OPTIONS\]/);
+  const typed = await capture(["ships", "get", "s1", "--worker-type", "eor", "--help"], fleet.manifest.descriptors);
+  assert.match(typed.out, /USAGE  deel ships get <ship> --worker-type eor \[GLOBAL OPTIONS\]/);
+  const json = JSON.parse((await capture(["ships", "get", "s1", "--help", "--json"], fleet.manifest.descriptors)).out);
+  assert.equal(json.usage, "deel ships get <ship> [GLOBAL OPTIONS]");
+  // The words alone still list every endpoint, with a hint that shows how to pick one.
+  const all = await capture(["ships", "get", "--help"], fleet.manifest.descriptors);
+  assert.match(all.out, /e\.g\. deel ships get SHIP --help/);
+});
+
 test("--generate-input needs the endpoint picked first when several share the words", async () => {
   const group = await capture(["ships", "reviews", "create", "--generate-input"], fleet.manifest.descriptors);
   assert.notEqual(group.code, EXIT.OK);
