@@ -5,7 +5,7 @@ import { parseDefinitions } from "../scripts/public-api/definitions.ts";
 import type { Definition } from "../scripts/public-api/definitions.ts";
 import { pathParams } from "../scripts/public-api/command-map.ts";
 import type { MapEntry } from "../scripts/public-api/command-map.ts";
-import { generate as generateWith, summarize } from "../scripts/public-api/generate.ts";
+import { generate as generateWith, mergeVariants, summarize } from "../scripts/public-api/generate.ts";
 import type { GenerateOptions } from "../scripts/public-api/generate.ts";
 import type { Descriptor } from "../src/types.ts";
 
@@ -379,4 +379,21 @@ test("two endpoints that share the words and differ only in their arguments are 
   ];
   const { errors } = generateWith(definitions, options({ map }));
   assert.ok(errors.some((error) => /"deel vault items list" and "deel vault items list <folder>" differ only in their arguments/.test(error)), errors.join("\n"));
+});
+
+test("object variants read as one object: every property, enums joined, required only where every variant requires it", () => {
+  const cash = { type: "object", required: ["type", "amount"], properties: { type: { type: "string", enum: ["CASH"] }, amount: { type: "number" } } };
+  const time = { type: "object", required: ["type", "time_unit"], properties: { type: { type: "string", enum: ["TIME"] }, time_unit: { type: "string" } } };
+  const merged = mergeVariants({ type: "object", properties: { severance: { oneOf: [cash, time] } } }).properties.severance;
+  assert.deepEqual(Object.keys(merged.properties).sort(), ["amount", "time_unit", "type"]);
+  assert.deepEqual(merged.properties.type.enum, ["CASH", "TIME"]);
+  assert.deepEqual(merged.required, ["type"]);
+  // allOf requires what any member requires; a lone member plus null is left for the nullable reading.
+  assert.deepEqual(mergeVariants({ allOf: [cash, { type: "object", required: ["note"], properties: { note: { type: "string" } } }] }).required.sort(), ["amount", "note", "type"]);
+  const nullable = { anyOf: [cash, { type: "null" }] };
+  assert.deepEqual(mergeVariants(nullable), nullable);
+  assert.equal(mergeVariants({ anyOf: [cash, time, { type: "null" }] }).nullable, true);
+  // Variants that aren't all objects stay as they are.
+  const mixed = { oneOf: [cash, { type: "string" }] };
+  assert.deepEqual(mergeVariants(mixed), mixed);
 });

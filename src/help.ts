@@ -79,25 +79,19 @@ export function printFormsJson(descriptors: Descriptor[]): void {
   process.stdout.write(JSON.stringify({ command: descriptors[0].command.join(" "), forms }, null, 2) + "\n");
 }
 
-// Help for a generated command whose words several endpoints share: every endpoint's usage first, then each
-// one's full help, so nothing needs typing to read it. The flags before --help narrow the page to one endpoint.
+// Help for a generated command whose words several endpoints share: one line per endpoint. The flags before
+// --help narrow it to one endpoint's full help; for the line without flags, its arguments do.
 export function printFormsHelp(descriptors: Descriptor[]): void {
   const out = process.stdout.write.bind(process.stdout);
   const cmd = descriptors[0].command.join(" ");
-  out(`\n${cmd} — ${descriptors.length} endpoints; the flags pick one\n\nUSAGE\n`);
-  for (const d of descriptors) out(`  ${usageOf(d)}\n`);
-  descriptors.forEach((d, index) => {
-    out(`\n${`── ${index + 1} of ${descriptors.length}: ${usageOf(d)} `.padEnd(72, "─")}\n`);
-    printFormSection(d);
-  });
-  out(`Global options (--json, --jq, --fields, --quiet, --env, ...) — run 'deel --help'.\n`);
-  // The selectors alone narrow the page, so the example needs no argument a shell could misread.
+  out(`\n${cmd} — the flags pick the endpoint:\n\n`);
+  for (const d of descriptors) out(`  ${usageOf(d)}\n      ${d.method} ${d.path}${d.summary ? `  — ${d.summary}` : ""}\n`);
+  // The selectors alone narrow it, so the example needs no argument a shell could misread.
   const picked = descriptors.find((d) => d.form!.selectors.length);
-  if (picked) {
-    const flags = picked.form!.selectors.map((s) => (s.value === undefined ? `--${s.flag}` : `--${s.flag} ${s.value}`));
-    out(`One endpoint only: add its flags before --help (deel ${[cmd, ...flags, "--help"].join(" ")}).\n`);
-  }
-  out(`Machine-readable contracts: 'deel ${cmd} --help --json'.\n`);
+  const flags = picked?.form!.selectors.map((s) => (s.value === undefined ? `--${s.flag}` : `--${s.flag} ${s.value}`)) ?? [];
+  const bare = descriptors.some((d) => !d.form!.selectors.length && !d.form!.scopes.length && d.form!.positionals.length);
+  out(`\nOne endpoint's arguments, options and fields: add its flags before --help${picked ? ` (deel ${[cmd, ...flags, "--help"].join(" ")})` : ""}`);
+  out(`${bare ? "; for the line without flags, put its ID before --help" : ""}.\n\n`);
 }
 
 // The exact command line a caller should type — shared by the human --help USAGE
@@ -372,7 +366,7 @@ export function printRootHelp(root: CommandDef, staticNames: Set<string>, at: De
 }
 
 // A line a reader can paste: the row's words only. Its <arguments> would read as shell redirections, and the
-// words alone already give the help of every endpoint behind them.
+// words alone give its help (or, for words several endpoints share, the list that leads to each one's help).
 function exampleLine(path: string[], row: string): string {
   const words = row.split(/\s+/).filter(Boolean);
   const end = words.findIndex((t) => /^[<\[-]/.test(t));
@@ -396,7 +390,7 @@ export function printGroupHelp(cmd: CommandDef, path: string[], title: string, a
   out(rowLines(rows));
   const used = Object.keys(PICKING_LEGEND).filter((flag) => rows.some((row) => row.name.includes(`--${flag} `) || row.name.endsWith(`--${flag}`)));
   if (used.length) out(`\nFlags that pick the endpoint:\n${used.map((flag) => `  ${PICKING_LEGEND[flag]}\n`).join("")}`);
-  const what = apiCommands ? "its arguments, flags and request body" : "its flags";
+  const what = apiCommands ? "its arguments, flags and fields" : "its flags";
   const example = rows[0] ? ` (e.g. ${exampleLine(path, rows[0].name)})` : "";
   out(`\nAdd --help to a line's words for ${what}${example}.\n`);
 }
