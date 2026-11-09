@@ -506,3 +506,10 @@ test("withholdSecrets leaves a response without secrets untouched", () => {
   assert.deepEqual(kept, data);
   assert.deepEqual(withheld, []);
 });
+
+test("errorFromResponse reads the message from a nested error list and from responseMessage", () => {
+  const nested = errorFromResponse(500, { errors: { errors: [{ message: "SCIM job profiles could not be resolved" }] } }, "req-1");
+  assert.equal(nested.message, "SCIM job profiles could not be resolved");
+  const wrapped = errorFromResponse(400, { statusCode: 400, responseMessage: { message: "Missing a user header" } }, "req-2");
+  assert.deepEqual([wrapped.code, wrapped.message], ["http.400", "Missing a user header"]);
+});

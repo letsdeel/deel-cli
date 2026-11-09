@@ -370,3 +370,13 @@ test("a flag that picks an endpoint can't also be a flag of another endpoint sha
   const { errors } = generateWith(definitions, options({ map }));
   assert.ok(errors.some((error) => /"deel ships list --status archived": --status picks this endpoint, but it is also a flag of "deel ships list"/.test(error)), errors.join("\n"));
 });
+
+test("two endpoints that share the words and differ only in their arguments are an error", () => {
+  const definitions = parseDefinitions([def("GET", "/vault/items"), def("GET", "/vault/folders/{folder_id}/items")]);
+  const map: MapEntry[] = [
+    { method: "GET", path: "/vault/items", command: "deel vault items list" },
+    { method: "GET", path: "/vault/folders/{folder_id}/items", command: "deel vault items list <folder>" },
+  ];
+  const { errors } = generateWith(definitions, options({ map }));
+  assert.ok(errors.some((error) => /"deel vault items list" and "deel vault items list <folder>" differ only in their arguments/.test(error)), errors.join("\n"));
+});

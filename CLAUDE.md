@@ -14,8 +14,8 @@ This is a **public repo** (`letsdeel/deel-cli`). Code, fixtures, commit messages
 npm ci                                  # install deps + husky git hooks
 node src/main.ts --help                 # run from source (or: npm run deel -- <args>)
 npm test                                # node --test test/*.test.ts
-node --test test/tokens.test.ts         # a single test file
-node --test --test-name-pattern="reserved" test/tokens.test.ts   # a single test by name
+node --test test/executor.test.ts       # a single test file
+node --test --test-name-pattern="reserved" test/public-api-commands.test.ts   # a single test by name
 npm run typecheck                       # tsc --noEmit, strict
 npm run check                           # everything CI runs: typecheck, tests + coverage gate, manifest/lockfile/version/shell checks
 npm run build:smoke                     # bun compile to dist/deel, then --version / --help
@@ -40,7 +40,7 @@ Coverage floor over `src/**` (in `test:coverage`): lines ≥ 80 %, branches ≥ 
    - To expose a new endpoint: add it to `commands.map.ts`, then regenerate.
    - **Variants**: several map entries with the same `command` but different `variant` (e.g. `adjustments create --invoice` / `--payroll`) become one command with mutually exclusive boolean selector flags.
 2. **Generated public API commands** — one per documented public endpoint, in `src/public-api/manifest.json` (written by `npm run generate:public-api -- --from <file|url>`, never hand-edited). Names come only from the reviewed command map `src/public-api/commands.json` (rules R1–R11 in CONTRIBUTING.md, checked by `npm run check:command-map`); an endpoint with no entry fails the generator. Path IDs are positional arguments, and fixed selector flags (`--worker-type eor`, `--as worker`, `--file-format pdf`, `--bulk`, `--status <value>`) or scope flags (`--contract <id>`) pick one endpoint among those sharing the words (`src/public-api/commands.ts` `selectForm`).
-3. **Static commands** — hand-written in `src/commands/<name>.ts` (`auth`, `job`, `tokens`) for things that don't map 1:1 to one operation. Registered in `src/commands/index.ts` (`staticCommands`); the keys **must** match `RESERVED_COMMANDS` in `src/core/constants.ts`, which stops a generated command from colliding. The pattern is a thin citty command in `src/commands/` with the API/business logic in a matching `src/core/<concern>.ts` (e.g. `commands/tokens.ts` → `core/api-tokens.ts`). A static command is kept only for what a generated one can't do; an endpoint the command map names is generated, not hand-written.
+3. **Static commands** — hand-written in `src/commands/<name>.ts` (`auth`, `job`) for things that don't map 1:1 to one operation. Registered in `src/commands/index.ts` (`staticCommands`); the keys **must** match `RESERVED_COMMANDS` in `src/core/constants.ts`, which stops a generated command from colliding. The pattern is a thin citty command in `src/commands/` with the API/business logic in a matching `src/core/<concern>.ts` (e.g. `commands/auth.ts` → `core/auth.ts`). A static command is kept only for what a generated one can't do; an endpoint the command map names is generated, not hand-written.
    - `src/commands/shared.ts` holds the global flag set (`commonArgs`) and flag helpers. Repeatable and hidden flags are read from `rawArgs` (`gatherFlagValues`, `gatherFiles`, `readHidden`) because citty doesn't expose them; the `--flag=value` form lets a value start with `-`. The `nullable*` parsers send the literal `null` as JSON null to clear a nullable field.
 
 ### Request flow
@@ -52,7 +52,7 @@ Coverage floor over `src/**` (in `test:coverage`): lines ≥ 80 %, branches ≥ 
 
 ### Context and transport (dependency injection)
 
-`core/context.ts` `createContext()` is the single composition point: `Ctx = { io, http, clock, newRequestId, logger, config, token }`. Modules don't reach for `process.*` or globals — they take a `Ctx`. The `http` transport is a middleware stack composed in `core/http.ts`: retry → beta header → request id → CLI version → auth → logging (innermost, sees final headers). Tests inject `baseTransport`, `io` (`captureIO()` from `core/io.ts`), `clock`, `rng`, and `logger` fakes — see `test/tokens.test.ts` `ctxWith()` for the standard pattern.
+`core/context.ts` `createContext()` is the single composition point: `Ctx = { io, http, clock, newRequestId, logger, config, token }`. Modules don't reach for `process.*` or globals — they take a `Ctx`. The `http` transport is a middleware stack composed in `core/http.ts`: retry → beta header → request id → CLI version → auth → logging (innermost, sees final headers). Tests inject `baseTransport`, `io` (`captureIO()` from `core/io.ts`), `clock`, `rng`, and `logger` fakes — see `test/executor.test.ts` `ctxWith()` for the standard pattern.
 
 ### Conventions baked into the executor/output
 

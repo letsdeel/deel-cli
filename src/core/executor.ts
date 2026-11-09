@@ -251,7 +251,9 @@ function errorCodeOf(item: any): string | undefined {
 // `betaSent`: the request already carried X-Beta, so a BETA_ACCESS_REQUIRED answer must not tell the user to add --beta.
 export function errorFromResponse(status: number, json: unknown, requestId: string, betaSent = false): CliError {
   const body = json as any;
-  const list: any[] | undefined = Array.isArray(body?.errors) ? body.errors : undefined;
+  // Most services answer { errors: [...] } or { error: {...} }; some nest the list ({ errors: { errors: [...] } })
+  // or the message ({ responseMessage: { message } }), and those messages are still the user's best hint.
+  const list: any[] | undefined = Array.isArray(body?.errors) ? body.errors : Array.isArray(body?.errors?.errors) ? body.errors.errors : undefined;
 
   let code: string;
   let message: string;
@@ -267,7 +269,7 @@ export function errorFromResponse(status: number, json: unknown, requestId: stri
   } else {
     const payload = body?.error ?? body ?? {};
     code = errorCodeOf(payload) ?? `http.${status}`;
-    message = payload.message ?? `Request failed with status ${status}`;
+    message = payload.message ?? payload.responseMessage?.message ?? `Request failed with status ${status}`;
     next = payload.next;
   }
 

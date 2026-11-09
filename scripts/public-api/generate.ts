@@ -252,6 +252,17 @@ export function generate(definitions: Definition[], options: GenerateOptions): G
     byCommand.set(name, [...(byCommand.get(name) ?? []), descriptor]);
   }
 
+  // Endpoints sharing the words are told apart by their selectors and scopes only, never by how many arguments they take.
+  for (const group of byCommand.values()) {
+    const bySignature = new Map<string, Descriptor>();
+    for (const d of group) {
+      const signature = JSON.stringify([d.form!.selectors.map((s) => `${s.flag}=${s.value ?? ""}`).sort(), d.form!.scopes.map((s) => s.flag).sort()]);
+      const other = bySignature.get(signature);
+      if (other) errors.push(`"${usage(other)}" and "${usage(d)}" differ only in their arguments, so the flags can't tell them apart. Give one a selector or other words.`);
+      else bySignature.set(signature, d);
+    }
+  }
+
   // The flags that pick an endpoint are read before the endpoint is known, so none may be another endpoint's own flag:
   // `list --status archived` next to a `list` that has a status query param would leave that param unusable.
   for (const [name, group] of byCommand) {
