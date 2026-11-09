@@ -77,14 +77,23 @@ function isHttps(url: string): boolean {
   }
 }
 
-// Attach the bearer token, but never over a non-https URL (also guards redirects).
-export function withAuth(token: string | null): Middleware {
-  return (next) => (request) => {
-    const willSendCredential = Boolean(token) || Boolean(request.headers[HEADER.authorization]);
+// Resolves the bearer token at send time, so an OAuth access token can be refreshed first.
+export type TokenProvider = () => Promise<string | null>;
+
+// Attach the bearer token (a static string or an async provider), but never over a non-https URL
+// (also guards redirects). The provider is only called when the request carries no credential yet, and the
+// header goes on a copy, so a retry asks the provider again instead of resending a token that may have expired.
+export function withAuth(token: string | TokenProvider | null): Middleware {
+  return (next) => async (request) => {
+    const hasHeader = Boolean(request.headers[HEADER.authorization]);
+    const willSendCredential = Boolean(token) || hasHeader;
     if (willSendCredential && !isHttps(request.url)) {
       throw new CliError("network.insecure", `Refusing to send credentials over a non-https URL: ${request.url}`, "Only https endpoints are supported.");
     }
-    if (token && !request.headers[HEADER.authorization]) request.headers[HEADER.authorization] = `Bearer ${token}`;
+    if (token && !hasHeader) {
+      const value = typeof token === "function" ? await token() : token;
+      if (value) return next({ ...request, headers: { ...request.headers, [HEADER.authorization]: `Bearer ${value}` } });
+    }
     return next(request);
   };
 }
