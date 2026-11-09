@@ -111,5 +111,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   for (const f of failures) process.stderr.write(`FAIL  ${f.message}\n      ${f.entry}\n`);
   for (const w of warnings) process.stderr.write(`warn  ${w.message}\n      ${w.entry}\n`);
   process.stderr.write(`command map: ${failures.length} failure(s), ${warnings.length} warning(s)\n`);
-  process.exit(failures.length ? 1 : 0);
+  process.exitCode = failures.length ? 1 : 0;
 }
