@@ -73,20 +73,31 @@ export function printVariantGroupHelp(descriptors: Descriptor[]): void {
   out(`Help:  deel ${cmd} --<variant> --help\n\n`);
 }
 
-// The --help --json for a generated command whose words several endpoints share: each endpoint's command line.
+// The --help --json for a generated command whose words several endpoints share: each endpoint's full contract.
 export function printFormsJson(descriptors: Descriptor[]): void {
-  const forms = descriptors.map((d) => ({ usage: usageOf(d), method: d.method, path: d.path, ...(d.summary ? { summary: d.summary } : {}) }));
+  const forms = descriptors.map((d) => ({ ...contractOf(d), ...(d.summary ? { summary: d.summary } : {}) }));
   process.stdout.write(JSON.stringify({ command: descriptors[0].command.join(" "), forms }, null, 2) + "\n");
 }
 
-// Help for a generated command whose words several endpoints share: one line per endpoint.
+// Help for a generated command whose words several endpoints share: every endpoint's usage first, then each
+// one's full help, so nothing needs typing to read it. The flags before --help narrow the page to one endpoint.
 export function printFormsHelp(descriptors: Descriptor[]): void {
   const out = process.stdout.write.bind(process.stdout);
   const cmd = descriptors[0].command.join(" ");
-  out(`\n${cmd} — the flags pick the endpoint:\n\n`);
-  for (const d of descriptors) out(`  ${usageOf(d)}\n      ${d.method} ${d.path}${d.summary ? `  — ${d.summary}` : ""}\n`);
-  const example = [cmd, ...descriptors[0].form!.positionals.map((p) => p.label.toUpperCase()), "--help"].join(" ");
-  out(`\nHelp:  type one of the lines above with your values in place of <…>, then --help (e.g. deel ${example})\n\n`);
+  out(`\n${cmd} — ${descriptors.length} endpoints; the flags pick one\n\nUSAGE\n`);
+  for (const d of descriptors) out(`  ${usageOf(d)}\n`);
+  descriptors.forEach((d, index) => {
+    out(`\n${`── ${index + 1} of ${descriptors.length}: ${usageOf(d)} `.padEnd(72, "─")}\n`);
+    printFormSection(d);
+  });
+  out(`Global options (--json, --jq, --fields, --quiet, --env, ...) — run 'deel --help'.\n`);
+  // The selectors alone narrow the page, so the example needs no argument a shell could misread.
+  const picked = descriptors.find((d) => d.form!.selectors.length);
+  if (picked) {
+    const flags = picked.form!.selectors.map((s) => (s.value === undefined ? `--${s.flag}` : `--${s.flag} ${s.value}`));
+    out(`One endpoint only: add its flags before --help (deel ${[cmd, ...flags, "--help"].join(" ")}).\n`);
+  }
+  out(`Machine-readable contracts: 'deel ${cmd} --help --json'.\n`);
 }
 
 // The exact command line a caller should type — shared by the human --help USAGE
@@ -125,8 +136,12 @@ const flagParams = (descriptor: Descriptor) =>
   descriptor.params.filter((param) => !(descriptor.form && (param.in === "path" || descriptor.form.scopes.some((s) => s.param === param.name))));
 
 export function printContractJson(descriptor: Descriptor): void {
+  process.stdout.write(JSON.stringify(contractOf(descriptor), null, 2) + "\n");
+}
+
+function contractOf(descriptor: Descriptor) {
   const form = descriptor.form;
-  const contract = {
+  return {
     command: descriptor.command.join(" "),
     ...(descriptor.variant ? { variant: descriptor.variant } : {}),
     usage: buildUsage(descriptor),
@@ -151,15 +166,25 @@ export function printContractJson(descriptor: Descriptor): void {
       fields: fieldsToJson(descriptor.responseFields),
     },
   };
-  process.stdout.write(JSON.stringify(contract, null, 2) + "\n");
 }
 
 // Action-level help: only the action-specific options + the full contract.
 // Global flags are declared (so citty parses them) but documented once at `deel --help`.
 export function printActionHelp(descriptor: Descriptor): void {
   const out = process.stdout.write.bind(process.stdout);
+  out(`\n`);
+  printFormSection(descriptor);
+  out(`Global options (--json, --jq, --fields, --quiet, --env, ...) — run 'deel --help'.\n`);
+  out(`Machine-readable contract: 'deel ${descriptor.command.join(" ")} --help --json'.\n`);
+}
 
-  out(`\n${descriptor.summary ?? descriptor.command.join(" ")}\n\n`);
+// One endpoint's help: what it does, how to call it, its arguments and options, its request and response.
+function printFormSection(descriptor: Descriptor): void {
+  const out = process.stdout.write.bind(process.stdout);
+
+  out(`${descriptor.summary ?? descriptor.command.join(" ")}\n`);
+  if (descriptor.form) out(`${descriptor.method} ${descriptor.path}\n`);
+  out(`\n`);
   out(`USAGE  ${buildUsage(descriptor)}\n`);
 
   if (descriptor.form?.positionals.length || descriptor.form?.scopes.length) {
@@ -179,8 +204,6 @@ export function printActionHelp(descriptor: Descriptor): void {
   }
 
   printContract(descriptor);
-  out(`Global options (--json, --jq, --fields, --quiet, --env, ...) — run 'deel --help'.\n`);
-  out(`Machine-readable contract: 'deel ${descriptor.command.join(" ")} --help --json'.\n`);
 }
 
 // Global flags documented once, at the root.
@@ -348,11 +371,12 @@ export function printRootHelp(root: CommandDef, staticNames: Set<string>, at: De
   out(`\nAdd --help to a command to see its commands${first ? ` (e.g. ${exampleLine([], first.name)})` : ""}. Search every command: deel commands --filter TEXT.\n`);
 }
 
-// A line a reader can paste: the row's <label>s become LABEL, so a shell doesn't read them as redirections,
-// and its optional [--flags] are left out.
+// A line a reader can paste: the row's words only. Its <arguments> would read as shell redirections, and the
+// words alone already give the help of every endpoint behind them.
 function exampleLine(path: string[], row: string): string {
-  const tokens = row.replace(/\[[^\]]*\]/g, "").split(/\s+/).filter(Boolean).map((t) => (/^<.+>$/.test(t) ? t.slice(1, -1).toUpperCase() : t));
-  return ["deel", ...path, ...tokens, "--help"].join(" ");
+  const words = row.split(/\s+/).filter(Boolean);
+  const end = words.findIndex((t) => /^[<\[-]/.test(t));
+  return ["deel", ...path, ...(end === -1 ? words : words.slice(0, end)), "--help"].join(" ");
 }
 
 // What the flags that pick an endpoint mean, shown under a group whose lines use them.
@@ -374,7 +398,7 @@ export function printGroupHelp(cmd: CommandDef, path: string[], title: string, a
   if (used.length) out(`\nFlags that pick the endpoint:\n${used.map((flag) => `  ${PICKING_LEGEND[flag]}\n`).join("")}`);
   const what = apiCommands ? "its arguments, flags and request body" : "its flags";
   const example = rows[0] ? ` (e.g. ${exampleLine(path, rows[0].name)})` : "";
-  out(`\nFor one line's ${what.replace(/^its /, "")}, type it with your values in place of <…> and add --help${example}.\n`);
+  out(`\nAdd --help to a line's words for ${what}${example}.\n`);
 }
 
 // The title of a group's help: a top-level domain's description, else its path.

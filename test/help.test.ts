@@ -72,7 +72,7 @@ test("group help lists one line per endpoint, collapses single-child chains and 
   assert.match(out, /^ {2}invite send <contract> {3,}Send contract to worker$/m);
   assert.match(out, /^ {2}amendments {3,}2 commands$/m);
   assert.match(out, /^Flags that pick the endpoint:\n {2}--worker-type <type> /m);
-  assert.match(out, /^For one line's arguments, flags and request body, type it with your values in place of <…> and add --help \(e\.g\. deel contracts list --help\)\.$/m);
+  assert.match(out, /^Add --help to a line's words for its arguments, flags and request body \(e\.g\. deel contracts list --help\)\.$/m);
 });
 
 test("a group without --help prints its help too, and a nested group is titled with its path", async () => {
@@ -83,16 +83,16 @@ test("a group without --help prints its help too, and a nested group is titled w
   assert.doesNotMatch(nested.out, /Flags that pick the endpoint/);
 });
 
-test("help examples replace <label> with LABEL and drop optional flags, so they paste into a shell", async () => {
+test("help examples keep only the words, so they paste into a shell", async () => {
   const { out } = await capture(["contracts", "amendments", "--help"]);
-  assert.match(out, /\(e\.g\. deel contracts amendments list CONTRACT --help\)\.$/m);
+  assert.match(out, /\(e\.g\. deel contracts amendments list --help\)\.$/m);
   assert.match((await capture(["--help"])).out, /^Add --help to a command to see its commands \(e\.g\. deel [a-z -]+ --help\)\./m);
 });
 
 test("a static group uses its own description and the static footer", async () => {
   const { code, out } = await capture(["auth", "--help"]);
   assert.equal(code, EXIT.OK);
-  assert.match(out, /^For one line's flags, type it with your values in place of <…> and add --help \(e\.g\. deel auth login --help\)\.$/m);
+  assert.match(out, /^Add --help to a line's words for its flags \(e\.g\. deel auth login --help\)\.$/m);
 });
 
 test("an unknown word suggests the closest commands, at the top level and under a group", async () => {
