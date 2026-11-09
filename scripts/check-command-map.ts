@@ -15,6 +15,8 @@ import { manifest as handPicked } from "../src/manifest.generated.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
 
 const WORD = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+// The map's path keys don't always keep the API's case ({roleid} for {roleId}), so names compare without it.
+const squashed = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, "");
 
 export type Finding = { entry: string; message: string };
 
@@ -54,6 +56,11 @@ export function checkMap(entries: MapEntry[], options: CheckOptions = {}): { fai
     // Every path ID needs an argument. A scope flag left over may name a query param, which only the definitions know.
     const bound = bindForm(command, entry.path, command.labels.filter((l) => l.flag).map((l) => l.flag!));
     if (bound.error) fail(bound.error);
+    // An argument is named after the path param it fills, so help reads like the API reference.
+    const sharesLine = entry.collapse !== undefined && lines.get(lineKey(command))?.collapse === entry.collapse;
+    for (const { label, param } of sharesLine ? [] : [...(bound.form?.positionals ?? []), ...(bound.form?.scopes ?? []).filter((s) => !s.in)]) {
+      if (squashed(label) !== squashed(param)) fail(`<${label}> fills {${param}}, so it is written <${param}>`);
+    }
     const order = (bound.form?.positionals ?? []).map((p) => entry.path.indexOf(`{${p.param}}`));
     if (order.some((at, i) => i > 0 && at < order[i - 1])) fail("arguments must follow the path order of their IDs");
 

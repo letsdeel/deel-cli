@@ -555,7 +555,7 @@
    "form": {
     "positionals": [
      {
-      "label": "role",
+      "label": "roleId",
       "param": "roleId"
      }
     ],
@@ -657,7 +657,7 @@
    "form": {
     "positionals": [
      {
-      "label": "worker",
+      "label": "worker_id",
       "param": "worker_id"
      }
     ],
@@ -937,7 +937,7 @@
    "form": {
     "positionals": [
      {
-      "label": "adjustment",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -1340,7 +1340,7 @@
    "form": {
     "positionals": [
      {
-      "label": "adjustment",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -2225,7 +2225,7 @@
     "scopes": [
      {
       "flag": "contract",
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -2299,7 +2299,7 @@
    "form": {
     "positionals": [
      {
-      "label": "adjustment",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -2375,7 +2375,7 @@
    "form": {
     "positionals": [
      {
-      "label": "adjustment",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -2481,7 +2481,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -2616,11 +2616,11 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
-      "label": "payment",
+      "label": "off_cycle_payment_id",
       "param": "off_cycle_payment_id"
      }
     ],
@@ -2748,7 +2748,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -3061,7 +3061,7 @@
    "form": {
     "positionals": [
      {
-      "label": "adjustment",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -3260,7 +3260,7 @@
    "form": {
     "positionals": [
      {
-      "label": "adjustment",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -3475,7 +3475,7 @@
     "scopes": [
      {
       "flag": "contract",
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -3587,7 +3587,7 @@
    "form": {
     "positionals": [
      {
-      "label": "adjustment",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -4874,7 +4874,7 @@
    "form": {
     "positionals": [
      {
-      "label": "application",
+      "label": "application_id",
       "param": "application_id"
      }
     ],
@@ -5786,7 +5786,7 @@
    "form": {
     "positionals": [
      {
-      "label": "application",
+      "label": "application_id",
       "param": "application_id"
      }
     ],
@@ -5878,7 +5878,7 @@
    "form": {
     "positionals": [
      {
-      "label": "application",
+      "label": "application_id",
       "param": "application_id"
      }
     ],
@@ -5961,7 +5961,7 @@
    "form": {
     "positionals": [
      {
-      "label": "application",
+      "label": "application_id",
       "param": "application_id"
      }
     ],
@@ -6117,15 +6117,15 @@
    "form": {
     "positionals": [
      {
-      "label": "type",
+      "label": "attachable_type_slug",
       "param": "attachable_type_slug"
      },
      {
-      "label": "id",
+      "label": "attachable_id",
       "param": "attachable_id"
      },
      {
-      "label": "attachment-type",
+      "label": "attachment_type_slug",
       "param": "attachment_type_slug"
      }
     ],
@@ -6295,15 +6295,15 @@
    "form": {
     "positionals": [
      {
-      "label": "type",
+      "label": "attachable_type_slug",
       "param": "attachable_type_slug"
      },
      {
-      "label": "id",
+      "label": "attachable_id",
       "param": "attachable_id"
      },
      {
-      "label": "attachment-type",
+      "label": "attachment_type_slug",
       "param": "attachment_type_slug"
      }
     ],
@@ -6931,7 +6931,7 @@
    "form": {
     "positionals": [
      {
-      "label": "candidate",
+      "label": "candidate_id",
       "param": "candidate_id"
      }
     ],
@@ -7579,7 +7579,7 @@
    "form": {
     "positionals": [
      {
-      "label": "candidate",
+      "label": "candidate_id",
       "param": "candidate_id"
      }
     ],
@@ -8123,7 +8123,7 @@
    "form": {
     "positionals": [
      {
-      "label": "candidate",
+      "label": "candidate_id",
       "param": "candidate_id"
      }
     ],
@@ -8369,7 +8369,7 @@
    "form": {
     "positionals": [
      {
-      "label": "candidate",
+      "label": "candidate_id",
       "param": "candidate_id"
      }
     ],
@@ -8645,7 +8645,7 @@
    "form": {
     "positionals": [
      {
-      "label": "candidate",
+      "label": "candidate_id",
       "param": "candidate_id"
      }
     ],
@@ -8707,11 +8707,11 @@
    "form": {
     "positionals": [
      {
-      "label": "candidate",
+      "label": "candidate_id",
       "param": "candidate_id"
      },
      {
-      "label": "draft",
+      "label": "email_draft_id",
       "param": "email_draft_id"
      }
     ],
@@ -8860,7 +8860,7 @@
    "form": {
     "positionals": [
      {
-      "label": "candidate",
+      "label": "candidate_id",
       "param": "candidate_id"
      }
     ],
@@ -8993,7 +8993,7 @@
    "form": {
     "positionals": [
      {
-      "label": "candidate",
+      "label": "candidate_id",
       "param": "candidate_id"
      }
     ],
@@ -9524,7 +9524,7 @@
    "form": {
     "positionals": [
      {
-      "label": "template",
+      "label": "email_template_id",
       "param": "email_template_id"
      }
     ],
@@ -10581,7 +10581,7 @@
     "scopes": [
      {
       "flag": "application",
-      "label": "application",
+      "label": "application_id",
       "param": "application_id"
      }
     ],
@@ -11242,7 +11242,7 @@
    "form": {
     "positionals": [
      {
-      "label": "form",
+      "label": "application_form_id",
       "param": "application_form_id"
      }
     ],
@@ -12410,7 +12410,7 @@
    "form": {
     "positionals": [
      {
-      "label": "interview",
+      "label": "interview_id",
       "param": "interview_id"
      }
     ],
@@ -12510,11 +12510,11 @@
    "form": {
     "positionals": [
      {
-      "label": "application",
+      "label": "application_id",
       "param": "application_id"
      },
      {
-      "label": "activity",
+      "label": "application_activity_id",
       "param": "application_activity_id"
      }
     ],
@@ -12605,11 +12605,11 @@
    "form": {
     "positionals": [
      {
-      "label": "application",
+      "label": "application_id",
       "param": "application_id"
      },
      {
-      "label": "activity",
+      "label": "application_activity_id",
       "param": "application_activity_id"
      }
     ],
@@ -12714,7 +12714,7 @@
    "form": {
     "positionals": [
      {
-      "label": "interview",
+      "label": "interview_id",
       "param": "interview_id"
      }
     ],
@@ -13678,7 +13678,7 @@
    "form": {
     "positionals": [
      {
-      "label": "job",
+      "label": "job_id",
       "param": "job_id"
      }
     ],
@@ -14414,11 +14414,11 @@
    "form": {
     "positionals": [
      {
-      "label": "job",
+      "label": "job_id",
       "param": "job_id"
      },
      {
-      "label": "user",
+      "label": "hris_organization_user_id",
       "param": "hris_organization_user_id"
      }
     ],
@@ -14622,7 +14622,7 @@
    "form": {
     "positionals": [
      {
-      "label": "job",
+      "label": "job_id",
       "param": "job_id"
      }
     ],
@@ -14992,7 +14992,7 @@
     "scopes": [
      {
       "flag": "application",
-      "label": "application",
+      "label": "application_id",
       "param": "application_id"
      }
     ],
@@ -15074,7 +15074,7 @@
     "scopes": [
      {
       "flag": "candidate",
-      "label": "candidate",
+      "label": "candidate_id",
       "param": "candidate_id"
      }
     ],
@@ -15181,7 +15181,7 @@
     "scopes": [
      {
       "flag": "job",
-      "label": "job",
+      "label": "job_id",
       "param": "job_id"
      }
     ],
@@ -15272,7 +15272,7 @@
     "scopes": [
      {
       "flag": "job",
-      "label": "job",
+      "label": "job_id",
       "param": "job_id"
      }
     ],
@@ -15489,7 +15489,7 @@
    "form": {
     "positionals": [
      {
-      "label": "application",
+      "label": "application_id",
       "param": "application_id"
      }
     ],
@@ -15941,7 +15941,7 @@
    "form": {
     "positionals": [
      {
-      "label": "offer",
+      "label": "offer_id",
       "param": "offer_id"
      }
     ],
@@ -16724,7 +16724,7 @@
    "form": {
     "positionals": [
      {
-      "label": "application",
+      "label": "application_id",
       "param": "application_id"
      }
     ],
@@ -17574,7 +17574,7 @@
    "form": {
     "positionals": [
      {
-      "label": "posting",
+      "label": "job_posting_id",
       "param": "job_posting_id"
      }
     ],
@@ -18428,7 +18428,7 @@
     "scopes": [
      {
       "flag": "board",
-      "label": "board",
+      "label": "job_board_id",
       "param": "job_board_id"
      }
     ],
@@ -21374,7 +21374,7 @@
     "scopes": [
      {
       "flag": "contract",
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -21689,7 +21689,7 @@
     "scopes": [
      {
       "flag": "country",
-      "label": "country",
+      "label": "country_code",
       "param": "country_code",
       "in": "query"
      }
@@ -21699,6 +21699,79 @@
       "flag": "worker-type",
       "value": "eor",
       "optional": true
+     }
+    ]
+   }
+  },
+  {
+   "command": [
+    "billing",
+    "invoices",
+    "get"
+   ],
+   "method": "GET",
+   "path": "/invoices/{id}/download",
+   "summary": "Download invoice PDF",
+   "version": "2026-01-01",
+   "async": false,
+   "bodyKind": "none",
+   "supportsMultipart": false,
+   "bodyWrapper": "none",
+   "params": [
+    {
+     "name": "id",
+     "in": "path",
+     "type": "string",
+     "required": true,
+     "description": "The invoice ID used to identify the invoice to be downloaded."
+    }
+   ],
+   "bodyProps": [],
+   "fileFields": [],
+   "responseKind": "object",
+   "responseFields": [
+    {
+     "name": "id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Unique identifier of the invoice."
+    },
+    {
+     "name": "url",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "URL to the requested invoice for download. This URL may expire after a certain duration."
+    },
+    {
+     "name": "expires_at",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The expiration date and time of the download URL, after which the URL will no longer be accessible."
+    }
+   ],
+   "api": "rest",
+   "versions": [
+    {
+     "version": "2026-01-01",
+     "beta_until": null,
+     "sunset_at": null
+    }
+   ],
+   "form": {
+    "positionals": [
+     {
+      "label": "id",
+      "param": "id"
+     }
+    ],
+    "scopes": [],
+    "selectors": [
+     {
+      "flag": "file-format",
+      "value": "pdf"
      }
     ]
    }
@@ -22342,85 +22415,12 @@
    "form": {
     "positionals": [
      {
-      "label": "invoice",
+      "label": "invoice_id",
       "param": "invoice_id"
      }
     ],
     "scopes": [],
     "selectors": []
-   }
-  },
-  {
-   "command": [
-    "billing",
-    "invoices",
-    "get"
-   ],
-   "method": "GET",
-   "path": "/invoices/{id}/download",
-   "summary": "Download invoice PDF",
-   "version": "2026-01-01",
-   "async": false,
-   "bodyKind": "none",
-   "supportsMultipart": false,
-   "bodyWrapper": "none",
-   "params": [
-    {
-     "name": "id",
-     "in": "path",
-     "type": "string",
-     "required": true,
-     "description": "The invoice ID used to identify the invoice to be downloaded."
-    }
-   ],
-   "bodyProps": [],
-   "fileFields": [],
-   "responseKind": "object",
-   "responseFields": [
-    {
-     "name": "id",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "Unique identifier of the invoice."
-    },
-    {
-     "name": "url",
-     "in": "body",
-     "type": "string",
-     "required": true,
-     "description": "URL to the requested invoice for download. This URL may expire after a certain duration."
-    },
-    {
-     "name": "expires_at",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "The expiration date and time of the download URL, after which the URL will no longer be accessible."
-    }
-   ],
-   "api": "rest",
-   "versions": [
-    {
-     "version": "2026-01-01",
-     "beta_until": null,
-     "sunset_at": null
-    }
-   ],
-   "form": {
-    "positionals": [
-     {
-      "label": "invoice",
-      "param": "id"
-     }
-    ],
-    "scopes": [],
-    "selectors": [
-     {
-      "flag": "file-format",
-      "value": "pdf"
-     }
-    ]
    }
   },
   {
@@ -22469,7 +22469,7 @@
    "form": {
     "positionals": [
      {
-      "label": "invoice",
+      "label": "invoice_id",
       "param": "invoice_id"
      }
     ],
@@ -22609,7 +22609,7 @@
    "form": {
     "positionals": [
      {
-      "label": "invoice",
+      "label": "invoice_id",
       "param": "invoice_id"
      }
     ],
@@ -23278,7 +23278,7 @@
    "form": {
     "positionals": [
      {
-      "label": "payment",
+      "label": "payment_id",
       "param": "payment_id"
      }
     ],
@@ -23722,7 +23722,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -23812,7 +23812,7 @@
    "form": {
     "positionals": [
      {
-      "label": "refund",
+      "label": "refund_statement_id",
       "param": "refund_statement_id"
      }
     ],
@@ -24758,7 +24758,7 @@
    "form": {
     "positionals": [
      {
-      "label": "statement",
+      "label": "payment_statement_id",
       "param": "payment_statement_id"
      }
     ],
@@ -24829,7 +24829,7 @@
    "form": {
     "positionals": [
      {
-      "label": "bill",
+      "label": "vendor_bill_id",
       "param": "vendor_bill_id"
      }
     ],
@@ -25257,7 +25257,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -25329,7 +25329,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -25522,7 +25522,7 @@
    "form": {
     "positionals": [
      {
-      "label": "country",
+      "label": "country_code",
       "param": "country_code"
      }
     ],
@@ -25720,7 +25720,7 @@
    "form": {
     "positionals": [
      {
-      "label": "country",
+      "label": "country_code",
       "param": "country_code"
      }
     ],
@@ -25771,7 +25771,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -25882,7 +25882,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -26010,7 +26010,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -26109,7 +26109,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -26935,11 +26935,11 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
-      "label": "amendment",
+      "label": "amendment_id",
       "param": "amendment_id"
      }
     ],
@@ -27758,11 +27758,11 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
-      "label": "amendment",
+      "label": "amendment_id",
       "param": "amendment_id"
      }
     ],
@@ -27814,7 +27814,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -28885,7 +28885,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -28987,11 +28987,11 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
-      "label": "amendment",
+      "label": "amendment_id",
       "param": "amendment_id"
      }
     ],
@@ -29058,11 +29058,11 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
-      "label": "amendment",
+      "label": "amendment_id",
       "param": "amendment_id"
      }
     ],
@@ -29332,11 +29332,11 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
-      "label": "amendment",
+      "label": "amendment_id",
       "param": "amendment_id"
      }
     ],
@@ -30166,11 +30166,11 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
-      "label": "amendment",
+      "label": "amendment_id",
       "param": "amendment_id"
      }
     ],
@@ -30250,7 +30250,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -31057,7 +31057,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -31131,7 +31131,7 @@
    "form": {
     "positionals": [
      {
-      "label": "amendment",
+      "label": "amendment_id",
       "param": "amendment_id"
      }
     ],
@@ -31213,11 +31213,11 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
-      "label": "amendment",
+      "label": "amendment_id",
       "param": "amendment_id"
      }
     ],
@@ -32016,11 +32016,11 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
-      "label": "amendment",
+      "label": "amendment_id",
       "param": "amendment_id"
      }
     ],
@@ -33103,11 +33103,11 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
-      "label": "amendment",
+      "label": "amendment_id",
       "param": "amendment_id"
      }
     ],
@@ -33337,7 +33337,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -33405,7 +33405,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -33465,7 +33465,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -33517,7 +33517,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -33600,7 +33600,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -33793,7 +33793,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -33853,7 +33853,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -33929,7 +33929,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "oid",
       "param": "oid"
      }
     ],
@@ -34003,7 +34003,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -37606,14 +37606,14 @@
    "form": {
     "positionals": [
      {
-      "label": "field",
+      "label": "id",
       "param": "id"
      }
     ],
     "scopes": [
      {
       "flag": "contract",
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -37769,7 +37769,7 @@
    "form": {
     "positionals": [
      {
-      "label": "field",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -38006,7 +38006,7 @@
     "scopes": [
      {
       "flag": "contract",
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -38067,7 +38067,7 @@
     "scopes": [
      {
       "flag": "contract",
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -38129,7 +38129,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -38185,7 +38185,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
@@ -38287,7 +38287,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -38410,7 +38410,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
@@ -38527,7 +38527,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -38629,7 +38629,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -39614,7 +39614,7 @@
    "form": {
     "positionals": [
      {
-      "label": "country",
+      "label": "country_code",
       "param": "country_code"
      }
     ],
@@ -41127,7 +41127,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -41180,7 +41180,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -41257,7 +41257,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -42410,7 +42410,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -42469,7 +42469,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -42523,7 +42523,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -42615,7 +42615,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -43579,7 +43579,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -43640,11 +43640,11 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
-      "label": "milestone",
+      "label": "milestone_id",
       "param": "milestone_id"
      }
     ],
@@ -43790,11 +43790,11 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
-      "label": "milestone",
+      "label": "milestone_id",
       "param": "milestone_id"
      }
     ],
@@ -43933,7 +43933,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -43979,7 +43979,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -44065,7 +44065,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -44387,7 +44387,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -44462,7 +44462,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -44561,7 +44561,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -44612,7 +44612,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -44686,7 +44686,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -44768,7 +44768,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -44840,7 +44840,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -44972,7 +44972,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -45040,11 +45040,11 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
-      "label": "task",
+      "label": "task_id",
       "param": "task_id"
      }
     ],
@@ -45156,7 +45156,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -45239,7 +45239,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -45325,11 +45325,11 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
-      "label": "task",
+      "label": "task_id",
       "param": "task_id"
      }
     ],
@@ -45394,7 +45394,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -45457,11 +45457,11 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
-      "label": "tax-type",
+      "label": "tax_type",
       "param": "tax_type"
      }
     ],
@@ -45553,7 +45553,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -45624,7 +45624,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -46583,7 +46583,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -47144,7 +47144,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -48282,7 +48282,7 @@
    "form": {
     "positionals": [
      {
-      "label": "country",
+      "label": "country_code",
       "param": "country_code"
      }
     ],
@@ -48486,7 +48486,7 @@
    "form": {
     "positionals": [
      {
-      "label": "country",
+      "label": "country_code",
       "param": "country_code"
      }
     ],
@@ -49048,7 +49048,7 @@
    "form": {
     "positionals": [
      {
-      "label": "request",
+      "label": "request_id",
       "param": "request_id"
      }
     ],
@@ -49861,7 +49861,7 @@
    "form": {
     "positionals": [
      {
-      "label": "token",
+      "label": "token_id",
       "param": "token_id"
      }
     ],
@@ -50238,7 +50238,7 @@
    "form": {
     "positionals": [
      {
-      "label": "token",
+      "label": "token_id",
       "param": "token_id"
      }
     ],
@@ -50285,7 +50285,7 @@
    "form": {
     "positionals": [
      {
-      "label": "document",
+      "label": "document_id",
       "param": "document_id"
      }
     ],
@@ -50348,11 +50348,11 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
-      "label": "document",
+      "label": "document_id",
       "param": "document_id"
      }
     ],
@@ -50420,14 +50420,14 @@
    "form": {
     "positionals": [
      {
-      "label": "document",
+      "label": "document_id",
       "param": "document_id"
      }
     ],
     "scopes": [
      {
       "flag": "contract",
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -50488,7 +50488,7 @@
    "form": {
     "positionals": [
      {
-      "label": "document",
+      "label": "document_id",
       "param": "document_id"
      }
     ],
@@ -50589,14 +50589,14 @@
    "form": {
     "positionals": [
      {
-      "label": "document",
+      "label": "document_id",
       "param": "document_id"
      }
     ],
     "scopes": [
      {
       "flag": "contract",
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -50662,7 +50662,7 @@
    "form": {
     "positionals": [
      {
-      "label": "document",
+      "label": "document_id",
       "param": "document_id"
      }
     ],
@@ -50847,11 +50847,11 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
-      "label": "document",
+      "label": "document_id",
       "param": "document_id"
      }
     ],
@@ -51193,7 +51193,7 @@
     "scopes": [
      {
       "flag": "contract",
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -51423,7 +51423,7 @@
    "form": {
     "positionals": [
      {
-      "label": "document",
+      "label": "document_id",
       "param": "document_id"
      }
     ],
@@ -51508,11 +51508,11 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
-      "label": "document",
+      "label": "document_id",
       "param": "document_id"
      }
     ],
@@ -51644,7 +51644,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -51711,7 +51711,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -51974,7 +51974,7 @@
    "form": {
     "positionals": [
      {
-      "label": "form",
+      "label": "tax_form_id",
       "param": "tax_form_id"
      }
     ],
@@ -52025,7 +52025,7 @@
    "form": {
     "positionals": [
      {
-      "label": "file",
+      "label": "file_id",
       "param": "file_id"
      }
     ],
@@ -52188,7 +52188,7 @@
     "scopes": [
      {
       "flag": "folder",
-      "label": "folder",
+      "label": "folder_id",
       "param": "folder_id"
      }
     ],
@@ -52300,7 +52300,7 @@
    "form": {
     "positionals": [
      {
-      "label": "folder",
+      "label": "folder_id",
       "param": "folder_id"
      }
     ],
@@ -52425,7 +52425,7 @@
    "form": {
     "positionals": [
      {
-      "label": "folder",
+      "label": "folder_id",
       "param": "folder_id"
      }
     ],
@@ -52488,7 +52488,7 @@
    "form": {
     "positionals": [
      {
-      "label": "folder",
+      "label": "folder_id",
       "param": "folder_id"
      }
     ],
@@ -52655,7 +52655,7 @@
    "form": {
     "positionals": [
      {
-      "label": "folder",
+      "label": "folder_id",
       "param": "folder_id"
      }
     ],
@@ -53802,7 +53802,7 @@
    "form": {
     "positionals": [
      {
-      "label": "exercise",
+      "label": "public_id",
       "param": "public_id"
      }
     ],
@@ -56240,7 +56240,7 @@
    "form": {
     "positionals": [
      {
-      "label": "file",
+      "label": "fileid",
       "param": "fileid"
      }
     ],
@@ -56300,7 +56300,7 @@
    "form": {
     "positionals": [
      {
-      "label": "file",
+      "label": "fileid",
       "param": "fileid"
      }
     ],
@@ -56781,208 +56781,6 @@
     "get"
    ],
    "method": "GET",
-   "path": "/immigration/client/cases/{id}",
-   "summary": "Get immigration case details",
-   "version": "2026-01-01",
-   "async": false,
-   "bodyKind": "none",
-   "supportsMultipart": false,
-   "bodyWrapper": "none",
-   "params": [
-    {
-     "name": "id",
-     "in": "path",
-     "type": "string",
-     "required": true,
-     "description": "Immigration case id"
-    }
-   ],
-   "bodyProps": [],
-   "fileFields": [],
-   "responseKind": "object",
-   "responseFields": [
-    {
-     "name": "id",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "Unique identifier of immigration case."
-    },
-    {
-     "name": "status",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "enum": [
-      "OPEN",
-      "CLOSED",
-      "ON_HOLD"
-     ],
-     "description": "Status of the immigration case."
-    },
-    {
-     "name": "process",
-     "in": "body",
-     "type": "object",
-     "required": false,
-     "properties": [
-      {
-       "name": "id",
-       "in": "body",
-       "type": "string",
-       "required": false,
-       "description": "Unique identifier of the current active process."
-      },
-      {
-       "name": "name",
-       "in": "body",
-       "type": "string",
-       "required": false,
-       "description": "Name of the current active process."
-      },
-      {
-       "name": "status",
-       "in": "body",
-       "type": "string",
-       "required": false,
-       "description": "Status of the current active process."
-      }
-     ]
-    },
-    {
-     "name": "applicant",
-     "in": "body",
-     "type": "object",
-     "required": false,
-     "properties": [
-      {
-       "name": "id",
-       "in": "body",
-       "type": "string",
-       "required": false,
-       "description": "Unique identifier of the applicant profile id."
-      },
-      {
-       "name": "external_id",
-       "in": "body",
-       "type": "string",
-       "required": false,
-       "description": "External identifier of the applicant."
-      }
-     ]
-    },
-    {
-     "name": "case_type",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "Name of the case type"
-    },
-    {
-     "name": "documents",
-     "in": "body",
-     "type": "array",
-     "required": false,
-     "properties": [
-      {
-       "name": "id",
-       "in": "body",
-       "type": "string",
-       "required": false,
-       "description": "Unique identifier of the document."
-      },
-      {
-       "name": "status",
-       "in": "body",
-       "type": "string",
-       "required": false,
-       "enum": [
-        "IN_REVIEW",
-        "ACTIVE",
-        "EXPIRED",
-        "EXPIRING",
-        "UNKNOWN"
-       ],
-       "description": "Status of the document."
-      },
-      {
-       "name": "document_type",
-       "in": "body",
-       "type": "string",
-       "required": false,
-       "description": "The type of the document. Represents the visa type for right to work cases."
-      },
-      {
-       "name": "expiration_date",
-       "in": "body",
-       "type": "string",
-       "required": false,
-       "description": "Expiry date of the document."
-      }
-     ]
-    },
-    {
-     "name": "visa_type",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "The type of the the visa."
-    },
-    {
-     "name": "country_code",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "The country of the immigration case."
-    },
-    {
-     "name": "last_update_at",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "Last activity on the immigration case."
-    },
-    {
-     "name": "case_created_at",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "Creation date of the immigration case."
-    },
-    {
-     "name": "estimated_completion_date",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "Estimated completion date of the immigration case."
-    }
-   ],
-   "api": "rest",
-   "versions": [
-    {
-     "version": "2026-01-01",
-     "beta_until": null,
-     "sunset_at": null
-    }
-   ],
-   "form": {
-    "positionals": [
-     {
-      "label": "case",
-      "param": "id"
-     }
-    ],
-    "scopes": [],
-    "selectors": []
-   }
-  },
-  {
-   "command": [
-    "immigration",
-    "cases",
-    "get"
-   ],
-   "method": "GET",
    "path": "/immigration/workers/cases/{case_id}",
    "summary": "Get specific immigration case details ",
    "version": "2026-01-01",
@@ -57208,7 +57006,7 @@
    "form": {
     "positionals": [
      {
-      "label": "case",
+      "label": "case_id",
       "param": "case_id"
      }
     ],
@@ -57219,6 +57017,208 @@
       "value": "worker"
      }
     ]
+   }
+  },
+  {
+   "command": [
+    "immigration",
+    "cases",
+    "get"
+   ],
+   "method": "GET",
+   "path": "/immigration/client/cases/{id}",
+   "summary": "Get immigration case details",
+   "version": "2026-01-01",
+   "async": false,
+   "bodyKind": "none",
+   "supportsMultipart": false,
+   "bodyWrapper": "none",
+   "params": [
+    {
+     "name": "id",
+     "in": "path",
+     "type": "string",
+     "required": true,
+     "description": "Immigration case id"
+    }
+   ],
+   "bodyProps": [],
+   "fileFields": [],
+   "responseKind": "object",
+   "responseFields": [
+    {
+     "name": "id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Unique identifier of immigration case."
+    },
+    {
+     "name": "status",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "OPEN",
+      "CLOSED",
+      "ON_HOLD"
+     ],
+     "description": "Status of the immigration case."
+    },
+    {
+     "name": "process",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "properties": [
+      {
+       "name": "id",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Unique identifier of the current active process."
+      },
+      {
+       "name": "name",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Name of the current active process."
+      },
+      {
+       "name": "status",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Status of the current active process."
+      }
+     ]
+    },
+    {
+     "name": "applicant",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "properties": [
+      {
+       "name": "id",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Unique identifier of the applicant profile id."
+      },
+      {
+       "name": "external_id",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "External identifier of the applicant."
+      }
+     ]
+    },
+    {
+     "name": "case_type",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Name of the case type"
+    },
+    {
+     "name": "documents",
+     "in": "body",
+     "type": "array",
+     "required": false,
+     "properties": [
+      {
+       "name": "id",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Unique identifier of the document."
+      },
+      {
+       "name": "status",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "enum": [
+        "IN_REVIEW",
+        "ACTIVE",
+        "EXPIRED",
+        "EXPIRING",
+        "UNKNOWN"
+       ],
+       "description": "Status of the document."
+      },
+      {
+       "name": "document_type",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The type of the document. Represents the visa type for right to work cases."
+      },
+      {
+       "name": "expiration_date",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Expiry date of the document."
+      }
+     ]
+    },
+    {
+     "name": "visa_type",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The type of the the visa."
+    },
+    {
+     "name": "country_code",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The country of the immigration case."
+    },
+    {
+     "name": "last_update_at",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Last activity on the immigration case."
+    },
+    {
+     "name": "case_created_at",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Creation date of the immigration case."
+    },
+    {
+     "name": "estimated_completion_date",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Estimated completion date of the immigration case."
+    }
+   ],
+   "api": "rest",
+   "versions": [
+    {
+     "version": "2026-01-01",
+     "beta_until": null,
+     "sunset_at": null
+    }
+   ],
+   "form": {
+    "positionals": [
+     {
+      "label": "id",
+      "param": "id"
+     }
+    ],
+    "scopes": [],
+    "selectors": []
    }
   },
   {
@@ -57939,7 +57939,7 @@
    "form": {
     "positionals": [
      {
-      "label": "worker",
+      "label": "worker_id",
       "param": "worker_id"
      }
     ],
@@ -58210,7 +58210,7 @@
    "form": {
     "positionals": [
      {
-      "label": "case",
+      "label": "case_id",
       "param": "case_id"
      }
     ],
@@ -58304,15 +58304,15 @@
    "form": {
     "positionals": [
      {
-      "label": "worker",
+      "label": "worker_id",
       "param": "worker_id"
      },
      {
-      "label": "case",
+      "label": "case_id",
       "param": "case_id"
      },
      {
-      "label": "request",
+      "label": "document_request_id",
       "param": "document_request_id"
      }
     ],
@@ -58399,7 +58399,7 @@
    "form": {
     "positionals": [
      {
-      "label": "document",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -58578,11 +58578,11 @@
    "form": {
     "positionals": [
      {
-      "label": "worker",
+      "label": "worker_id",
       "param": "worker_id"
      },
      {
-      "label": "case",
+      "label": "case_id",
       "param": "case_id"
      }
     ],
@@ -58950,7 +58950,7 @@
    "form": {
     "positionals": [
      {
-      "label": "quote",
+      "label": "visa_application_quote_id",
       "param": "visa_application_quote_id"
      }
     ],
@@ -59326,7 +59326,7 @@
    "form": {
     "positionals": [
      {
-      "label": "country",
+      "label": "country_code",
       "param": "country_code"
      }
     ],
@@ -59798,7 +59798,7 @@
    "form": {
     "positionals": [
      {
-      "label": "agreement",
+      "label": "agreement_id",
       "param": "agreement_id"
      }
     ],
@@ -60632,7 +60632,7 @@
    "form": {
     "positionals": [
      {
-      "label": "agreement",
+      "label": "agreement_id",
       "param": "agreement_id"
      }
     ],
@@ -61568,7 +61568,7 @@
    "form": {
     "positionals": [
      {
-      "label": "asset",
+      "label": "asset_id",
       "param": "asset_id"
      }
     ],
@@ -67824,7 +67824,7 @@
    "form": {
     "positionals": [
      {
-      "label": "asset",
+      "label": "asset_id",
       "param": "asset_id"
      }
     ],
@@ -80248,7 +80248,7 @@
    "form": {
     "positionals": [
      {
-      "label": "asset",
+      "label": "asset_id",
       "param": "asset_id"
      }
     ],
@@ -86366,7 +86366,7 @@
    "form": {
     "positionals": [
      {
-      "label": "asset",
+      "label": "asset_id",
       "param": "asset_id"
      }
     ],
@@ -92950,7 +92950,7 @@
    "form": {
     "positionals": [
      {
-      "label": "asset",
+      "label": "asset_id",
       "param": "asset_id"
      }
     ],
@@ -100152,7 +100152,7 @@
    "form": {
     "positionals": [
      {
-      "label": "asset",
+      "label": "asset_id",
       "param": "asset_id"
      }
     ],
@@ -106117,7 +106117,7 @@
    "form": {
     "positionals": [
      {
-      "label": "asset",
+      "label": "asset_id",
       "param": "asset_id"
      }
     ],
@@ -111867,7 +111867,7 @@
    "form": {
     "positionals": [
      {
-      "label": "asset",
+      "label": "asset_id",
       "param": "asset_id"
      }
     ],
@@ -117653,7 +117653,7 @@
    "form": {
     "positionals": [
      {
-      "label": "asset",
+      "label": "asset_id",
       "param": "asset_id"
      }
     ],
@@ -118067,7 +118067,7 @@
    "form": {
     "positionals": [
      {
-      "label": "request",
+      "label": "clearance_request_id",
       "param": "clearance_request_id"
      }
     ],
@@ -118485,7 +118485,7 @@
    "form": {
     "positionals": [
      {
-      "label": "request",
+      "label": "clearance_request_id",
       "param": "clearance_request_id"
      }
     ],
@@ -118894,7 +118894,7 @@
    "form": {
     "positionals": [
      {
-      "label": "request",
+      "label": "clearance_request_id",
       "param": "clearance_request_id"
      }
     ],
@@ -120006,7 +120006,7 @@
    "form": {
     "positionals": [
      {
-      "label": "order",
+      "label": "order_id",
       "param": "order_id"
      }
     ],
@@ -121024,7 +121024,7 @@
    "form": {
     "positionals": [
      {
-      "label": "order",
+      "label": "order_id",
       "param": "order_id"
      }
     ],
@@ -123768,7 +123768,7 @@
    "form": {
     "positionals": [
      {
-      "label": "order",
+      "label": "order_id",
       "param": "order_id"
      }
     ],
@@ -125755,7 +125755,7 @@
    "form": {
     "positionals": [
      {
-      "label": "order",
+      "label": "order_id",
       "param": "order_id"
      }
     ],
@@ -125811,7 +125811,7 @@
    "form": {
     "positionals": [
      {
-      "label": "policy",
+      "label": "it_policy_id",
       "param": "it_policy_id"
      }
     ],
@@ -125964,7 +125964,7 @@
    "form": {
     "positionals": [
      {
-      "label": "policy",
+      "label": "policy_id",
       "param": "policy_id"
      }
     ],
@@ -126431,7 +126431,7 @@
    "form": {
     "positionals": [
      {
-      "label": "policy",
+      "label": "policy_id",
       "param": "policy_id"
      }
     ],
@@ -126913,7 +126913,7 @@
    "form": {
     "positionals": [
      {
-      "label": "product",
+      "label": "product_id",
       "param": "product_id"
      }
     ],
@@ -128745,11 +128745,11 @@
    "form": {
     "positionals": [
      {
-      "label": "product",
+      "label": "product_id",
       "param": "product_id"
      },
      {
-      "label": "country",
+      "label": "country_code",
       "param": "country_code"
      }
     ],
@@ -129780,7 +129780,7 @@
    "form": {
     "positionals": [
      {
-      "label": "warehouse",
+      "label": "warehouse_id",
       "param": "warehouse_id"
      }
     ],
@@ -130377,7 +130377,7 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      }
     ],
@@ -130474,7 +130474,7 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      }
     ],
@@ -130743,7 +130743,7 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -130798,7 +130798,7 @@
    "form": {
     "positionals": [
      {
-      "label": "requirement",
+      "label": "requirement_id",
       "param": "requirement_id"
      }
     ],
@@ -131225,7 +131225,7 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      }
     ],
@@ -131278,11 +131278,11 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      },
      {
-      "label": "document",
+      "label": "document_id",
       "param": "document_id"
      }
     ],
@@ -131345,11 +131345,11 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      },
      {
-      "label": "document",
+      "label": "document_id",
       "param": "document_id"
      }
     ],
@@ -131418,15 +131418,15 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      },
      {
-      "label": "document",
+      "label": "document_id",
       "param": "document_id"
      },
      {
-      "label": "file",
+      "label": "file_id",
       "param": "file_id"
      }
     ],
@@ -131851,11 +131851,11 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      },
      {
-      "label": "document",
+      "label": "document_id",
       "param": "document_id"
      }
     ],
@@ -132786,7 +132786,7 @@
     "scopes": [
      {
       "flag": "entity",
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      }
     ],
@@ -133219,11 +133219,11 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      },
      {
-      "label": "document",
+      "label": "document_id",
       "param": "document_id"
      }
     ],
@@ -133664,11 +133664,11 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      },
      {
-      "label": "document",
+      "label": "document_id",
       "param": "document_id"
      }
     ],
@@ -133772,7 +133772,7 @@
    "form": {
     "positionals": [
      {
-      "label": "country",
+      "label": "country_code",
       "param": "country_code"
      }
     ],
@@ -133998,7 +133998,7 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      }
     ],
@@ -134338,7 +134338,7 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      }
     ],
@@ -134586,7 +134586,7 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -135224,7 +135224,7 @@
    "form": {
     "positionals": [
      {
-      "label": "app",
+      "label": "app_id",
       "param": "app_id"
      }
     ],
@@ -135613,7 +135613,7 @@
    "form": {
     "positionals": [
      {
-      "label": "app",
+      "label": "app_id",
       "param": "app_id"
      }
     ],
@@ -135786,7 +135786,7 @@
    "form": {
     "positionals": [
      {
-      "label": "app",
+      "label": "app_id",
       "param": "app_id"
      }
     ],
@@ -135964,7 +135964,7 @@
    "form": {
     "positionals": [
      {
-      "label": "app",
+      "label": "app_id",
       "param": "app_id"
      }
     ],
@@ -136022,11 +136022,11 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      },
      {
-      "label": "attachment",
+      "label": "attachment_id",
       "param": "attachment_id"
      }
     ],
@@ -136593,7 +136593,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -137160,7 +137160,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -137529,7 +137529,7 @@
     "scopes": [
      {
       "flag": "person",
-      "label": "person",
+      "label": "oid",
       "param": "oid"
      }
     ],
@@ -137889,7 +137889,7 @@
    "form": {
     "positionals": [
      {
-      "label": "offboarding",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -138744,7 +138744,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -138827,7 +138827,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -138879,7 +138879,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -139433,7 +139433,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -140113,7 +140113,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -140660,7 +140660,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -141440,7 +141440,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -141532,7 +141532,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -141666,394 +141666,12 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
     "scopes": [],
     "selectors": []
-   }
-  },
-  {
-   "command": [
-    "offboarding",
-    "terminations",
-    "create"
-   ],
-   "method": "POST",
-   "path": "/eor/{oid}/terminations/regular",
-   "summary": "Termination Request",
-   "version": "2026-01-01",
-   "async": false,
-   "bodyKind": "json",
-   "supportsMultipart": false,
-   "bodyWrapper": "data",
-   "params": [
-    {
-     "name": "oid",
-     "in": "path",
-     "type": "string",
-     "required": true,
-     "description": "Public contract id"
-    }
-   ],
-   "bodyProps": [
-    {
-     "name": "reason",
-     "in": "body",
-     "type": "string",
-     "required": true,
-     "enum": [
-      "DEEL_COLLECTIONS",
-      "STATUS_CHANGE",
-      "RELOCATION",
-      "COMPENSATION",
-      "RETIREMENT",
-      "JOB_ABANDONMENT",
-      "WORK_RELATED",
-      "PERSONAL",
-      "OTHER_OPPORTUNITY",
-      "NON_RENEWAL",
-      "PROBATION",
-      "ASSIGNMENT_ENDED",
-      "POSITION_ELIMINATION",
-      "FORCE_REDUCTION",
-      "DEATH",
-      "FOR_CAUSE",
-      "PERFORMANCE",
-      "MEDICAL",
-      "PERFORMANCE_ISSUES",
-      "ATTENDANCE_ISSUES",
-      "REORGANIZATION_DOWNSIZING_BUDGET_OR_REDUCTION_OF_WORKFORCE",
-      "ROLE_BECAME_REDUNDANT_OR_ROLE_CHANGED",
-      "OFFER_WAS_REVOKED",
-      "EXITING_THE_MARKET",
-      "NO_LONGER_WISH_TO_WORK_WITH_DEEL",
-      "COMPANY_ACQUIRED",
-      "STEALING",
-      "MISCONDUCT",
-      "FALSIFYING",
-      "HARASSMENT",
-      "VIOLENCE",
-      "REORGANIZATION_DOWNSIZING_BUDGET_OR_REDUCTION_OF_WORKFORCE_OR_ROLE_BECAME_REDUNDANT_OR_ROLE_CHANGED",
-      "UNAUTHORIZED_ABSENCES_OR_LACK_OF_ATTENDANCE",
-      "STANDARD_RESELLER_PRACTICE",
-      "MOVING_EMPLOYEE_TO_INTERNAL_ENTITY",
-      "MOVING_EMPLOYEE_TO_DEEL_PEO",
-      "OTHER"
-     ],
-     "description": "Reason why the contract is being terminated"
-    },
-    {
-     "name": "attachments",
-     "in": "body",
-     "type": "array",
-     "required": false,
-     "description": "Any document that is important for the request to terminate the contract"
-    },
-    {
-     "name": "is_sensitive",
-     "in": "body",
-     "type": "boolean",
-     "required": false,
-     "description": "Defines whether the termination is sensitive. In this case, only the person requesting the termination will be able to view the termination, receive emails or notifications."
-    },
-    {
-     "name": "reason_detail",
-     "in": "body",
-     "type": "string",
-     "required": true,
-     "description": "Field to better explain how communication with the employee will be and/or their reaction to the communication, or other necessary information"
-    },
-    {
-     "name": "used_time_off",
-     "in": "body",
-     "type": "object",
-     "required": true,
-     "properties": [
-      {
-       "name": "time_offs",
-       "in": "body",
-       "type": "array",
-       "required": false,
-       "description": "All time-off used by the employee during contract period"
-      },
-      {
-       "name": "additional_details",
-       "in": "body",
-       "type": "string",
-       "required": false,
-       "nullable": true,
-       "description": "Any additional details regarding time off that HRX should know"
-      },
-      {
-       "name": "is_deel_pto_confirmed",
-       "in": "body",
-       "type": "boolean",
-       "required": false,
-       "description": "Defines whether the client agrees with the time off values ​​that are registered in Deel. If false, it means that the client changed the values."
-      }
-     ]
-    },
-    {
-     "name": "severance_type",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "enum": [
-      "DAYS",
-      "WEEKS",
-      "MONTHS",
-      "CASH"
-     ],
-     "description": "The type of severance selected by the client. It's an optional field"
-    },
-    {
-     "name": "desired_end_date",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "The desired end date. If the date is not provided, it will be selected by HRX the closest date possible"
-    },
-    {
-     "name": "severance_amount",
-     "in": "body",
-     "type": "number",
-     "required": false,
-     "description": "The amount of severance needed"
-    },
-    {
-     "name": "additional_reason",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "nullable": true,
-     "enum": [
-      "DISSATISFIED_WITH_DEEL_SERVICE",
-      "DISSATISFIED_WITH_DEEL_PRICING",
-      "DISSATISFIED_WITH_DEEL_PRODUCT"
-     ],
-     "description": "An additional reason can be provided in case the reason selected is NO_LONGER_WISH_TO_WORK_WITH_DEEL"
-    },
-    {
-     "name": "termination_notes",
-     "in": "body",
-     "type": "array",
-     "required": false,
-     "description": "Additional notes can be provided regarding the termination for Deel, like questions and doubts"
-    },
-    {
-     "name": "eligible_for_rehire",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "nullable": true,
-     "enum": [
-      "YES",
-      "NO",
-      "DONT_KNOW"
-     ],
-     "description": "Parameter to inform whether it would be possible for the client to hire the employee again"
-    },
-    {
-     "name": "eor_country_data_id",
-     "in": "body",
-     "type": "number",
-     "required": false,
-     "description": "The current country data id"
-    },
-    {
-     "name": "is_employee_notified",
-     "in": "body",
-     "type": "boolean",
-     "required": true,
-     "description": "Defines if employee was informed by client or not before the termination"
-    },
-    {
-     "name": "termination_impact_id",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "Termination impact data if there is some configured on HR module"
-    },
-    {
-     "name": "additional_country_data",
-     "in": "body",
-     "type": "array",
-     "required": false,
-     "description": "For some countries some data is needed to help Deel to process the termination. The questions comes from another endpoint to get the additional country data"
-    },
-    {
-     "name": "custom_termination_reason_id",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "Custom termination reason ID. A custom termination reason can be added on Client HR module"
-    },
-    {
-     "name": "employee_notification_detail",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "nullable": true,
-     "description": "If it's an termination contract ending and employee was already informed, the employee notification details should be provided"
-    },
-    {
-     "name": "additional_supporting_documents",
-     "in": "body",
-     "type": "array",
-     "required": false,
-     "description": "Any proof such as correspondence, documentation of previous warnings or attendance records for the reason select above."
-    }
-   ],
-   "fileFields": [],
-   "responseKind": "object",
-   "responseFields": [
-    {
-     "name": "id",
-     "in": "body",
-     "type": "number",
-     "required": false
-    },
-    {
-     "name": "end_date",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "The definitive contract end date"
-    },
-    {
-     "name": "contract_id",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "Public contract oid"
-    },
-    {
-     "name": "request_data",
-     "in": "body",
-     "type": "object",
-     "required": false,
-     "properties": [
-      {
-       "name": "reason",
-       "in": "body",
-       "type": "string",
-       "required": false
-      },
-      {
-       "name": "end_date",
-       "in": "body",
-       "type": "string",
-       "required": false,
-       "description": "The definitive contract end date"
-      },
-      {
-       "name": "reason_detail",
-       "in": "body",
-       "type": "string",
-       "required": false,
-       "description": "Optional field to describe the reason behind the resignation request"
-      },
-      {
-       "name": "desired_end_date",
-       "in": "body",
-       "type": "string",
-       "required": false,
-       "description": "The desired end date. If the date is not provided, it will be selected by HRX the closest date possible"
-      },
-      {
-       "name": "termination_impact",
-       "in": "body",
-       "type": "object",
-       "required": false,
-       "description": "Custom termination impact data if there is some configured on HR module",
-       "properties": [
-        {
-         "name": "id",
-         "in": "body",
-         "type": "string",
-         "required": false
-        },
-        {
-         "name": "title",
-         "in": "body",
-         "type": "string",
-         "required": false,
-         "description": "Termination impact title"
-        },
-        {
-         "name": "description",
-         "in": "body",
-         "type": "string",
-         "required": false,
-         "description": "Termination impact description"
-        }
-       ]
-      },
-      {
-       "name": "eligible_for_rehire",
-       "in": "body",
-       "type": "string",
-       "required": false,
-       "enum": [
-        "YES",
-        "NO",
-        "DONT_KNOW"
-       ],
-       "description": "Parameter to inform whether it would be possible for the client to hire the employee again"
-      },
-      {
-       "name": "eligible_for_rehire_reason",
-       "in": "body",
-       "type": "string",
-       "required": false,
-       "description": "Describe if the option DONT_KNOW was selected on eligibleForRehire"
-      },
-      {
-       "name": "custom_termination_reason_id",
-       "in": "body",
-       "type": "number",
-       "required": false,
-       "description": "Custom termination reason ID. A custom termination reason can be added on Client HR module"
-      }
-     ]
-    },
-    {
-     "name": "desired_end_date",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "The desired end date. If the date is not provided, it will be selected by HRX the closest date possible"
-    }
-   ],
-   "api": "rest",
-   "versions": [
-    {
-     "version": "2026-01-01",
-     "beta_until": null,
-     "sunset_at": null
-    }
-   ],
-   "form": {
-    "positionals": [
-     {
-      "label": "contract",
-      "param": "oid"
-     }
-    ],
-    "scopes": [],
-    "selectors": [
-     {
-      "flag": "type",
-      "value": "regular"
-     },
-     {
-      "flag": "worker-type",
-      "value": "eor",
-      "optional": true
-     }
-    ]
    }
   },
   {
@@ -142752,7 +142370,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -142761,6 +142379,388 @@
      {
       "flag": "worker-type",
       "value": "eor"
+     }
+    ]
+   }
+  },
+  {
+   "command": [
+    "offboarding",
+    "terminations",
+    "create"
+   ],
+   "method": "POST",
+   "path": "/eor/{oid}/terminations/regular",
+   "summary": "Termination Request",
+   "version": "2026-01-01",
+   "async": false,
+   "bodyKind": "json",
+   "supportsMultipart": false,
+   "bodyWrapper": "data",
+   "params": [
+    {
+     "name": "oid",
+     "in": "path",
+     "type": "string",
+     "required": true,
+     "description": "Public contract id"
+    }
+   ],
+   "bodyProps": [
+    {
+     "name": "reason",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "enum": [
+      "DEEL_COLLECTIONS",
+      "STATUS_CHANGE",
+      "RELOCATION",
+      "COMPENSATION",
+      "RETIREMENT",
+      "JOB_ABANDONMENT",
+      "WORK_RELATED",
+      "PERSONAL",
+      "OTHER_OPPORTUNITY",
+      "NON_RENEWAL",
+      "PROBATION",
+      "ASSIGNMENT_ENDED",
+      "POSITION_ELIMINATION",
+      "FORCE_REDUCTION",
+      "DEATH",
+      "FOR_CAUSE",
+      "PERFORMANCE",
+      "MEDICAL",
+      "PERFORMANCE_ISSUES",
+      "ATTENDANCE_ISSUES",
+      "REORGANIZATION_DOWNSIZING_BUDGET_OR_REDUCTION_OF_WORKFORCE",
+      "ROLE_BECAME_REDUNDANT_OR_ROLE_CHANGED",
+      "OFFER_WAS_REVOKED",
+      "EXITING_THE_MARKET",
+      "NO_LONGER_WISH_TO_WORK_WITH_DEEL",
+      "COMPANY_ACQUIRED",
+      "STEALING",
+      "MISCONDUCT",
+      "FALSIFYING",
+      "HARASSMENT",
+      "VIOLENCE",
+      "REORGANIZATION_DOWNSIZING_BUDGET_OR_REDUCTION_OF_WORKFORCE_OR_ROLE_BECAME_REDUNDANT_OR_ROLE_CHANGED",
+      "UNAUTHORIZED_ABSENCES_OR_LACK_OF_ATTENDANCE",
+      "STANDARD_RESELLER_PRACTICE",
+      "MOVING_EMPLOYEE_TO_INTERNAL_ENTITY",
+      "MOVING_EMPLOYEE_TO_DEEL_PEO",
+      "OTHER"
+     ],
+     "description": "Reason why the contract is being terminated"
+    },
+    {
+     "name": "attachments",
+     "in": "body",
+     "type": "array",
+     "required": false,
+     "description": "Any document that is important for the request to terminate the contract"
+    },
+    {
+     "name": "is_sensitive",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Defines whether the termination is sensitive. In this case, only the person requesting the termination will be able to view the termination, receive emails or notifications."
+    },
+    {
+     "name": "reason_detail",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Field to better explain how communication with the employee will be and/or their reaction to the communication, or other necessary information"
+    },
+    {
+     "name": "used_time_off",
+     "in": "body",
+     "type": "object",
+     "required": true,
+     "properties": [
+      {
+       "name": "time_offs",
+       "in": "body",
+       "type": "array",
+       "required": false,
+       "description": "All time-off used by the employee during contract period"
+      },
+      {
+       "name": "additional_details",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "nullable": true,
+       "description": "Any additional details regarding time off that HRX should know"
+      },
+      {
+       "name": "is_deel_pto_confirmed",
+       "in": "body",
+       "type": "boolean",
+       "required": false,
+       "description": "Defines whether the client agrees with the time off values ​​that are registered in Deel. If false, it means that the client changed the values."
+      }
+     ]
+    },
+    {
+     "name": "severance_type",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "DAYS",
+      "WEEKS",
+      "MONTHS",
+      "CASH"
+     ],
+     "description": "The type of severance selected by the client. It's an optional field"
+    },
+    {
+     "name": "desired_end_date",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The desired end date. If the date is not provided, it will be selected by HRX the closest date possible"
+    },
+    {
+     "name": "severance_amount",
+     "in": "body",
+     "type": "number",
+     "required": false,
+     "description": "The amount of severance needed"
+    },
+    {
+     "name": "additional_reason",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "enum": [
+      "DISSATISFIED_WITH_DEEL_SERVICE",
+      "DISSATISFIED_WITH_DEEL_PRICING",
+      "DISSATISFIED_WITH_DEEL_PRODUCT"
+     ],
+     "description": "An additional reason can be provided in case the reason selected is NO_LONGER_WISH_TO_WORK_WITH_DEEL"
+    },
+    {
+     "name": "termination_notes",
+     "in": "body",
+     "type": "array",
+     "required": false,
+     "description": "Additional notes can be provided regarding the termination for Deel, like questions and doubts"
+    },
+    {
+     "name": "eligible_for_rehire",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "enum": [
+      "YES",
+      "NO",
+      "DONT_KNOW"
+     ],
+     "description": "Parameter to inform whether it would be possible for the client to hire the employee again"
+    },
+    {
+     "name": "eor_country_data_id",
+     "in": "body",
+     "type": "number",
+     "required": false,
+     "description": "The current country data id"
+    },
+    {
+     "name": "is_employee_notified",
+     "in": "body",
+     "type": "boolean",
+     "required": true,
+     "description": "Defines if employee was informed by client or not before the termination"
+    },
+    {
+     "name": "termination_impact_id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Termination impact data if there is some configured on HR module"
+    },
+    {
+     "name": "additional_country_data",
+     "in": "body",
+     "type": "array",
+     "required": false,
+     "description": "For some countries some data is needed to help Deel to process the termination. The questions comes from another endpoint to get the additional country data"
+    },
+    {
+     "name": "custom_termination_reason_id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Custom termination reason ID. A custom termination reason can be added on Client HR module"
+    },
+    {
+     "name": "employee_notification_detail",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "If it's an termination contract ending and employee was already informed, the employee notification details should be provided"
+    },
+    {
+     "name": "additional_supporting_documents",
+     "in": "body",
+     "type": "array",
+     "required": false,
+     "description": "Any proof such as correspondence, documentation of previous warnings or attendance records for the reason select above."
+    }
+   ],
+   "fileFields": [],
+   "responseKind": "object",
+   "responseFields": [
+    {
+     "name": "id",
+     "in": "body",
+     "type": "number",
+     "required": false
+    },
+    {
+     "name": "end_date",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The definitive contract end date"
+    },
+    {
+     "name": "contract_id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Public contract oid"
+    },
+    {
+     "name": "request_data",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "properties": [
+      {
+       "name": "reason",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "end_date",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The definitive contract end date"
+      },
+      {
+       "name": "reason_detail",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Optional field to describe the reason behind the resignation request"
+      },
+      {
+       "name": "desired_end_date",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The desired end date. If the date is not provided, it will be selected by HRX the closest date possible"
+      },
+      {
+       "name": "termination_impact",
+       "in": "body",
+       "type": "object",
+       "required": false,
+       "description": "Custom termination impact data if there is some configured on HR module",
+       "properties": [
+        {
+         "name": "id",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "title",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "Termination impact title"
+        },
+        {
+         "name": "description",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "Termination impact description"
+        }
+       ]
+      },
+      {
+       "name": "eligible_for_rehire",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "enum": [
+        "YES",
+        "NO",
+        "DONT_KNOW"
+       ],
+       "description": "Parameter to inform whether it would be possible for the client to hire the employee again"
+      },
+      {
+       "name": "eligible_for_rehire_reason",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Describe if the option DONT_KNOW was selected on eligibleForRehire"
+      },
+      {
+       "name": "custom_termination_reason_id",
+       "in": "body",
+       "type": "number",
+       "required": false,
+       "description": "Custom termination reason ID. A custom termination reason can be added on Client HR module"
+      }
+     ]
+    },
+    {
+     "name": "desired_end_date",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The desired end date. If the date is not provided, it will be selected by HRX the closest date possible"
+    }
+   ],
+   "api": "rest",
+   "versions": [
+    {
+     "version": "2026-01-01",
+     "beta_until": null,
+     "sunset_at": null
+    }
+   ],
+   "form": {
+    "positionals": [
+     {
+      "label": "oid",
+      "param": "oid"
+     }
+    ],
+    "scopes": [],
+    "selectors": [
+     {
+      "flag": "type",
+      "value": "regular"
+     },
+     {
+      "flag": "worker-type",
+      "value": "eor",
+      "optional": true
      }
     ]
    }
@@ -142853,7 +142853,7 @@
    "form": {
     "positionals": [
      {
-      "label": "worker",
+      "label": "worker_id",
       "param": "worker_id"
      }
     ],
@@ -142904,7 +142904,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -143075,11 +143075,11 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "oid",
       "param": "oid"
      },
      {
-      "label": "termination",
+      "label": "terminationId",
       "param": "terminationId"
      }
     ],
@@ -143346,7 +143346,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -143560,7 +143560,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "oid",
       "param": "oid"
      }
     ],
@@ -144758,7 +144758,7 @@
     "scopes": [
      {
       "flag": "person",
-      "label": "person",
+      "label": "hris_profile_id",
       "param": "hris_profile_id"
      }
     ],
@@ -145947,7 +145947,7 @@
    "form": {
     "positionals": [
      {
-      "label": "tracker",
+      "label": "tracker_id",
       "param": "tracker_id"
      }
     ],
@@ -148456,7 +148456,7 @@
    "form": {
     "positionals": [
      {
-      "label": "org",
+      "label": "child_organization_id",
       "param": "child_organization_id"
      }
     ],
@@ -148816,7 +148816,7 @@
    "form": {
     "positionals": [
      {
-      "label": "group",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -148955,7 +148955,7 @@
    "form": {
     "positionals": [
      {
-      "label": "group",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -149179,7 +149179,7 @@
    "form": {
     "positionals": [
      {
-      "label": "group",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -149339,52 +149339,6 @@
     "delete"
    ],
    "method": "DELETE",
-   "path": "/hris/worker_relations/types/{type_id}",
-   "summary": "Delete a worker relation type",
-   "version": "2026-01-01",
-   "async": false,
-   "bodyKind": "none",
-   "supportsMultipart": false,
-   "bodyWrapper": "none",
-   "params": [
-    {
-     "name": "type_id",
-     "in": "path",
-     "type": "string",
-     "required": true,
-     "description": "Worker Relation Type ID"
-    }
-   ],
-   "bodyProps": [],
-   "fileFields": [],
-   "responseKind": "none",
-   "responseFields": [],
-   "api": "rest",
-   "versions": [
-    {
-     "version": "2026-01-01",
-     "beta_until": null,
-     "sunset_at": null
-    }
-   ],
-   "form": {
-    "positionals": [
-     {
-      "label": "type",
-      "param": "type_id"
-     }
-    ],
-    "scopes": [],
-    "selectors": []
-   }
-  },
-  {
-   "command": [
-    "org",
-    "relation-types",
-    "delete"
-   ],
-   "method": "DELETE",
    "path": "/hris/worker_relations/types/external/{externalId}",
    "summary": "Delete a worker relation type by external id",
    "version": "2026-01-01",
@@ -149416,7 +149370,7 @@
    "form": {
     "positionals": [
      {
-      "label": "type",
+      "label": "externalId",
       "param": "externalId"
      }
     ],
@@ -149426,6 +149380,52 @@
       "flag": "external-id"
      }
     ]
+   }
+  },
+  {
+   "command": [
+    "org",
+    "relation-types",
+    "delete"
+   ],
+   "method": "DELETE",
+   "path": "/hris/worker_relations/types/{type_id}",
+   "summary": "Delete a worker relation type",
+   "version": "2026-01-01",
+   "async": false,
+   "bodyKind": "none",
+   "supportsMultipart": false,
+   "bodyWrapper": "none",
+   "params": [
+    {
+     "name": "type_id",
+     "in": "path",
+     "type": "string",
+     "required": true,
+     "description": "Worker Relation Type ID"
+    }
+   ],
+   "bodyProps": [],
+   "fileFields": [],
+   "responseKind": "none",
+   "responseFields": [],
+   "api": "rest",
+   "versions": [
+    {
+     "version": "2026-01-01",
+     "beta_until": null,
+     "sunset_at": null
+    }
+   ],
+   "form": {
+    "positionals": [
+     {
+      "label": "type_id",
+      "param": "type_id"
+     }
+    ],
+    "scopes": [],
+    "selectors": []
    }
   },
   {
@@ -149493,110 +149493,6 @@
    ],
    "form": {
     "positionals": [],
-    "scopes": [],
-    "selectors": []
-   }
-  },
-  {
-   "command": [
-    "org",
-    "relation-types",
-    "update"
-   ],
-   "method": "PATCH",
-   "path": "/hris/worker_relations/types/{typeId}",
-   "summary": "Update a worker relation type",
-   "version": "2026-01-01",
-   "async": false,
-   "bodyKind": "json",
-   "supportsMultipart": false,
-   "bodyWrapper": "data",
-   "params": [
-    {
-     "name": "typeId",
-     "in": "path",
-     "type": "string",
-     "required": true,
-     "description": "Worker Relation Type id"
-    }
-   ],
-   "bodyProps": [
-    {
-     "name": "child_name",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "The name of the secondary party in the relationship"
-    },
-    {
-     "name": "external_id",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "A custom ID for the relation type"
-    },
-    {
-     "name": "parent_name",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "The name of the primary party in the relationship"
-    }
-   ],
-   "fileFields": [],
-   "responseKind": "object",
-   "responseFields": [
-    {
-     "name": "id",
-     "in": "body",
-     "type": "integer",
-     "required": false,
-     "description": "Worker Relation Type id"
-    },
-    {
-     "name": "child_name",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "The name of the secondary party in the relationship"
-    },
-    {
-     "name": "is_default",
-     "in": "body",
-     "type": "boolean",
-     "required": false,
-     "description": "Whether this relation is default or not"
-    },
-    {
-     "name": "external_id",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "A custom ID for the relation type"
-    },
-    {
-     "name": "parent_name",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "The name of the primary party in the relationship"
-    }
-   ],
-   "api": "rest",
-   "versions": [
-    {
-     "version": "2026-01-01",
-     "beta_until": null,
-     "sunset_at": null
-    }
-   ],
-   "form": {
-    "positionals": [
-     {
-      "label": "type",
-      "param": "typeId"
-     }
-    ],
     "scopes": [],
     "selectors": []
    }
@@ -149697,7 +149593,7 @@
    "form": {
     "positionals": [
      {
-      "label": "type",
+      "label": "externalId",
       "param": "externalId"
      }
     ],
@@ -149707,6 +149603,110 @@
       "flag": "external-id"
      }
     ]
+   }
+  },
+  {
+   "command": [
+    "org",
+    "relation-types",
+    "update"
+   ],
+   "method": "PATCH",
+   "path": "/hris/worker_relations/types/{typeId}",
+   "summary": "Update a worker relation type",
+   "version": "2026-01-01",
+   "async": false,
+   "bodyKind": "json",
+   "supportsMultipart": false,
+   "bodyWrapper": "data",
+   "params": [
+    {
+     "name": "typeId",
+     "in": "path",
+     "type": "string",
+     "required": true,
+     "description": "Worker Relation Type id"
+    }
+   ],
+   "bodyProps": [
+    {
+     "name": "child_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The name of the secondary party in the relationship"
+    },
+    {
+     "name": "external_id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "A custom ID for the relation type"
+    },
+    {
+     "name": "parent_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The name of the primary party in the relationship"
+    }
+   ],
+   "fileFields": [],
+   "responseKind": "object",
+   "responseFields": [
+    {
+     "name": "id",
+     "in": "body",
+     "type": "integer",
+     "required": false,
+     "description": "Worker Relation Type id"
+    },
+    {
+     "name": "child_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The name of the secondary party in the relationship"
+    },
+    {
+     "name": "is_default",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Whether this relation is default or not"
+    },
+    {
+     "name": "external_id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "A custom ID for the relation type"
+    },
+    {
+     "name": "parent_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The name of the primary party in the relationship"
+    }
+   ],
+   "api": "rest",
+   "versions": [
+    {
+     "version": "2026-01-01",
+     "beta_until": null,
+     "sunset_at": null
+    }
+   ],
+   "form": {
+    "positionals": [
+     {
+      "label": "typeId",
+      "param": "typeId"
+     }
+    ],
+    "scopes": [],
+    "selectors": []
    }
   },
   {
@@ -149848,52 +149848,6 @@
     "delete"
    ],
    "method": "DELETE",
-   "path": "/hris/organization_structures/{hris_org_structure_id}",
-   "summary": "Delete an Org Structure from the Organization",
-   "version": "2026-01-01",
-   "async": false,
-   "bodyKind": "none",
-   "supportsMultipart": false,
-   "bodyWrapper": "none",
-   "params": [
-    {
-     "name": "hris_org_structure_id",
-     "in": "path",
-     "type": "string",
-     "required": true,
-     "description": "Org Structure"
-    }
-   ],
-   "bodyProps": [],
-   "fileFields": [],
-   "responseKind": "none",
-   "responseFields": [],
-   "api": "rest",
-   "versions": [
-    {
-     "version": "2026-01-01",
-     "beta_until": null,
-     "sunset_at": null
-    }
-   ],
-   "form": {
-    "positionals": [
-     {
-      "label": "structure",
-      "param": "hris_org_structure_id"
-     }
-    ],
-    "scopes": [],
-    "selectors": []
-   }
-  },
-  {
-   "command": [
-    "org",
-    "structures",
-    "delete"
-   ],
-   "method": "DELETE",
    "path": "/hris/organization_structures/external/{external_id}",
    "summary": "Delete an Org Structure from the Organization by external ID",
    "version": "2026-01-01",
@@ -149925,7 +149879,181 @@
    "form": {
     "positionals": [
      {
-      "label": "structure",
+      "label": "external_id",
+      "param": "external_id"
+     }
+    ],
+    "scopes": [],
+    "selectors": [
+     {
+      "flag": "external-id"
+     }
+    ]
+   }
+  },
+  {
+   "command": [
+    "org",
+    "structures",
+    "delete"
+   ],
+   "method": "DELETE",
+   "path": "/hris/organization_structures/{hris_org_structure_id}",
+   "summary": "Delete an Org Structure from the Organization",
+   "version": "2026-01-01",
+   "async": false,
+   "bodyKind": "none",
+   "supportsMultipart": false,
+   "bodyWrapper": "none",
+   "params": [
+    {
+     "name": "hris_org_structure_id",
+     "in": "path",
+     "type": "string",
+     "required": true,
+     "description": "Org Structure"
+    }
+   ],
+   "bodyProps": [],
+   "fileFields": [],
+   "responseKind": "none",
+   "responseFields": [],
+   "api": "rest",
+   "versions": [
+    {
+     "version": "2026-01-01",
+     "beta_until": null,
+     "sunset_at": null
+    }
+   ],
+   "form": {
+    "positionals": [
+     {
+      "label": "hris_org_structure_id",
+      "param": "hris_org_structure_id"
+     }
+    ],
+    "scopes": [],
+    "selectors": []
+   }
+  },
+  {
+   "command": [
+    "org",
+    "structures",
+    "get"
+   ],
+   "method": "GET",
+   "path": "/hris/organization_structures/external/{external_id}",
+   "summary": "Fetch an Org Structure from the Organization",
+   "version": "2026-01-01",
+   "async": false,
+   "bodyKind": "none",
+   "supportsMultipart": false,
+   "bodyWrapper": "none",
+   "params": [
+    {
+     "name": "external_id",
+     "in": "path",
+     "type": "string",
+     "required": true,
+     "description": "External ID"
+    }
+   ],
+   "bodyProps": [],
+   "fileFields": [],
+   "responseKind": "object",
+   "responseFields": [
+    {
+     "name": "id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Organization ID"
+    },
+    {
+     "name": "name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Organization name"
+    },
+    {
+     "name": "type",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Organization type"
+    },
+    {
+     "name": "roles",
+     "in": "body",
+     "type": "array",
+     "required": false,
+     "properties": [
+      {
+       "name": "id",
+       "in": "body",
+       "type": "integer",
+       "required": false,
+       "description": "Role ID"
+      },
+      {
+       "name": "name",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Role name"
+      }
+     ]
+    },
+    {
+     "name": "teams",
+     "in": "body",
+     "type": "array",
+     "required": false
+    },
+    {
+     "name": "external_id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "External ID"
+    },
+    {
+     "name": "teams_count",
+     "in": "body",
+     "type": "integer",
+     "required": false,
+     "description": "Number of teams in the organization"
+    },
+    {
+     "name": "enable_roles",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Flag to enable roles in the organization"
+    },
+    {
+     "name": "is_multiselect",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Flag to enable multiselect in the organization"
+    }
+   ],
+   "api": "rest",
+   "versions": [
+    {
+     "version": "2026-01-01",
+     "beta_until": null,
+     "sunset_at": null
+    }
+   ],
+   "form": {
+    "positionals": [
+     {
+      "label": "external_id",
       "param": "external_id"
      }
     ],
@@ -150053,140 +150181,12 @@
    "form": {
     "positionals": [
      {
-      "label": "structure",
+      "label": "hris_org_structure_id",
       "param": "hris_org_structure_id"
      }
     ],
     "scopes": [],
     "selectors": []
-   }
-  },
-  {
-   "command": [
-    "org",
-    "structures",
-    "get"
-   ],
-   "method": "GET",
-   "path": "/hris/organization_structures/external/{external_id}",
-   "summary": "Fetch an Org Structure from the Organization",
-   "version": "2026-01-01",
-   "async": false,
-   "bodyKind": "none",
-   "supportsMultipart": false,
-   "bodyWrapper": "none",
-   "params": [
-    {
-     "name": "external_id",
-     "in": "path",
-     "type": "string",
-     "required": true,
-     "description": "External ID"
-    }
-   ],
-   "bodyProps": [],
-   "fileFields": [],
-   "responseKind": "object",
-   "responseFields": [
-    {
-     "name": "id",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "Organization ID"
-    },
-    {
-     "name": "name",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "Organization name"
-    },
-    {
-     "name": "type",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "Organization type"
-    },
-    {
-     "name": "roles",
-     "in": "body",
-     "type": "array",
-     "required": false,
-     "properties": [
-      {
-       "name": "id",
-       "in": "body",
-       "type": "integer",
-       "required": false,
-       "description": "Role ID"
-      },
-      {
-       "name": "name",
-       "in": "body",
-       "type": "string",
-       "required": false,
-       "description": "Role name"
-      }
-     ]
-    },
-    {
-     "name": "teams",
-     "in": "body",
-     "type": "array",
-     "required": false
-    },
-    {
-     "name": "external_id",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "External ID"
-    },
-    {
-     "name": "teams_count",
-     "in": "body",
-     "type": "integer",
-     "required": false,
-     "description": "Number of teams in the organization"
-    },
-    {
-     "name": "enable_roles",
-     "in": "body",
-     "type": "boolean",
-     "required": false,
-     "description": "Flag to enable roles in the organization"
-    },
-    {
-     "name": "is_multiselect",
-     "in": "body",
-     "type": "boolean",
-     "required": false,
-     "description": "Flag to enable multiselect in the organization"
-    }
-   ],
-   "api": "rest",
-   "versions": [
-    {
-     "version": "2026-01-01",
-     "beta_until": null,
-     "sunset_at": null
-    }
-   ],
-   "form": {
-    "positionals": [
-     {
-      "label": "structure",
-      "param": "external_id"
-     }
-    ],
-    "scopes": [],
-    "selectors": [
-     {
-      "flag": "external-id"
-     }
-    ]
    }
   },
   {
@@ -150386,6 +150386,91 @@
     "update"
    ],
    "method": "PATCH",
+   "path": "/hris/organization_structures/external/{external_id}",
+   "summary": "Update an existing HRIS Org Structure by external ID",
+   "version": "2026-01-01",
+   "async": false,
+   "bodyKind": "json",
+   "supportsMultipart": false,
+   "bodyWrapper": "data",
+   "params": [
+    {
+     "name": "external_id",
+     "in": "path",
+     "type": "string",
+     "required": true,
+     "description": "External ID"
+    }
+   ],
+   "bodyProps": [
+    {
+     "name": "name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Name of the organization"
+    },
+    {
+     "name": "teams",
+     "in": "body",
+     "type": "array",
+     "required": true
+    },
+    {
+     "name": "external_id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "External ID"
+    },
+    {
+     "name": "enable_roles",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Enable roles"
+    },
+    {
+     "name": "is_multiselect",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Is multiselect"
+    }
+   ],
+   "fileFields": [],
+   "responseKind": "none",
+   "responseFields": [],
+   "api": "rest",
+   "versions": [
+    {
+     "version": "2026-01-01",
+     "beta_until": null,
+     "sunset_at": null
+    }
+   ],
+   "form": {
+    "positionals": [
+     {
+      "label": "external_id",
+      "param": "external_id"
+     }
+    ],
+    "scopes": [],
+    "selectors": [
+     {
+      "flag": "external-id"
+     }
+    ]
+   }
+  },
+  {
+   "command": [
+    "org",
+    "structures",
+    "update"
+   ],
+   "method": "PATCH",
    "path": "/hris/organization_structures/{hris_org_structure_id}",
    "summary": "Update an existing HRIS Org Structure",
    "version": "2026-01-01",
@@ -150453,97 +150538,12 @@
    "form": {
     "positionals": [
      {
-      "label": "structure",
+      "label": "hris_org_structure_id",
       "param": "hris_org_structure_id"
      }
     ],
     "scopes": [],
     "selectors": []
-   }
-  },
-  {
-   "command": [
-    "org",
-    "structures",
-    "update"
-   ],
-   "method": "PATCH",
-   "path": "/hris/organization_structures/external/{external_id}",
-   "summary": "Update an existing HRIS Org Structure by external ID",
-   "version": "2026-01-01",
-   "async": false,
-   "bodyKind": "json",
-   "supportsMultipart": false,
-   "bodyWrapper": "data",
-   "params": [
-    {
-     "name": "external_id",
-     "in": "path",
-     "type": "string",
-     "required": true,
-     "description": "External ID"
-    }
-   ],
-   "bodyProps": [
-    {
-     "name": "name",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "Name of the organization"
-    },
-    {
-     "name": "teams",
-     "in": "body",
-     "type": "array",
-     "required": true
-    },
-    {
-     "name": "external_id",
-     "in": "body",
-     "type": "string",
-     "required": false,
-     "description": "External ID"
-    },
-    {
-     "name": "enable_roles",
-     "in": "body",
-     "type": "boolean",
-     "required": false,
-     "description": "Enable roles"
-    },
-    {
-     "name": "is_multiselect",
-     "in": "body",
-     "type": "boolean",
-     "required": false,
-     "description": "Is multiselect"
-    }
-   ],
-   "fileFields": [],
-   "responseKind": "none",
-   "responseFields": [],
-   "api": "rest",
-   "versions": [
-    {
-     "version": "2026-01-01",
-     "beta_until": null,
-     "sunset_at": null
-    }
-   ],
-   "form": {
-    "positionals": [
-     {
-      "label": "structure",
-      "param": "external_id"
-     }
-    ],
-    "scopes": [],
-    "selectors": [
-     {
-      "flag": "external-id"
-     }
-    ]
    }
   },
   {
@@ -151202,7 +151202,7 @@
     "scopes": [
      {
       "flag": "contract",
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -151446,7 +151446,7 @@
     "scopes": [
      {
       "flag": "worker",
-      "label": "worker",
+      "label": "worker_id",
       "param": "worker_id"
      }
     ],
@@ -151542,7 +151542,7 @@
     "scopes": [
      {
       "flag": "worker",
-      "label": "worker",
+      "label": "worker_id",
       "param": "worker_id"
      }
     ],
@@ -151589,7 +151589,7 @@
     "scopes": [
      {
       "flag": "worker",
-      "label": "worker",
+      "label": "worker_id",
       "param": "worker_id"
      }
     ],
@@ -151641,7 +151641,7 @@
     "scopes": [
      {
       "flag": "contract",
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -152074,7 +152074,7 @@
     "scopes": [
      {
       "flag": "contract",
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -152207,7 +152207,7 @@
     "scopes": [
      {
       "flag": "worker",
-      "label": "worker",
+      "label": "worker_id",
       "param": "worker_id"
      }
     ],
@@ -152282,7 +152282,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -152384,7 +152384,7 @@
    "form": {
     "positionals": [
      {
-      "label": "account",
+      "label": "bank_id",
       "param": "bank_id"
      }
     ],
@@ -152471,7 +152471,7 @@
    "form": {
     "positionals": [
      {
-      "label": "account",
+      "label": "bank_id",
       "param": "bank_id"
      }
     ],
@@ -152725,14 +152725,14 @@
    "form": {
     "positionals": [
      {
-      "label": "account",
+      "label": "bank_id",
       "param": "bank_id"
      }
     ],
     "scopes": [
      {
       "flag": "contract",
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -152981,14 +152981,14 @@
    "form": {
     "positionals": [
      {
-      "label": "account",
+      "label": "bank_id",
       "param": "bank_id"
      }
     ],
     "scopes": [
      {
       "flag": "worker",
-      "label": "worker",
+      "label": "worker_id",
       "param": "worker_id"
      }
     ],
@@ -153447,7 +153447,7 @@
    "form": {
     "positionals": [
      {
-      "label": "method",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -154968,7 +154968,7 @@
    "form": {
     "positionals": [
      {
-      "label": "method",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -155243,7 +155243,7 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      }
     ],
@@ -155542,7 +155542,7 @@
     "scopes": [
      {
       "flag": "entity",
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      }
     ],
@@ -155713,11 +155713,11 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      },
      {
-      "label": "import",
+      "label": "import_id",
       "param": "import_id"
      }
     ],
@@ -155930,7 +155930,7 @@
     "scopes": [
      {
       "flag": "entity",
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      }
     ],
@@ -156102,11 +156102,11 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      },
      {
-      "label": "import",
+      "label": "import_id",
       "param": "import_id"
      }
     ],
@@ -156166,7 +156166,7 @@
    "form": {
     "positionals": [
      {
-      "label": "run",
+      "label": "odp_id",
       "param": "odp_id"
      }
     ],
@@ -156499,7 +156499,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -156816,7 +156816,7 @@
    "form": {
     "positionals": [
      {
-      "label": "run",
+      "label": "odp_id",
       "param": "odp_id"
      }
     ],
@@ -156879,7 +156879,7 @@
    "form": {
     "positionals": [
      {
-      "label": "run",
+      "label": "odp_id",
       "param": "odp_id"
      }
     ],
@@ -157189,7 +157189,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -157509,7 +157509,7 @@
     "scopes": [
      {
       "flag": "contract",
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -157559,86 +157559,12 @@
    "form": {
     "positionals": [
      {
-      "label": "run",
+      "label": "odp_id",
       "param": "odp_id"
      }
     ],
     "scopes": [],
     "selectors": []
-   }
-  },
-  {
-   "command": [
-    "payroll",
-    "payslips",
-    "get"
-   ],
-   "method": "GET",
-   "path": "/eor/workers/{worker_id}/payslips/{payslip_id}/download",
-   "summary": "Retrieve payslip PDF download link",
-   "version": "2026-01-01",
-   "async": false,
-   "bodyKind": "none",
-   "supportsMultipart": false,
-   "bodyWrapper": "none",
-   "params": [
-    {
-     "name": "worker_id",
-     "in": "path",
-     "type": "string",
-     "required": true,
-     "description": "The ID of the worker whose payslip download link is being requested."
-    },
-    {
-     "name": "payslip_id",
-     "in": "path",
-     "type": "string",
-     "required": true,
-     "description": "The ID of the specific payslip to download."
-    }
-   ],
-   "bodyProps": [],
-   "fileFields": [],
-   "responseKind": "object",
-   "responseFields": [
-    {
-     "name": "url",
-     "in": "body",
-     "type": "string",
-     "required": true,
-     "description": "The URL to download the payslip PDF."
-    }
-   ],
-   "api": "rest",
-   "versions": [
-    {
-     "version": "2026-01-01",
-     "beta_until": null,
-     "sunset_at": null
-    }
-   ],
-   "form": {
-    "positionals": [
-     {
-      "label": "worker",
-      "param": "worker_id"
-     },
-     {
-      "label": "payslip",
-      "param": "payslip_id"
-     }
-    ],
-    "scopes": [],
-    "selectors": [
-     {
-      "flag": "file-format",
-      "value": "pdf"
-     },
-     {
-      "flag": "worker-type",
-      "value": "eor"
-     }
-    ]
    }
   },
   {
@@ -157694,11 +157620,11 @@
    "form": {
     "positionals": [
      {
-      "label": "worker",
+      "label": "id",
       "param": "id"
      },
      {
-      "label": "payslip",
+      "label": "payslip_id",
       "param": "payslip_id"
      }
     ],
@@ -157711,6 +157637,80 @@
      {
       "flag": "worker-type",
       "value": "gp"
+     }
+    ]
+   }
+  },
+  {
+   "command": [
+    "payroll",
+    "payslips",
+    "get"
+   ],
+   "method": "GET",
+   "path": "/eor/workers/{worker_id}/payslips/{payslip_id}/download",
+   "summary": "Retrieve payslip PDF download link",
+   "version": "2026-01-01",
+   "async": false,
+   "bodyKind": "none",
+   "supportsMultipart": false,
+   "bodyWrapper": "none",
+   "params": [
+    {
+     "name": "worker_id",
+     "in": "path",
+     "type": "string",
+     "required": true,
+     "description": "The ID of the worker whose payslip download link is being requested."
+    },
+    {
+     "name": "payslip_id",
+     "in": "path",
+     "type": "string",
+     "required": true,
+     "description": "The ID of the specific payslip to download."
+    }
+   ],
+   "bodyProps": [],
+   "fileFields": [],
+   "responseKind": "object",
+   "responseFields": [
+    {
+     "name": "url",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "The URL to download the payslip PDF."
+    }
+   ],
+   "api": "rest",
+   "versions": [
+    {
+     "version": "2026-01-01",
+     "beta_until": null,
+     "sunset_at": null
+    }
+   ],
+   "form": {
+    "positionals": [
+     {
+      "label": "worker_id",
+      "param": "worker_id"
+     },
+     {
+      "label": "payslip_id",
+      "param": "payslip_id"
+     }
+    ],
+    "scopes": [],
+    "selectors": [
+     {
+      "flag": "file-format",
+      "value": "pdf"
+     },
+     {
+      "flag": "worker-type",
+      "value": "eor"
      }
     ]
    }
@@ -157845,86 +157845,6 @@
     "list"
    ],
    "method": "GET",
-   "path": "/eor/workers/{worker_id}/payslips",
-   "summary": "Retrieve employee payslip records",
-   "version": "2026-01-01",
-   "async": false,
-   "bodyKind": "none",
-   "supportsMultipart": false,
-   "bodyWrapper": "none",
-   "params": [
-    {
-     "name": "worker_id",
-     "in": "path",
-     "type": "string",
-     "required": true,
-     "description": "The ID of the worker whose payslips are being retrieved."
-    }
-   ],
-   "bodyProps": [],
-   "fileFields": [],
-   "responseKind": "array",
-   "responseFields": [
-    {
-     "name": "id",
-     "in": "body",
-     "type": "string",
-     "required": true,
-     "description": "Unique identifier for the payslip record."
-    },
-    {
-     "name": "to",
-     "in": "body",
-     "type": "string",
-     "required": true,
-     "description": "End date of the payment period."
-    },
-    {
-     "name": "from",
-     "in": "body",
-     "type": "string",
-     "required": true,
-     "description": "Start date of the payment period."
-    },
-    {
-     "name": "status",
-     "in": "body",
-     "type": "string",
-     "required": true,
-     "description": "Status of the payslip (e.g., 'Pending', 'Processed')."
-    }
-   ],
-   "api": "rest",
-   "versions": [
-    {
-     "version": "2026-01-01",
-     "beta_until": null,
-     "sunset_at": null
-    }
-   ],
-   "form": {
-    "positionals": [
-     {
-      "label": "worker",
-      "param": "worker_id"
-     }
-    ],
-    "scopes": [],
-    "selectors": [
-     {
-      "flag": "worker-type",
-      "value": "eor"
-     }
-    ]
-   }
-  },
-  {
-   "command": [
-    "payroll",
-    "payslips",
-    "list"
-   ],
-   "method": "GET",
    "path": "/gp/workers/{id}/payslips",
    "summary": "Retrieve employee payslips",
    "version": "2026-01-01",
@@ -157985,7 +157905,7 @@
    "form": {
     "positionals": [
      {
-      "label": "worker",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -157994,6 +157914,86 @@
      {
       "flag": "worker-type",
       "value": "gp"
+     }
+    ]
+   }
+  },
+  {
+   "command": [
+    "payroll",
+    "payslips",
+    "list"
+   ],
+   "method": "GET",
+   "path": "/eor/workers/{worker_id}/payslips",
+   "summary": "Retrieve employee payslip records",
+   "version": "2026-01-01",
+   "async": false,
+   "bodyKind": "none",
+   "supportsMultipart": false,
+   "bodyWrapper": "none",
+   "params": [
+    {
+     "name": "worker_id",
+     "in": "path",
+     "type": "string",
+     "required": true,
+     "description": "The ID of the worker whose payslips are being retrieved."
+    }
+   ],
+   "bodyProps": [],
+   "fileFields": [],
+   "responseKind": "array",
+   "responseFields": [
+    {
+     "name": "id",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Unique identifier for the payslip record."
+    },
+    {
+     "name": "to",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "End date of the payment period."
+    },
+    {
+     "name": "from",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Start date of the payment period."
+    },
+    {
+     "name": "status",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Status of the payslip (e.g., 'Pending', 'Processed')."
+    }
+   ],
+   "api": "rest",
+   "versions": [
+    {
+     "version": "2026-01-01",
+     "beta_until": null,
+     "sunset_at": null
+    }
+   ],
+   "form": {
+    "positionals": [
+     {
+      "label": "worker_id",
+      "param": "worker_id"
+     }
+    ],
+    "scopes": [],
+    "selectors": [
+     {
+      "flag": "worker-type",
+      "value": "eor"
      }
     ]
    }
@@ -158143,7 +158143,7 @@
     "scopes": [
      {
       "flag": "cycle",
-      "label": "cycle",
+      "label": "cycle_id",
       "param": "cycle_id"
      }
     ],
@@ -158196,7 +158196,7 @@
    "form": {
     "positionals": [
      {
-      "label": "report",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -158274,7 +158274,7 @@
    "form": {
     "positionals": [
      {
-      "label": "report",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -158362,7 +158362,7 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      }
     ],
@@ -158479,7 +158479,7 @@
    "form": {
     "positionals": [
      {
-      "label": "person",
+      "label": "worker_id",
       "param": "worker_id"
      }
     ],
@@ -158614,7 +158614,7 @@
    "form": {
     "positionals": [
      {
-      "label": "person",
+      "label": "worker_id",
       "param": "worker_id"
      }
     ],
@@ -158820,11 +158820,11 @@
    "form": {
     "positionals": [
      {
-      "label": "person",
+      "label": "worker_id",
       "param": "worker_id"
      },
      {
-      "label": "type",
+      "label": "address_type",
       "param": "address_type"
      }
     ],
@@ -158936,7 +158936,7 @@
    "form": {
     "positionals": [
      {
-      "label": "worker",
+      "label": "worker_id",
       "param": "worker_id"
      }
     ],
@@ -160668,14 +160668,14 @@
    "form": {
     "positionals": [
      {
-      "label": "field",
+      "label": "worker_id",
       "param": "worker_id"
      }
     ],
     "scopes": [
      {
       "flag": "person",
-      "label": "person",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -160825,7 +160825,7 @@
    "form": {
     "positionals": [
      {
-      "label": "field",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -161062,7 +161062,7 @@
     "scopes": [
      {
       "flag": "person",
-      "label": "person",
+      "label": "worker_id",
       "param": "worker_id"
      }
     ],
@@ -161123,7 +161123,7 @@
     "scopes": [
      {
       "flag": "person",
-      "label": "person",
+      "label": "worker_id",
       "param": "worker_id"
      }
     ],
@@ -161198,7 +161198,7 @@
    "form": {
     "positionals": [
      {
-      "label": "person",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -161305,7 +161305,7 @@
    "form": {
     "positionals": [
      {
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -161364,7 +161364,7 @@
    "form": {
     "positionals": [
      {
-      "label": "worker",
+      "label": "worker_id",
       "param": "worker_id"
      }
     ],
@@ -161605,7 +161605,7 @@
    "form": {
     "positionals": [
      {
-      "label": "person",
+      "label": "hris_profile_id",
       "param": "hris_profile_id"
      }
     ],
@@ -163445,7 +163445,7 @@
    "form": {
     "positionals": [
      {
-      "label": "person",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -164093,7 +164093,7 @@
    "form": {
     "positionals": [
      {
-      "label": "person",
+      "label": "worker_id",
       "param": "worker_id"
      }
     ],
@@ -164139,7 +164139,7 @@
    "form": {
     "positionals": [
      {
-      "label": "person",
+      "label": "worker_id",
       "param": "worker_id"
      }
     ],
@@ -164239,7 +164239,7 @@
    "form": {
     "positionals": [
      {
-      "label": "person",
+      "label": "worker_id",
       "param": "worker_id"
      }
     ],
@@ -164322,7 +164322,7 @@
    "form": {
     "positionals": [
      {
-      "label": "person",
+      "label": "worker_id",
       "param": "worker_id"
      }
     ],
@@ -164453,7 +164453,7 @@
    "form": {
     "positionals": [
      {
-      "label": "person",
+      "label": "hris_profile_id",
       "param": "hris_profile_id"
      }
     ],
@@ -164672,7 +164672,7 @@
    "form": {
     "positionals": [
      {
-      "label": "person",
+      "label": "hrisProfileOid",
       "param": "hrisProfileOid"
      }
     ],
@@ -164718,7 +164718,7 @@
    "form": {
     "positionals": [
      {
-      "label": "person",
+      "label": "profileId",
       "param": "profileId"
      }
     ],
@@ -164871,7 +164871,7 @@
    "form": {
     "positionals": [
      {
-      "label": "person",
+      "label": "hrisProfileOid",
       "param": "hrisProfileOid"
      }
     ],
@@ -165041,7 +165041,7 @@
    "form": {
     "positionals": [
      {
-      "label": "person",
+      "label": "profile_id",
       "param": "profile_id"
      }
     ],
@@ -165107,7 +165107,7 @@
    "form": {
     "positionals": [
      {
-      "label": "person",
+      "label": "hrisProfileOid",
       "param": "hrisProfileOid"
      }
     ],
@@ -165178,7 +165178,7 @@
    "form": {
     "positionals": [
      {
-      "label": "person",
+      "label": "profile_id",
       "param": "profile_id"
      }
     ],
@@ -165244,7 +165244,7 @@
    "form": {
     "positionals": [
      {
-      "label": "person",
+      "label": "hris_profile_oid",
       "param": "hris_profile_oid"
      }
     ],
@@ -165304,7 +165304,7 @@
    "form": {
     "positionals": [
      {
-      "label": "person",
+      "label": "profileId",
       "param": "profileId"
      }
     ],
@@ -165472,7 +165472,7 @@
    "form": {
     "positionals": [
      {
-      "label": "user",
+      "label": "hris_profile_id",
       "param": "hris_profile_id"
      }
     ],
@@ -165691,11 +165691,11 @@
    "form": {
     "positionals": [
      {
-      "label": "type",
+      "label": "entity_type",
       "param": "entity_type"
      },
      {
-      "label": "id",
+      "label": "entity_id",
       "param": "entity_id"
      }
     ],
@@ -165818,7 +165818,7 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      }
     ],
@@ -165913,7 +165913,7 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      }
     ],
@@ -166501,7 +166501,7 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      }
     ],
@@ -167072,7 +167072,7 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      }
     ],
@@ -167783,7 +167783,7 @@
    "form": {
     "positionals": [
      {
-      "label": "entity",
+      "label": "legal_entity_id",
       "param": "legal_entity_id"
      }
     ],
@@ -168653,7 +168653,7 @@
    "form": {
     "positionals": [
      {
-      "label": "task",
+      "label": "task_id",
       "param": "task_id"
      }
     ],
@@ -168707,7 +168707,7 @@
    "form": {
     "positionals": [
      {
-      "label": "attachment",
+      "label": "attachment_id",
       "param": "attachment_id"
      }
     ],
@@ -169378,7 +169378,7 @@
    "form": {
     "positionals": [
      {
-      "label": "person",
+      "label": "hris_profile_id",
       "param": "hris_profile_id"
      }
     ],
@@ -170454,7 +170454,7 @@
    "form": {
     "positionals": [
      {
-      "label": "request",
+      "label": "time_off_id",
       "param": "time_off_id"
      }
     ],
@@ -171593,7 +171593,7 @@
     "scopes": [
      {
       "flag": "person",
-      "label": "person",
+      "label": "hris_profile_id",
       "param": "hris_profile_id"
      }
     ],
@@ -171782,7 +171782,7 @@
    "form": {
     "positionals": [
      {
-      "label": "policy",
+      "label": "policy_id",
       "param": "policy_id"
      }
     ],
@@ -171852,7 +171852,7 @@
    "form": {
     "positionals": [
      {
-      "label": "worker",
+      "label": "worker_id",
       "param": "worker_id"
      }
     ],
@@ -173611,7 +173611,7 @@
     "scopes": [
      {
       "flag": "person",
-      "label": "person",
+      "label": "hris_profile_id",
       "param": "hris_profile_id"
      }
     ],
@@ -175447,7 +175447,7 @@
    "form": {
     "positionals": [
      {
-      "label": "request",
+      "label": "time_off_id",
       "param": "time_off_id"
      }
     ],
@@ -176960,7 +176960,7 @@
    "form": {
     "positionals": [
      {
-      "label": "shift",
+      "label": "external_id",
       "param": "external_id"
      }
     ],
@@ -177294,7 +177294,7 @@
    "form": {
     "positionals": [
      {
-      "label": "shift",
+      "label": "external_id",
       "param": "external_id"
      }
     ],
@@ -177821,7 +177821,7 @@
    "form": {
     "positionals": [
      {
-      "label": "rate",
+      "label": "external_id",
       "param": "external_id"
      }
     ],
@@ -177916,7 +177916,7 @@
    "form": {
     "positionals": [
      {
-      "label": "rate",
+      "label": "external_id",
       "param": "external_id"
      }
     ],
@@ -178135,7 +178135,7 @@
    "form": {
     "positionals": [
      {
-      "label": "rate",
+      "label": "external_id",
       "param": "external_id"
      }
     ],
@@ -178550,7 +178550,7 @@
    "form": {
     "positionals": [
      {
-      "label": "shift",
+      "label": "external_id",
       "param": "external_id"
      }
     ],
@@ -178785,7 +178785,7 @@
    "form": {
     "positionals": [
      {
-      "label": "timesheet",
+      "label": "timesheet_id",
       "param": "timesheet_id"
      }
     ],
@@ -178887,7 +178887,7 @@
    "form": {
     "positionals": [
      {
-      "label": "timesheet",
+      "label": "timesheet_id",
       "param": "timesheet_id"
      }
     ],
@@ -179167,7 +179167,7 @@
    "form": {
     "positionals": [
      {
-      "label": "timesheet",
+      "label": "timesheet_id",
       "param": "timesheet_id"
      }
     ],
@@ -179212,7 +179212,7 @@
    "form": {
     "positionals": [
      {
-      "label": "timesheet",
+      "label": "timesheet_id",
       "param": "timesheet_id"
      }
     ],
@@ -180021,7 +180021,7 @@
     "scopes": [
      {
       "flag": "contract",
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -180152,7 +180152,7 @@
    "form": {
     "positionals": [
      {
-      "label": "preset",
+      "label": "preset_id",
       "param": "preset_id"
      }
     ],
@@ -180267,7 +180267,7 @@
    "form": {
     "positionals": [
      {
-      "label": "preset",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -180480,7 +180480,7 @@
     "scopes": [
      {
       "flag": "contract",
-      "label": "contract",
+      "label": "contract_id",
       "param": "contract_id"
      }
     ],
@@ -180556,7 +180556,7 @@
    "form": {
     "positionals": [
      {
-      "label": "preset",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -180702,7 +180702,7 @@
    "form": {
     "positionals": [
      {
-      "label": "timesheet",
+      "label": "timesheet_id",
       "param": "timesheet_id"
      }
     ],
@@ -180917,7 +180917,7 @@
    "form": {
     "positionals": [
      {
-      "label": "preset",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -181145,7 +181145,7 @@
    "form": {
     "positionals": [
      {
-      "label": "timesheet",
+      "label": "timesheet_id",
       "param": "timesheet_id"
      }
     ],
@@ -181398,7 +181398,7 @@
    "form": {
     "positionals": [
      {
-      "label": "webhook",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -181636,7 +181636,7 @@
    "form": {
     "positionals": [
      {
-      "label": "webhook",
+      "label": "id",
       "param": "id"
      }
     ],
@@ -182012,7 +182012,7 @@
    "form": {
     "positionals": [
      {
-      "label": "webhook",
+      "label": "webhook_id",
       "param": "webhook_id"
      }
     ],
@@ -182209,7 +182209,7 @@
    "form": {
     "positionals": [
      {
-      "label": "webhook",
+      "label": "id",
       "param": "id"
      }
     ],

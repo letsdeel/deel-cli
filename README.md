@@ -252,8 +252,8 @@ deel jobs list --quiet
 
 ```bash
 deel dev tokens list                                   # newest first; --limit/--cursor to page
-deel dev tokens get <token>
-deel dev tokens revocations create <token> --input reason=rotated   # invalidates the token; there is no undo
+deel dev tokens get <token_id>
+deel dev tokens revocations create <token_id> --input reason=rotated   # invalidates the token; there is no undo
 deel dev logs tokens list                              # what each token has been used for
 ```
 
@@ -263,13 +263,13 @@ Every mutating request (`POST`/`PUT`/`PATCH`/`DELETE`) carries an `Idempotency-K
 
 ## Webhooks
 
-`deel webhooks list`, `get <webhook>` and `events list` read webhook subscriptions; the signing key is never printed (reveal it in Developer Center → Webhooks).
+`deel webhooks list`, `get <id>` and `events list` read webhook subscriptions; the signing key is never printed (reveal it in Developer Center → Webhooks).
 
 ```bash
 deel webhooks create --input file://webhook.json             # deel webhooks create --generate-input for the fields
-deel webhooks update <webhook> --input status=disabled       # changes only the given fields
-deel webhooks delete <webhook>
-deel webhooks test <webhook> --input event_type=contract.created --beta   # Deel delivers a test event to the receiver
+deel webhooks update <id> --input status=disabled       # changes only the given fields
+deel webhooks delete <id>
+deel webhooks test <webhook_id> --input event_type=contract.created --beta   # Deel delivers a test event to the receiver
 ```
 
 A webhook id can start with `-`, which the argument parser reads as a flag. Put it after `--`, which ends the options: `deel webhooks get -- -WZ1uT2DFF01`. The same works for any generated command.
@@ -294,7 +294,7 @@ base URL. The `deel scim …` commands use the sibling `/scim` base path
 An endpoint that is still in beta answers `BETA_ACCESS_REQUIRED` unless the request carries `X-Beta: true`. Pass `--beta` (on any command) to send that header:
 
 ```bash
-deel webhooks test <webhook> --input event_type=contract.created --beta
+deel webhooks test <webhook_id> --input event_type=contract.created --beta
 deel dev logs list --beta                  # the logs commands are beta too
 ```
 
