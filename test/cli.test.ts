@@ -2,6 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { run } from "../src/cli.ts";
 import { EXIT } from "../src/core/errors.ts";
+import { printContract, printContractJson } from "../src/help.ts";
+import type { Descriptor } from "../src/types.ts";
 
 // Capture direct process.stdout/stderr writes for the offline routing paths
 // (version, help, generate-input, unknown command) — none of these hit the network.
@@ -203,4 +205,59 @@ test("logs group help routes to the requests and tokens sub-groups", async () =>
   const tokens = await capture(["logs", "tokens", "--help"]);
   assert.equal(tokens.code, EXIT.OK);
   assert.match(tokens.out, /\blist\b/);
+});
+
+function captureStdout(run: () => void): string {
+  const chunks: string[] = [];
+  const original = process.stdout.write.bind(process.stdout);
+  process.stdout.write = ((chunk: string | Uint8Array) => {
+    chunks.push(String(chunk));
+    return true;
+  }) as typeof process.stdout.write;
+  try {
+    run();
+  } finally {
+    process.stdout.write = original;
+  }
+  return chunks.join("");
+}
+
+const nullableContract: Descriptor = {
+  command: ["things", "update"],
+  method: "PATCH",
+  path: "/things",
+  async: false,
+  bodyKind: "json",
+  supportsMultipart: false,
+  bodyWrapper: "none",
+  params: [],
+  bodyProps: [
+    { name: "title", in: "body", type: "string", required: true },
+    { name: "note", in: "body", type: "string", required: false, nullable: true },
+    { name: "limit", in: "body", type: "number", required: true, nullable: true },
+  ],
+  fileFields: [],
+  responseKind: "none",
+  responseFields: [],
+};
+
+test("--help marks nullable body fields and keeps the other columns", () => {
+  const out = captureStdout(() => printContract(nullableContract));
+  assert.match(out, /note\s+string\s+nullable/);
+  assert.match(out, /limit\s+number\s+required, nullable/);
+  assert.match(out, /title\s+string\s+required\s*\n/);
+});
+
+test("--help leaves the flag column unchanged when nothing is nullable", () => {
+  const plain: Descriptor = { ...nullableContract, bodyProps: [{ name: "title", in: "body", type: "string", required: true }] };
+  const out = captureStdout(() => printContract(plain));
+  assert.ok(!out.includes("nullable"));
+  assert.match(out, /title {18}string {3}required \n/);
+});
+
+test("--help --json carries nullable on the fields that have it", () => {
+  const out = captureStdout(() => printContractJson(nullableContract));
+  const fields = JSON.parse(out).body.fields;
+  assert.equal(fields.find((f: { name: string }) => f.name === "note").nullable, true);
+  assert.equal("nullable" in fields.find((f: { name: string }) => f.name === "title"), false);
 });

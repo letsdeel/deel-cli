@@ -98,6 +98,9 @@ async function multipartBody(descriptor: Descriptor, call: ParsedCall): Promise<
   const inner = (call.body ?? {}) as Record<string, unknown>;
 
   for (const field of descriptor.bodyProps) {
+    if (field.nullable && inner[field.name] === null) {
+      throw new CliError("usage.body", `--form cannot send null for ${field.name}: a multipart form has no null value.`, "Send JSON instead (omit --form) to clear the field.");
+    }
     if (inner[field.name] != null) form.append(field.name, String(inner[field.name]));
     else if (field.required) throw new CliError("usage.body", `Missing required field --input ${field.name}=...`);
   }
