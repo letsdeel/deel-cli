@@ -52,7 +52,7 @@ function harness(responses: HttpResponse[]) {
   const seen: HttpRequest[] = [];
   let ids = 0;
   const ctx = createContext({
-    config: { env: "demo", baseUrl: "https://example.test/rest" },
+    config: { env: "demo", baseUrl: "https://example.test/rest", issuer: null, clientId: "test-client", oauthBaseUrlOk: false },
     token: "tok",
     io,
     clock: () => NOW,

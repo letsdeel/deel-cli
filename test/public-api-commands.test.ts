@@ -149,7 +149,7 @@ test("a missing required query param is reported under the flag the user types",
     params: [{ name: "fields", in: "query", type: "string", required: true, flag: "fields-param" }],
   };
   const ctx = createContext({
-    config: { env: "demo", baseUrl: "https://example.test/rest" }, token: "tok_test", io: captureIO({}), logger: () => {},
+    config: { env: "demo", baseUrl: "https://example.test/rest", issuer: null, clientId: "test-client", oauthBaseUrlOk: false }, token: "tok_test", io: captureIO({}), logger: () => {},
     baseTransport: async () => { throw new Error("no request expected"); },
   });
   await assert.rejects(execute(descriptor, { flags: {}, files: {} }, ctx, { output: {} as any, debug: false, form: false }), /--fields-param/);
@@ -213,7 +213,7 @@ test("a path-param error names the flag the user types, including the -param ren
 test("a missing path param names the flag the user types, including the -param rename", async () => {
   const descriptor = thing([{ name: "file", in: "path", type: "string", required: true, flag: "file-param" }], { method: "DELETE", path: "/things/{file}", command: ["things", "delete"] });
   const ctx = createContext({
-    config: { env: "demo", baseUrl: "https://example.test/rest" }, token: "tok_test", io: captureIO({}), logger: () => {},
+    config: { env: "demo", baseUrl: "https://example.test/rest", issuer: null, clientId: "test-client", oauthBaseUrlOk: false }, token: "tok_test", io: captureIO({}), logger: () => {},
     baseTransport: async () => { throw new Error("no request expected"); },
   });
   await assert.rejects(

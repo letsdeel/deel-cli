@@ -11,7 +11,7 @@ import type { HttpRequest, HttpResponse } from "../src/core/http.ts";
 import type { Config } from "../src/core/config.ts";
 import { HEADER } from "../src/core/constants.ts";
 
-const CONFIG: Config = { env: "demo", baseUrl: "https://example.test/rest" };
+const CONFIG: Config = { env: "demo", baseUrl: "https://example.test/rest", issuer: null, clientId: "test-client", oauthBaseUrlOk: false };
 
 function ctxWith(handler: (req: HttpRequest) => HttpResponse, io = captureIO({}), config: Config = CONFIG) {
   const seen: HttpRequest[] = [];

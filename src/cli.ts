@@ -9,7 +9,6 @@ import type { ArgsDef, CommandDef } from "citty";
 import type { Descriptor } from "./types.ts";
 import { allDescriptors, loadGeneratedDescriptors, matchForm, pickingFlags, selectForm, usageOf } from "./public-api/commands.ts";
 import { acceptsFlag, argvEnables, argvMentionsFlag, flagOf, joinSwitchValues } from "./core/flags.ts";
-import { resolveToken, requireToken } from "./core/auth.ts";
 import { parseInput } from "./core/input.ts";
 import { createContext } from "./core/context.ts";
 import { execute } from "./core/executor.ts";
@@ -20,7 +19,7 @@ import { setLoggingEnabled, setLogBodiesEnabled } from "./core/logging.ts";
 import { EXIT } from "./core/errors.ts";
 import { CliError } from "./core/errors.ts";
 import { CLI_VERSION } from "./version.ts";
-import { commonArgs, configFrom, gatherFiles, gatherFlagValues, outputOpts } from "./commands/shared.ts";
+import { commandToken, commonArgs, configFrom, gatherFiles, gatherFlagValues, outputOpts } from "./commands/shared.ts";
 import type { Args } from "./commands/shared.ts";
 import { staticCommands } from "./commands/index.ts";
 import {
@@ -85,7 +84,7 @@ async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<st
   };
   // execute() sends X-Beta itself so it can drop the header on a retry; the transport must not add it back.
   const config = configFrom({ ...args, beta: false }, cittyCtx.rawArgs);
-  const token = requireToken(resolveToken({ tokenStdin: Boolean(args["token-stdin"]), env: config.env }));
+  const token = commandToken(args, config);
   const ctx = createContext({ config, token });
   await execute(descriptor, call, ctx, {
     output: outputOpts(args),
