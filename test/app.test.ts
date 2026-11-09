@@ -6,7 +6,7 @@ import { createAppCommand, positionals, runDescribe, runRun, runSearch } from ".
 import type { AppDeps } from "../src/commands/app.ts";
 import { staticCommands } from "../src/commands/index.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
-import type { CliError } from "../src/core/errors.ts";
+import { CliError } from "../src/core/errors.ts";
 import type { HttpRequest, HttpResponse, Transport } from "../src/core/http.ts";
 import type { IOStreams } from "../src/core/io.ts";
 import type { CredentialStore } from "../src/core/keychain.ts";
@@ -99,10 +99,24 @@ test("search prints the actions with the request id", async (t) => {
   await runSearch({ ...ARGS, _: ["pending", "widgets"], limit: "5" }, [], deps(transport, loggedIn(), io.io));
   assert.deepEqual(tools(), [{ name: "search_actions", arguments: { query: "pending widgets", limit: 5 } }]);
   const printed = io.json();
-  assert.deepEqual(printed.data, { actions: [{ name: "list_widgets", method: "GET" }] });
+  assert.deepEqual(printed.data, [{ name: "list_widgets", method: "GET" }]);
   assert.equal(printed.meta.request_id, requests[0].headers["x-request-id"]);
   assert.equal(requests[0].url, MCP);
   assert.equal(requests[0].headers.authorization, `Bearer ${ACCESS}`);
+});
+
+test("search and describe take --fields and --quiet like any list", async (t) => {
+  isolated(t);
+  const { transport } = server((tool, args) => ({ texts: [tool === "get_action" ? JSON.stringify({ ...LIST, name: args.name }) : JSON.stringify({ actions: [{ name: "list_widgets", title: "List widgets", method: "GET" }, { name: "approve_widget", title: "Approve", method: "POST" }] })] }));
+  const run = async (fn: typeof runSearch, args: Record<string, unknown>) => {
+    const io = captureIO();
+    await fn({ ...ARGS, ...args }, [], deps(transport, loggedIn(), io.io));
+    return io;
+  };
+  assert.deepEqual((await run(runSearch, { _: ["x"], fields: "name,title" })).json().data, [{ name: "list_widgets", title: "List widgets" }, { name: "approve_widget", title: "Approve" }]);
+  assert.equal((await run(runSearch, { _: ["x"], quiet: true })).out(), "list_widgets\napprove_widget\n");
+  assert.equal((await run(runDescribe, { _: ["a", "b"], quiet: true })).out(), "a\nb\n");
+  assert.deepEqual((await run(runDescribe, { _: ["a"], fields: "name,method" })).json().data, [{ name: "a", method: "GET" }]);
 });
 
 test("search without words is a usage error, before any call", async (t) => {
@@ -125,7 +139,7 @@ test("describe prints each action, and --generate-input prints a skeleton", asyn
   const { transport, tools } = server((_tool, args) => ({ texts: [JSON.stringify(actions[String(args.name)])] }));
   const io = captureIO();
   await runDescribe({ ...ARGS, _: ["list_widgets", "approve_widget"] }, [], deps(transport, loggedIn(), io.io));
-  assert.deepEqual(io.json().data.actions, [LIST, APPROVE]);
+  assert.deepEqual(io.json().data, [LIST, APPROVE]);
   assert.deepEqual(tools().map((call) => call.arguments), [{ name: "list_widgets" }, { name: "approve_widget" }]);
 
   const skeleton = captureIO();
@@ -203,7 +217,21 @@ test("an HTTP 401 renews the stored login and retries with the new token", async
   const mcpCalls = requests.filter((request) => request.url === MCP);
   assert.deepEqual(mcpCalls.map((request) => request.headers.authorization), [`Bearer ${ACCESS}`, `Bearer ${RENEWED}`]);
   assert.equal(readOAuthEntry(store, ISSUER)?.access_token, RENEWED);
-  assert.deepEqual(io.json().data, { actions: [] });
+  assert.deepEqual(io.json().data, []);
+});
+
+test("a login refresh that fails during a write is its own error, not an unknown outcome", async (t) => {
+  isolated(t);
+  const { transport, tools } = server((tool, _args, request) => (tool === "get_action" ? { texts: [JSON.stringify(APPROVE)] } : { status: 401, headers: {}, text: "", json: undefined, url: request.url }));
+  const refusing: Transport = async (request) => {
+    if (request.url === `${ISSUER}/oauth/tokens`) throw new CliError("network.timeout", "The token endpoint timed out.");
+    return transport(request);
+  };
+  await assert.rejects(
+    () => runRun({ ...ARGS, _: ["approve_widget"], input: "path_params={widget_id=w1}" }, [], deps(refusing, loggedIn(), captureIO().io)),
+    (error: CliError) => error.code === "network.timeout",
+  );
+  assert.deepEqual(tools().map((call) => call.name), ["get_action", "run_write_action"]);
 });
 
 test("DEEL_MCP_URL points a DEEL_TOKEN at another /mcp", async (t) => {
@@ -255,7 +283,25 @@ test("flags a command would ignore are refused, before any call", async (t) => {
   await assert.rejects(() => runRun({ ...ARGS, _: ["approve_widget"] }, ["run", "approve_widget", "--file", "a=@b"], d), usage);
   await assert.rejects(() => runSearch({ ...ARGS, _: ["x"] }, ["search", "x", "--input", "a=1"], d), usage);
   await assert.rejects(() => runDescribe({ ...ARGS, _: ["x"] }, ["describe", "x", "--dry-run"], d), usage);
+  // Response bodies never reach the log for these commands, so the flag that would turn them on is refused.
+  await assert.rejects(() => runSearch({ ...ARGS, _: ["x"] }, ["search", "x", "--log-bodies"], d), (error: CliError) => error.code === "usage.app" && /--log-bodies/.test(error.message));
   assert.equal(requests.length, 0);
+});
+
+test("a flag the command doesn't have is refused before any call, so a mistyped --dry-run can't run the write", async (t) => {
+  isolated(t);
+  const { transport, requests } = server(() => assert.fail("no call expected"));
+  const d = deps(transport, loggedIn(), captureIO().io);
+  const unknown = (error: CliError) => error.code === "usage.app" && /Unknown flag/.test(error.message);
+  for (const flag of ["--dryrun", "--dry_run", "--dry", "--limit=3"]) {
+    await assert.rejects(() => runRun({ ...ARGS, _: ["approve_widget"] }, ["run", "approve_widget", "--input", "path_params={id=1}", flag], d), unknown, flag);
+  }
+  await assert.rejects(() => runSearch({ ...ARGS, _: ["x"] }, ["search", "--limt", "3", "x"], d), unknown);
+  await assert.rejects(() => runDescribe({ ...ARGS, _: ["x"] }, ["describe", "x", "--generate_input"], d), unknown);
+  assert.equal(requests.length, 0);
+  // Declared flags, their --no- forms, --base-url and everything after `--` pass.
+  const { transport: ok } = server(() => ({ texts: ['{"actions":[]}'] }));
+  await runSearch({ ...ARGS, _: ["x", "--weird"] }, ["search", "x", "--limit", "2", "--no-log", "--base-url", "https://api.letsdeel.com/rest", "--", "--weird"], deps(ok, loggedIn(), captureIO().io));
 });
 
 test("run keeps shorthand numbers exact, typed by the action's schema", async (t) => {

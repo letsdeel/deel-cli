@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { withAuth, withVersion, withRequestId, withRetry, withBeta } from "../src/core/http.ts";
+import { fetchTransport, withAuth, withVersion, withRequestId, withRetry, withBeta } from "../src/core/http.ts";
+import { wasNotSent } from "../src/core/errors.ts";
 import type { HttpRequest, HttpResponse, Transport } from "../src/core/http.ts";
 
 const req = (over: Partial<HttpRequest> = {}): HttpRequest => ({ method: "GET", url: "https://x", headers: {}, ...over });
@@ -117,4 +118,24 @@ test("withBeta sends X-Beta: true only when enabled", async () => {
   const off = capturing();
   await withBeta(undefined)(off.next)(req());
   assert.equal(off.seen[0].headers["x-beta"], undefined);
+});
+
+test("a fetch that never connected is marked as not sent; a reset after connecting is not", async (t) => {
+  const realFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = realFetch;
+  });
+  const failWith = (cause?: { code: string }) => {
+    globalThis.fetch = (async () => {
+      throw Object.assign(new TypeError("fetch failed"), { cause });
+    }) as typeof fetch;
+  };
+  for (const code of ["ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED"]) {
+    failWith({ code });
+    await assert.rejects(() => fetchTransport(req({ method: "POST" })), (error: Error) => (error as { code?: string }).code === "network.error" && wasNotSent(error), code);
+  }
+  for (const cause of [{ code: "ECONNRESET" }, undefined]) {
+    failWith(cause);
+    await assert.rejects(() => fetchTransport(req({ method: "POST" })), (error: Error) => (error as { code?: string }).code === "network.error" && !wasNotSent(error));
+  }
 });

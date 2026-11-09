@@ -2,7 +2,7 @@
 // Cross-cutting concerns (auth header, version, request-id, retry, logging) are
 // middlewares — the executor just builds a request and calls the composed transport.
 
-import { CliError } from "./errors.ts";
+import { CliError, markNotSent } from "./errors.ts";
 import { redactHeaders } from "./auth.ts";
 import { isCertError, TLS_HINT, installCaTrust } from "./tls.ts";
 import type { Logger } from "./logging.ts";
@@ -42,6 +42,9 @@ function headersToObject(headers: Headers): Record<string, string> {
   return result;
 }
 
+// `cause.code` values of a fetch that failed before any byte reached the server.
+const NOT_SENT_CAUSES = new Set(["ENOTFOUND", "EAI_AGAIN", "ECONNREFUSED"]);
+
 // Base transport: one real fetch, with a timeout. No retries/headers here.
 export const fetchTransport: Transport = async (request) => {
   installCaTrust(); // trust the OS store (once) before the first request
@@ -63,7 +66,10 @@ export const fetchTransport: Transport = async (request) => {
     const failure = error as Error;
     if (failure.name === "AbortError") throw new CliError("network.timeout", `Request timed out: ${request.method} ${request.url}`);
     if (isCertError(error)) throw new CliError("network.tls", `TLS verification failed: ${request.url}`, TLS_HINT);
-    throw new CliError("network.error", `Network error: ${failure.message}`);
+    const networkError = new CliError("network.error", `Network error: ${failure.message}`);
+    // The name didn't resolve or the connection was refused: nothing reached the server.
+    if (NOT_SENT_CAUSES.has(String((failure as { cause?: { code?: unknown } }).cause?.code))) markNotSent(networkError);
+    throw networkError;
   } finally {
     clearTimeout(timer);
   }

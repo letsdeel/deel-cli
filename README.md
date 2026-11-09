@@ -268,7 +268,7 @@ An invalidated token stops working at once and cannot be restored.
 
 ## Idempotency
 
-Every mutating request (`POST`/`PUT`/`PATCH`/`DELETE`) carries an `Idempotency-Key`. By default it is a **deterministic UUIDv5** derived from a canonicalized form of the request (method + path + query + body), so re-running the identical command sends the identical key and the server can dedupe a retry. Override it with `--idempotency-key <value>` when you want a fresh attempt.
+Every mutating request (`POST`/`PUT`/`PATCH`/`DELETE`) to the REST API carries an `Idempotency-Key` (`deel app run` is not one: it calls the MCP endpoint and sends none). By default it is a **deterministic UUIDv5** derived from a canonicalized form of the request (method + path + query + body), so re-running the identical command sends the identical key and the server can dedupe a retry. Override it with `--idempotency-key <value>` when you want a fresh attempt.
 
 ## Webhooks
 
@@ -291,7 +291,7 @@ A webhook id can start with `-`, which the argument parser reads as a flag. Pass
 
 ```bash
 deel auth login                                       # once; a PAT can't run web-app actions
-deel app search "time off"                            # actions this login can run (--limit 1-20)
+deel app search "time off"                            # actions this login can run (--limit 1-20; --quiet prints the names)
 deel app describe <name>                              # input schema, scopes, and whether it reads or writes
 deel app describe <name> --generate-input > input.json
 deel app run <name> --input file://input.json         # or --input 'path_params={id=123},query={status=open}'
@@ -299,8 +299,8 @@ deel app run <name> --input ... --dry-run             # print the call, run noth
 ```
 
 - `--input` is one object with `path_params`, `query` and `body`, in any of the [`--input` forms](#request-input). The server checks it against the action's schema and names each field that's wrong.
-- `run` asks the server whether the action reads or writes (`run_with` from `describe`) and calls it without a confirmation step. Writes are never retried; when a write gets no answer, the error says so and asks you to check with a read before running it again.
-- Shorthand values in `--input` stay text until the action's schema says a field is a number (so `00123`, `1.10` and ids past 2^53 arrive unchanged). Flags `deel app` doesn't use (`--file`, `--form`, `--idempotency-key`, `--debug`) are refused rather than ignored.
+- `run` asks the server whether the action reads or writes (`run_with` from `describe`) and calls it without a confirmation step. A write is never re-sent after a timeout or a server error (reads are retried); it is sent again only after a 401 once the login is renewed, which is answered before the action runs. When a write may have run without an answer, the error says so and asks you to check with a read before running it again.
+- Shorthand values in `--input` stay text until the action's schema says a field is a number (so `00123`, `1.10` and ids past 2^53 arrive unchanged) and `true`/`false` stay text until it says a field is a boolean. Flags `deel app` doesn't use (`--file`, `--form`, `--idempotency-key`, `--debug`, `--log-bodies`) and any flag it doesn't know (a mistyped `--dryrun`, say) are refused before anything runs, rather than ignored. Large ids are only kept exact in shorthand: JSON input is parsed as JSON, which rounds numbers past 2^53, so write such an id as a string.
 - Responses over 100 KB are cut by the server. The output then holds the text that came back, `meta.truncated` says how much, and stderr has a warning.
 - A login that hides sensitive data, or one without the action's scope, gets an error naming the next step (`deel auth login`, or `deel auth login --scopes ...`).
 

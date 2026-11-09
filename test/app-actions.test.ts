@@ -6,6 +6,7 @@ import {
   actionInput,
   appError,
   assertEligible,
+  beforeRequest,
   coerceInput,
   createAppClient,
   getAction,
@@ -17,7 +18,7 @@ import {
 } from "../src/core/app-actions.ts";
 import type { ActionDetail, AppClient } from "../src/core/app-actions.ts";
 import type { ResolvedToken } from "../src/core/auth.ts";
-import { CliError } from "../src/core/errors.ts";
+import { CliError, markNotSent, wasNotSent } from "../src/core/errors.ts";
 import type { HttpRequest, HttpResponse, Transport } from "../src/core/http.ts";
 import type { ToolResult } from "../src/core/mcp.ts";
 import type { OAuthSource } from "../src/core/oauth.ts";
@@ -215,14 +216,13 @@ test("search checks its arguments before calling", async () => {
 test("search maps an isError result and rejects a result that isn't JSON", async () => {
   await assert.rejects(() => searchActions(scripted(err(403, "APP_ACTIONS_NOT_ALLOWED")).client, "x"), (error: CliError) => error.code === "app.unavailable");
   await assert.rejects(() => searchActions(scripted(ok("not json")).client, "x"), (error: CliError) => error.code === "mcp.response" && error.requestId === "req");
-  assert.deepEqual((await searchActions(scripted(ok("{}")).client, "x")).actions, []);
+  assert.deepEqual((await searchActions(scripted(ok('{"actions":[]}')).client, "x")).actions, []);
 });
 
 test("a result in an unexpected shape is mcp.response, with the request id", async () => {
   const bad = (text: string, run: (client: AppClient) => Promise<unknown>) => assert.rejects(() => run(scripted(ok(text)).client), (error: CliError) => error.code === "mcp.response" && error.requestId === "req", text);
-  for (const text of ["[]", "7", '{"actions":"x"}', '{"actions":[1]}', '{"actions":[{"title":"no name"}]}']) await bad(text, (c) => searchActions(c, "x"));
+  for (const text of ["[]", "7", "{}", '{"message":"Service unavailable"}', '{"actions":"x"}', '{"actions":[1]}', '{"actions":[{"title":"no name"}]}']) await bad(text, (c) => searchActions(c, "x"));
   for (const text of ["[]", '"x"', "{}", '{"name":"a","scopes":"x"}', '{"name":"a","scopes":[1]}', '{"name":"a","run_with":1}', '{"name":"a","input_schema":[]}']) await bad(text, (c) => getAction(c, "a"));
-  assert.deepEqual((await searchActions(scripted(ok("{}")).client, "x")).actions, []);
 });
 
 test("getAction returns the action and names it in errors", async () => {
@@ -260,6 +260,41 @@ test("shorthand text is typed by the schema through the body, objects and lists;
     { path_params: { version: "1.10" }, body: { price: 1.5, qty: 3, ids: [1, 2], nested: { rate: 0.5 }, note: "007", other: "9" } },
   );
   assert.deepEqual(coerceInput({ body: { qty: 3, note: 5 } }, schema), { body: { qty: 3, note: 5 } });
+});
+
+test("text the schema declares boolean becomes one, and text it declares string stays text", () => {
+  const schema: ActionDetail["input_schema"] = {
+    type: "object",
+    properties: {
+      query: { type: "object", properties: { archived: { type: "boolean" }, flag: { type: ["boolean", "null"] } } },
+      body: { type: "object", properties: { status: { type: "string" }, urgent: { type: "boolean" }, mixed: { type: "boolean" } } },
+    },
+  };
+  assert.deepEqual(coerceInput({ query: { archived: "false", flag: "true" }, body: { status: "false", urgent: "true", mixed: "yes" } }, schema), {
+    query: { archived: false, flag: true },
+    body: { status: "false", urgent: true, mixed: "yes" },
+  });
+});
+
+test("a number is typed only when it reads back as written; allOf, anyOf and oneOf are read through", () => {
+  const num = (type: string, text: string) => coerceInput({ query: { v: text } }, { type: "object", properties: { query: { type: "object", properties: { v: { type } } } } }).query?.v;
+  assert.equal(num("number", "9007199254740993"), "9007199254740993");
+  assert.equal(num("number", "12345678901234567890"), "12345678901234567890");
+  assert.equal(num("number", "0.1234567890123456"), "0.1234567890123456");
+  assert.equal(num("number", "123.456"), 123.456);
+  assert.equal(num("number", "-0.5"), -0.5);
+  assert.equal(num("number", "9007199254740991"), 9007199254740991);
+
+  const schema: ActionDetail["input_schema"] = {
+    type: "object",
+    properties: {
+      body: {
+        allOf: [{ type: "object", properties: { n: { type: "integer" } } }, { properties: { flag: { type: "boolean" } } }],
+        properties: { opt: { anyOf: [{ type: "null" }, { type: "integer" }] }, either: { oneOf: [{ type: "boolean" }, { type: "string" }] }, deep: { anyOf: [{ type: "object", properties: { id: { type: "integer" } } }, { type: "null" }] } },
+      },
+    },
+  };
+  assert.deepEqual(coerceInput({ body: { n: "5", flag: "true", opt: "7", either: "false", deep: { id: "3" } } }, schema), { body: { n: 5, flag: true, opt: 7, either: false, deep: { id: 3 } } });
 });
 
 test("a number-typed field only takes decimal text: hex and exponent forms stay text", () => {
@@ -316,6 +351,39 @@ test("a write that fails after it was sent has an unknown outcome; a read, and a
   for (const code of ["auth.expired", "http.400", "http.429", "network.tls", "app.unavailable"]) {
     await assert.rejects(() => runAction(failing(new CliError(code, "x")), APPROVE, {}), (error: CliError) => error.code === code, code);
   }
+});
+
+test("an error raised before the request left, such as a failed login refresh, is never an unknown outcome", async () => {
+  const refreshFailure = new CliError("network.timeout", "The token endpoint timed out.");
+  const tagged = (): AppClient => ({ call: () => beforeRequest(() => Promise.reject(refreshFailure)) });
+  await assert.rejects(() => runAction(tagged(), APPROVE, {}), (error: CliError) => error === refreshFailure);
+  // The same error without the tag, raised by the request itself, is an unknown outcome.
+  await assert.rejects(() => runAction({ call: async () => { throw new CliError("network.timeout", "timed out"); } }, APPROVE, {}), (error: CliError) => error.code === "app.outcome_unknown");
+  assert.equal(await beforeRequest(async () => 7), 7);
+  await assert.rejects(() => beforeRequest(() => Promise.reject("not an Error")), (error) => error === "not an Error");
+});
+
+test("the client tags a failed renewal, whether it came from a 401 or from the server's token check", async () => {
+  const failingRenew = async () => {
+    throw new CliError("network.error", "refresh failed");
+  };
+  for (const first of [{ status: 401, headers: {}, text: "", json: undefined } as HttpResponse, content([failure(401, "AUTHENTICATION_REQUIRED")], true)]) {
+    const { appClient } = client([first], { renew: failingRenew });
+    await assert.rejects(() => runAction(appClient, APPROVE, {}), (error: CliError) => error.code === "network.error");
+  }
+});
+
+test("a failure with no status is not an unknown outcome, and a refused connection is not either", async () => {
+  const payload = (body: object | string) => ({ isError: true, texts: [typeof body === "string" ? body : JSON.stringify(body)], requestId: "req" }) as ToolResult;
+  for (const body of ["Invalid arguments: name is required", { message: "Validation failed", errors: [{ code: "X" }] }]) {
+    await assert.rejects(() => runAction(scripted(payload(body)).client, APPROVE, {}), (error: CliError) => error.code !== "app.outcome_unknown" && error.code.startsWith("app."), String(body));
+  }
+  assert.equal(appError({ message: "Invalid arguments" }, "r", { write: true }).code, "app.tool_failed");
+  const refused = markNotSent(new CliError("network.error", "Network error: fetch failed"));
+  await assert.rejects(() => runAction({ call: async () => { throw refused; } }, APPROVE, {}), (error: CliError) => error === refused);
+  assert.equal(wasNotSent(new CliError("network.error", "x")), false);
+  assert.equal(wasNotSent("text"), false);
+  assert.equal(markNotSent(undefined), undefined);
 });
 
 test("the retry with the other tool is also checked for an unknown outcome", async () => {

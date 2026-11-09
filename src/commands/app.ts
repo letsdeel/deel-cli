@@ -6,7 +6,7 @@ import { defineCommand } from "citty";
 import { createContext } from "../core/context.ts";
 import type { Ctx } from "../core/context.ts";
 import { envelope, render } from "../core/output.ts";
-import { setLoggingEnabled, setLogBodiesEnabled } from "../core/logging.ts";
+import { setLoggingEnabled } from "../core/logging.ts";
 import { resolveMcpUrl } from "../core/config.ts";
 import { authFor, resolveToken } from "../core/auth.ts";
 import type { ResolvedToken } from "../core/auth.ts";
@@ -19,6 +19,7 @@ import {
   SEARCH_MAX_LIMIT,
   actionInput,
   assertEligible,
+  beforeRequest,
   createAppClient,
   getAction,
   inputSkeleton,
@@ -37,12 +38,13 @@ type Session = { ctx: Ctx; client: AppClient };
 
 function prepare(args: Args, rawArgs: string[], deps: AppDeps = {}): Session {
   setLoggingEnabled(args.log !== false);
-  setLogBodiesEnabled(args["log-bodies"] === true);
   const config = configFrom(args, rawArgs);
   const resolved: ResolvedToken = resolveToken({ tokenStdin: Boolean(args["token-stdin"]), config, store: deps.store, transport: deps.baseTransport });
   assertEligible(resolved);
   const url = resolveMcpUrl(config, { oauth: resolved.source === "oauth" });
-  const ctx = createContext({ config, token: authFor(resolved), io: deps.io, baseTransport: deps.baseTransport });
+  // A failed login refresh must not read as "the action may have run": it fails before the request is sent.
+  const token = authFor(resolved);
+  const ctx = createContext({ config, token: typeof token === "function" ? () => beforeRequest(token) : token, io: deps.io, baseTransport: deps.baseTransport });
   const oauth = resolved.oauth;
   const client = createAppClient({
     http: ctx.http,
@@ -61,14 +63,32 @@ function prepare(args: Args, rawArgs: string[], deps: AppDeps = {}): Session {
 
 // Global flags the app commands honour; the rest of commonArgs (--file, --form, --idempotency-key, --debug ...)
 // would be accepted and ignored, which is worse than an error for a write.
-const HONOURED_FLAGS = ["json", "quiet", "fields", "jq", "raw", "env", "beta", "ca-cert", "token-stdin", "log", "log-bodies"] as const;
-const appArgs = Object.fromEntries(HONOURED_FLAGS.map((flag) => [flag, commonArgs[flag]]));
-const UNSUPPORTED_FLAGS = ["file", "form", "idempotency-key", "debug"];
+const HONOURED_FLAGS = ["json", "quiet", "fields", "jq", "raw", "env", "beta", "ca-cert", "token-stdin", "log"] as const;
+const FLAG_HELP: Record<string, string> = {
+  "token-stdin": "Read the OAuth access token from stdin",
+  quiet: "Print ids only (the action names for search and describe)",
+};
+const appArgs = Object.fromEntries(HONOURED_FLAGS.map((flag) => [flag, flag in FLAG_HELP ? { ...commonArgs[flag], description: FLAG_HELP[flag] } : commonArgs[flag]]));
+const UNSUPPORTED_FLAGS = ["file", "form", "idempotency-key", "debug", "log-bodies"];
 
 function refuseUnsupported(rawArgs: string[], extra: string[]): void {
   for (const flag of [...UNSUPPORTED_FLAGS, ...extra]) {
     if (rawArgs.some((token) => token === `--${flag}` || token.startsWith(`--${flag}=`))) {
       throw new CliError("usage.app", `--${flag} isn't supported by this 'deel app' command.`, "See 'deel app --help'.");
+    }
+  }
+}
+
+// citty ignores a flag it doesn't know, so a mistyped `--dryrun` would run the write. Every `--flag` must be one this
+// command declares, a `--no-` form of one, or the hidden `--base-url`.
+function refuseUnknownFlags(rawArgs: string[], own: string[]): void {
+  const known = new Set<string>([...HONOURED_FLAGS, ...own, ...HIDDEN_VALUE_FLAGS, "help"]);
+  for (const token of rawArgs) {
+    if (token === "--") return;
+    if (!token.startsWith("--")) continue;
+    const name = token.slice(2).split("=")[0];
+    if (!known.has(name) && !known.has(name.replace(/^no-/, ""))) {
+      throw new CliError("usage.app", `Unknown flag --${name}.`, "See 'deel app --help'. Nothing was run.");
     }
   }
 }
@@ -88,18 +108,27 @@ export function positionals(args: Args, rawArgs: string[]): string[] {
   return words;
 }
 
+// The actions as the `data` list. --quiet prints their names, one per line: the shared one looks for ids.
+async function renderActions(io: IOStreams, actions: Array<{ name: string }>, requestId: string, args: Args): Promise<void> {
+  const opts = outputOpts(args);
+  if (opts.quiet && !opts.jq) io.out(actions.map((action) => action.name).join("\n") + "\n");
+  else await render(io, envelope(actions, { request_id: requestId }), opts);
+}
+
 export async function runSearch(args: Args, rawArgs: string[], deps?: AppDeps): Promise<void> {
   refuseUnsupported(rawArgs, ["input", "generate-input", "dry-run"]);
+  refuseUnknownFlags(rawArgs, ["limit"]);
   const query = positionals(args, rawArgs).join(" ");
   const limit = args.limit === undefined ? undefined : Number(args.limit);
   if (!query.trim()) throw new CliError("usage.app", "Usage: deel app search <what the action does> [--limit 1-20]");
   const { ctx, client } = prepare(args, rawArgs, deps);
   const { actions, requestId } = await searchActions(client, query, limit);
-  await render(ctx.io, envelope({ actions }, { request_id: requestId }), outputOpts(args));
+  await renderActions(ctx.io, actions, requestId, args);
 }
 
 export async function runDescribe(args: Args, rawArgs: string[], deps?: AppDeps): Promise<void> {
   refuseUnsupported(rawArgs, ["input", "dry-run"]);
+  refuseUnknownFlags(rawArgs, ["generate-input"]);
   const names = positionals(args, rawArgs);
   if (names.length === 0) throw new CliError("usage.app", "Usage: deel app describe <name>... [--generate-input]");
   if (args["generate-input"] && names.length > 1) throw new CliError("usage.app", "--generate-input takes one action name.");
@@ -111,11 +140,12 @@ export async function runDescribe(args: Args, rawArgs: string[], deps?: AppDeps)
     return;
   }
   const actions = found.map((item) => item.action);
-  await render(ctx.io, envelope({ actions }, { request_id: found[found.length - 1].requestId }), outputOpts(args));
+  await renderActions(ctx.io, actions, found[found.length - 1].requestId, args);
 }
 
 export async function runRun(args: Args, rawArgs: string[], deps?: AppDeps): Promise<void> {
   refuseUnsupported(rawArgs, ["generate-input"]);
+  refuseUnknownFlags(rawArgs, ["input", "dry-run"]);
   const [name, ...extra] = positionals(args, rawArgs);
   if (!name || extra.length > 0) throw new CliError("usage.app", "Usage: deel app run <name> [--input ...] [--dry-run]");
   const input = actionInput(args.input === undefined ? undefined : parseInput(String(args.input), [], { exactScalars: true }));
@@ -158,7 +188,7 @@ export function createAppCommand(deps?: AppDeps) {
         meta: { name: "run", description: "Run an action: deel app run <name> --input '{path_params, query, body}'" },
         args: {
           name: { type: "positional", required: false, description: "Action name, as search returns it" },
-          input: commonArgs.input,
+          input: { ...commonArgs.input, description: "The call's input: one object with path_params, query and body" },
           "dry-run": { type: "boolean", description: "Print the tools/call that would be sent, without running it" },
           ...appArgs,
         },

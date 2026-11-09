@@ -4,7 +4,7 @@
 // work at all, the read or write choice from `run_with`, retries for reads only, and errors mapped to
 // the CLI's envelope with a next step.
 
-import { CliError } from "./errors.ts";
+import { CliError, markNotSent, wasNotSent } from "./errors.ts";
 import { accessTokenClaims } from "./auth.ts";
 import type { ResolvedToken } from "./auth.ts";
 import { RETRY_BASE_DELAY_MS, RETRY_MAX_ATTEMPTS } from "./constants.ts";
@@ -44,6 +44,16 @@ export type AppClientOpts = {
   sleep?: (ms: number) => Promise<void>;
 };
 
+// Runs a step that happens before a request is sent (a login refresh, a token lookup), so that an error from it
+// is never read as "the action may have run".
+export async function beforeRequest<T>(step: () => Promise<T>): Promise<T> {
+  try {
+    return await step();
+  } catch (error) {
+    throw markNotSent(error);
+  }
+}
+
 function oauthRequired(message: string): CliError {
   return new CliError("auth.oauth_required", message, "Run 'deel auth login' (a PAT can't run web-app actions).");
 }
@@ -75,6 +85,7 @@ const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(r
 
 export function createAppClient(opts: AppClientOpts): AppClient {
   const sleep = opts.sleep ?? defaultSleep;
+  const renewLogin = opts.renew ? () => beforeRequest(opts.renew!) : undefined;
   return {
     async call(tool, args, { retryable }) {
       const attempts = retryable ? RETRY_MAX_ATTEMPTS : 1;
@@ -89,17 +100,17 @@ export function createAppClient(opts: AppClientOpts): AppClient {
           retryable,
           command: `app ${tool}`,
           onUnauthorized: async () => {
-            if (renewed || !opts.renew) return false;
+            if (renewed || !renewLogin) return false;
             renewed = true;
-            return opts.renew();
+            return renewLogin();
           },
         });
         if (!result.isError) return result;
         const failure = toolFailure(result);
         // A token introspection rejected: answered before anything runs, so a renewed login may retry once.
-        if (failure.code === "AUTHENTICATION_REQUIRED" && !renewed && opts.renew) {
+        if (failure.code === "AUTHENTICATION_REQUIRED" && !renewed && renewLogin) {
           renewed = true;
-          if (await opts.renew()) {
+          if (await renewLogin()) {
             attempt--;
             continue;
           }
@@ -152,8 +163,8 @@ function mapFailure(failure: ToolFailure, context: FailureContext): CliError {
     case "WRONG_ACTION_KIND":
       return new CliError("app.wrong_kind", message);
   }
-  if (context.write && ((code !== undefined && NO_RESPONSE_CODES.has(code)) || failure.statusCode >= 500)) return outcomeUnknown(message);
-  const suffix = code ? code.toLowerCase().replace(/[^a-z0-9_]/g, "_") : `http_${failure.statusCode}`;
+  if (context.write && ((code !== undefined && NO_RESPONSE_CODES.has(code)) || (failure.statusCode !== undefined && failure.statusCode >= 500))) return outcomeUnknown(message);
+  const suffix = code ? code.toLowerCase().replace(/[^a-z0-9_]/g, "_") : failure.statusCode !== undefined ? `http_${failure.statusCode}` : "tool_failed";
   return new CliError(`app.${suffix}`, message);
 }
 
@@ -210,8 +221,8 @@ export async function searchActions(client: AppClient, query: string, limit?: nu
   const result = await client.call(APP_TOOL.search, { query, ...(limit !== undefined ? { limit } : {}) }, { retryable: true });
   if (result.isError) failed(result, {});
   const payload = jsonText(result);
-  if (!isRecord(payload) || (payload.actions !== undefined && !Array.isArray(payload.actions))) throw malformed(result, "the action list");
-  return { actions: (payload.actions ?? []).map((item) => asActionSummary(item, result)), requestId: result.requestId };
+  if (!isRecord(payload) || !Array.isArray(payload.actions)) throw malformed(result, "the action list");
+  return { actions: payload.actions.map((item) => asActionSummary(item, result)), requestId: result.requestId };
 }
 
 export async function getAction(client: AppClient, name: string): Promise<{ action: ActionDetail; requestId: string }> {
@@ -238,17 +249,41 @@ export function actionInput(value: unknown): ActionInput {
 
 const DECIMAL = /^-?\d+(\.\d+)?$/;
 
+// A number that parsed back to the digits it was written with: a whole one within 2^53, a decimal of at most 15
+// significant digits (a double holds that many). Anything longer stays text, so an id never changes on the way.
+function exactNumber(text: string, number: number): boolean {
+  if (!Number.isFinite(number)) return false;
+  if (!text.includes(".")) return Number.isSafeInteger(number);
+  return text.replace(/[-.]/g, "").replace(/^0+/, "").length <= 15;
+}
+
+// The one schema to read a value by: `allOf` merged, and for `anyOf`/`oneOf` (an optional field is often
+// `anyOf: [{type: integer}, {type: null}]`) the first member that says what it is, other than null.
+function effectiveSchema(schema: JsonSchema | undefined): JsonSchema | undefined {
+  if (!isRecord(schema)) return schema;
+  if (Array.isArray(schema.allOf)) return effectiveSchema(mergeAllOf(schema));
+  for (const key of ["anyOf", "oneOf"] as const) {
+    const options = schema[key];
+    if (!Array.isArray(options)) continue;
+    const pick = options.filter(isRecord).find((option) => option.type !== "null" && (typeOf(option as JsonSchema) !== undefined || isRecord(option.properties)));
+    if (pick) return effectiveSchema({ ...(schema as JsonSchema), [key]: undefined, ...(pick as JsonSchema) });
+  }
+  return schema;
+}
+
 // The schema's type, with OpenAPI 3.1's `["integer", "null"]` read as its first non-null entry.
 function typeOf(schema: JsonSchema | undefined): string | undefined {
   const type: unknown = schema?.type;
   return Array.isArray(type) ? type.find((item): item is string => typeof item === "string" && item !== "null") : typeof type === "string" ? type : undefined;
 }
 
-// `--input` shorthand arrives as text (so `00123`, `1.10` and ids past 2^53 survive); this types it by the
-// action's schema: text the schema declares a number becomes one when that is exact, through objects and lists.
+// `--input` shorthand arrives as text (so `00123`, `1.10`, ids past 2^53 and a string field's "false" survive); this
+// types it by the action's schema: text the schema declares a number becomes one when that is exact, and "true" or
+// "false" a boolean, through objects and lists.
 // With `stringify`, numbers and booleans the schema declares a string are sent as strings. What the schema doesn't
 // describe is left to the server.
-function coerceValue(value: unknown, schema: JsonSchema | undefined, stringify: boolean): unknown {
+function coerceValue(value: unknown, declared: JsonSchema | undefined, stringify: boolean): unknown {
+  const schema = effectiveSchema(declared);
   if (Array.isArray(value)) return value.map((item) => coerceValue(item, isRecord(schema?.items) ? (schema.items as JsonSchema) : undefined, stringify));
   if (isRecord(value)) {
     const properties = isRecord(schema?.properties) ? (schema.properties as Record<string, JsonSchema>) : {};
@@ -256,9 +291,10 @@ function coerceValue(value: unknown, schema: JsonSchema | undefined, stringify: 
   }
   const type = typeOf(schema);
   if (stringify && type === "string" && (typeof value === "number" || typeof value === "boolean")) return String(value);
+  if (type === "boolean" && (value === "true" || value === "false")) return value === "true";
   if ((type === "number" || type === "integer") && typeof value === "string" && DECIMAL.test(value.trim())) {
     const number = Number(value);
-    if (type === "number" ? Number.isFinite(number) : Number.isSafeInteger(number)) return number;
+    if (type === "number" ? exactNumber(value.trim(), number) : Number.isSafeInteger(number)) return number;
   }
   return value;
 }
@@ -303,7 +339,8 @@ const SENT_UNKNOWN = /^(network\.(timeout|error)|http\.5\d\d|mcp\.response)$/;
 // A JSON-RPC internal or server error (-32603, -32000..-32099) may come after the action started; invalid params
 // and an unknown method are answered before it.
 const RPC_SERVER_ERROR = /\(JSON-RPC -(32603|320\d\d)\)$/;
-const sentWithoutAnswer = (error: CliError) => SENT_UNKNOWN.test(error.code) || (error.code === "mcp.rpc" && RPC_SERVER_ERROR.test(error.message));
+const sentWithoutAnswer = (error: CliError) =>
+  !wasNotSent(error) && (SENT_UNKNOWN.test(error.code) || (error.code === "mcp.rpc" && RPC_SERVER_ERROR.test(error.message)));
 
 async function send(client: AppClient, call: RunCall): Promise<ToolResult> {
   const write = call.tool === APP_TOOL.runWrite;

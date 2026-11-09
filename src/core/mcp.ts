@@ -14,7 +14,7 @@ export type ToolResult = {
 
 // The error payload the server puts in an `isError` result's first text item.
 export type ToolFailure = {
-  statusCode: number;
+  statusCode?: number; // absent when the server's payload carries none
   code?: string;
   message: string;
   details?: unknown;
@@ -95,7 +95,7 @@ export async function callTool(opts: CallToolOpts): Promise<ToolResult> {
   if (message.error) {
     const text = printable(message.error.message, "JSON-RPC error");
     // An unregistered tool: the server has app actions switched off.
-    if (/not found|unknown tool/i.test(text)) {
+    if (/-32601|-32602/.test(String(message.error.code)) && /not found|unknown tool/i.test(text)) {
       throw withRequestId(new CliError("app.unavailable", "Web-app actions are not available on this server.", "They are rolled out per organization."), opts.requestId);
     }
     throw withRequestId(new CliError("mcp.rpc", `${text} (JSON-RPC ${String(message.error.code ?? "error")})`), opts.requestId);
@@ -127,9 +127,9 @@ export function toolFailure(result: ToolResult): ToolFailure {
   }
   const errors = Array.isArray(payload.errors) ? (payload.errors as Array<Record<string, unknown>>) : [];
   const code = errors.find((error) => typeof error?.code === "string" && error.code)?.code as string | undefined;
-  const statusCode = typeof payload.statusCode === "number" ? payload.statusCode : 500;
+  const statusCode = typeof payload.statusCode === "number" ? payload.statusCode : undefined;
   const message = printable(payload.message ?? result.texts[0], "The tool call failed.");
-  return { statusCode, ...(code ? { code } : {}), message, ...(payload.details !== undefined ? { details: payload.details } : {}) };
+  return { ...(statusCode !== undefined ? { statusCode } : {}), ...(code ? { code } : {}), message, ...(payload.details !== undefined ? { details: payload.details } : {}) };
 }
 
 function withRequestId(error: CliError, requestId: string): CliError {

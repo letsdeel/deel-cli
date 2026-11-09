@@ -124,10 +124,11 @@ function parseValue(raw: string, exact: boolean): unknown {
 }
 
 // Heuristic scalar coercion for nested values (top-level is re-coerced against the schema). With `exact`, numbers
-// stay text (`00123`, `1.10`, ids past 2^53 would not survive a round trip) for the caller to type by its schema.
+// and booleans stay text (`00123`, `1.10`, ids past 2^53 would not survive a round trip, and a string field may
+// hold "false") for the caller to type by its schema.
 function parseScalar(text: string, exact: boolean): unknown {
-  if (text === "true") return true;
-  if (text === "false") return false;
+  if (!exact && text === "true") return true;
+  if (!exact && text === "false") return false;
   if (!exact && text !== "" && !Number.isNaN(Number(text)) && /^-?\d+(\.\d+)?$/.test(text)) return Number(text);
   return text;
 }

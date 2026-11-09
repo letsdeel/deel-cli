@@ -109,6 +109,11 @@ test("an unknown tool means app actions are off on the server", async () => {
   await assert.rejects(() => call(transport), (error: CliError) => error.code === "app.unavailable");
 });
 
+test("a server error that happens to say \"not found\" is not the unknown-tool answer", async () => {
+  const { transport } = recording(reply(200, { jsonrpc: "2.0", id: 1, error: { code: -32603, message: "Internal error: record not found" } }));
+  await assert.rejects(() => call(transport), (error: CliError) => error.code === "mcp.rpc" && /-32603/.test(error.message));
+});
+
 test("another JSON-RPC error is mcp.rpc with a printable message", async () => {
   const { transport } = recording(reply(200, { jsonrpc: "2.0", id: 1, error: { code: -32603, message: "boom\u001b[31m" } }));
   await assert.rejects(() => call(transport), (error: CliError) => error.code === "mcp.rpc" && error.message === "boom [31m (JSON-RPC -32603)");
@@ -130,7 +135,7 @@ test("toolFailure reads the status, code, message and details of the server's er
   });
 });
 
-test("toolFailure falls back to the text and a 500 for a plain-text error", () => {
-  assert.deepEqual(toolFailure({ isError: true, texts: ["something broke"], requestId: "r" }), { statusCode: 500, message: "something broke" });
-  assert.deepEqual(toolFailure({ isError: true, texts: [], requestId: "r" }), { statusCode: 500, message: "The tool call failed." });
+test("toolFailure falls back to the text for a plain-text error and invents no status", () => {
+  assert.deepEqual(toolFailure({ isError: true, texts: ["something broke"], requestId: "r" }), { message: "something broke" });
+  assert.deepEqual(toolFailure({ isError: true, texts: [], requestId: "r" }), { message: "The tool call failed." });
 });
