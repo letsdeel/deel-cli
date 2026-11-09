@@ -63,72 +63,30 @@ say a minute later.
   public API endpoint, written by `npm run generate:public-api -- --from <file|url>` from the public
   definitions (`scripts/generate-public-api.ts`). Every name comes from the reviewed command map,
   `src/public-api/commands.json`: an endpoint with no entry there is a generator error, so it ships only
-  once it has a name (see [Naming generated commands](#naming-generated-commands)). The generator never
+  once it has a name (see [The command map](#the-command-map)). The generator never
   touches the hand-picked files; it only reserves their names, and a released name never changes.
   Tests use the made-up endpoints in `test/fixtures/definitions/`.
 
-## Naming generated commands
+## The command map
 
 Each entry in `src/public-api/commands.json` names one endpoint:
 `{ "method": "GET", "path": "/contracts/{contract_id}", "command": "deel contracts get <contract>" }`.
-`npm run check:command-map` checks the map against these rules, that no entry takes a hand-picked or
-static command's name, and that a released command line (one in `src/public-api/manifest.json`) never
-changes. The generator also checks that every argument fills a parameter and that a flag that picks an
-endpoint isn't another endpoint's own flag.
-
-Other keys an entry can carry:
+A command line is `deel <domain> <resources…> <verb>`, then one `<label>` per path ID in path order, then
+any flags that pick this endpoint among those sharing the words: a scope flag with a label
+(`--contract <contract>`), a fixed selector (`--worker-type eor`, `--as worker`), or an optional one in
+brackets (`[--worker-type eor]`). Two more keys are allowed:
 
 | Key | Meaning |
 |-----|---------|
 | `api` | `"scim"` for a SCIM endpoint; REST when absent |
-| `case` | the R2 case when the verb isn't the method's (`read`, `removal`, `overwrite`, `state`, `action`) |
-| `registry` | `true` when the verb is an R3 registry verb |
-| `literals` | words that are neither plural nor declared singletons, accepted for this entry only (R5) |
-| `worker_type` | a worker type the path doesn't name but the endpoint has (R8) |
-| `collapse` | entries with the same key are one operation under one command line; the first is called (R9) |
-| `required_exception` | `--worker-type` stays required although this is the only endpoint with these words (R8) |
+| `collapse` | entries with the same key are one operation under one command line; the first is called |
 
-- **R1 One grammar.** `deel <domain> <resources…> <verb> <arguments> [flags]`, lowercase kebab-case,
-  resources from parent to child, exactly one verb.
-- **R2 Five core verbs.** `list` `get` `create` `update` `delete`. The HTTP method sets the verb; an
-  entry may override it only with one of five named cases (`case` in the entry): `read` (a POST that only
-  reads: `get`/`list`), `removal` (a POST that removes: `delete`), `overwrite` (a POST that replaces a
-  record or setting: `update`), `state` (a change to the record's own state: `update --status <value>`),
-  `action` (an action that leaves a record: noun + `create`). Choose in that order: a core case, then a
-  registry trigger (R3), then noun + `create`.
-- **R3 Registry verbs.** A few verbs beyond the five, each with a scope and the last path segments that
-  select it: `sign` (…/sign, …/signatures), `accept` (…/accept, …/acknowledge), `cancel`, `send`
-  (…/invitations, …/email-draft-sends; ats, contracts), `approve` (immigration, it), `reject` (…/reject,
-  …/decline; contracts, it), `test` (…/simulate; webhooks), `assign`, `unassign` (it). A verb an R2 case
-  already covers is never registered.
-- **R4 list vs get.** `list` returns a collection and ends on a plural noun; `get` returns one record or a
-  singleton.
-- **R5 Plural resources.** Every resource word is plural, except things that exist once per parent
-  (`location`, `holder`, `preview`, …); new singletons are added to the checker's list.
-- **R6 Deel's own names.** Use the product's names (`custom-fields`, `form-definition`), not the path's
-  when they differ.
-- **R7 Arguments and scopes.** Every path ID is an argument, in path order (`<contract>`). It is a scope
-  flag (`--contract <contract>`) instead only when it tells endpoints of one resource apart: another is
-  unscoped or has another parent (`ats notes create --application|--candidate|--job`). A scope flag can
-  also name a required query param (`benefits offerings list --country <country>`).
-  **R7b:** arguments may differ between worker types only when `--worker-type` is required, and help
-  then shows one line per type.
-- **R8 Variant flags.** `--worker-type <eor|gp|daas|contractor|employee>` (taken from the path only:
-  `/eor/…`, `/gp/…`, `/payouts/contractors/…`, an `ic` segment), `--as worker` for worker-login
-  endpoints, `--file-format pdf|csv`, `--bulk`. When several endpoints share the words the flag is
-  required and the bare command calls the endpoint whose path names no type; when only one does it is
-  optional (`[--worker-type eor]`). Beyond these, a flag may pick an endpoint only if it is in the
-  checker's reviewed list (`VARIANT_FLAGS` in `scripts/check-command-map.ts`): `--status <value>` for R2's
-  state case, `--external-id` when the argument is an external ID, and the exceptions the map uses
-  (`--type`, `--manual`, `--external`, `--current`, `--deel`, `--dynamic`, `--replace`,
-  `--without-contract`). A new one goes in that list with its reason in the PR. A variant flag never
-  takes a global flag's name (`--raw`, `--json`, `--fields`, …).
-- **R9 Unique.** Words, flags and flag values are unique together. Two entries may share a command line
-  only when they are the same operation and both carry the same `collapse` key; the first is called.
-- **R10 Files.** Upload is `create`, download is `get`, a rendered form is `get --file-format pdf`.
-- **R11 Adding an endpoint.** Pick the domain, name the resource (R5, R6), choose the verb (R2–R4), add
-  arguments (R7) and variants (R8), check R9 with `npm run check:command-map`. When two rules disagree,
-  ask in the PR rather than inventing a verb.
+`npm run check:command-map` checks that every entry makes a command the CLI can call: the line parses,
+every path ID has an argument in path order, no flag takes a global flag's name, command lines and
+endpoints are unique, no entry takes a hand-picked or static command's name, and a released command line
+(one in `src/public-api/manifest.json`) never changes. The generator also checks that every argument fills a
+parameter and that a flag that picks an endpoint isn't another endpoint's own flag. Names for new endpoints
+are reviewed by the maintainers; when you're unsure of one, ask in the PR.
 
 ## Pull requests
 

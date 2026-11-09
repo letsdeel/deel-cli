@@ -1,4 +1,4 @@
-// GENERATED FILE — DO NOT EDIT. Produced by the deel-cli-extractor skill from the internal Deel REST API spec (adjustments, jobs).
+// GENERATED FILE — DO NOT EDIT. Produced by the deel-cli-extractor skill from the Deel REST API spec (adjustments, jobs).
 import type { Manifest } from "./types.ts";
 
 export const manifest: Manifest = {
