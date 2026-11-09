@@ -19,7 +19,7 @@ export type ParsedCommand = {
   selectors: FormSelector[];
 };
 
-const isLabel = (token: string) => /^<[a-z0-9-]+>$/.test(token);
+const isLabel = (token: string) => /^<[A-Za-z0-9_-]+>$/.test(token);
 
 export function parseCommand(command: string): ParsedCommand {
   const tokens = command.trim().split(/\s+/);
