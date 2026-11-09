@@ -10,12 +10,7 @@ export type MapEntry = {
   path: string;
   command: string; // "deel <domain> <resources> <verb> <positionals> [flags]"
   api?: Api; // "rest" when absent
-  case?: string; // R2 override case: read, removal, overwrite, state, action
-  registry?: boolean; // the verb is an R3 registry verb
-  literals?: string[]; // words that are neither plural nor declared singletons (R5)
-  worker_type?: string | null; // a worker type the path doesn't name (R8 exception)
   collapse?: string; // entries with the same key are one command: the first in the map is called
-  required_exception?: boolean; // --worker-type stays required on the only endpoint with these words
 };
 
 export type ParsedCommand = {
