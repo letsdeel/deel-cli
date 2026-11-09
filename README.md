@@ -167,6 +167,13 @@ deel adjustments create --invoice --generate-input      # JSON body skeleton to 
 
 `--help` for an action shows what generic `--help` cannot: the request-body fields (which arrive via `--input`, not as flags) and the response fields.
 
+When several endpoints share a command's words, the flags pick one. `--help` then prints one page with every endpoint's usage line and its full help; the flags before `--help` narrow it to one:
+
+```bash
+deel contracts get --help                               # every endpoint of 'contracts get', each with its arguments and fields
+deel contracts get --worker-type eor --help             # only the EOR endpoint
+```
+
 ## Request input
 
 Body content is supplied with `--input`, which accepts four interchangeable forms:
