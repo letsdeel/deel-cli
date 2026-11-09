@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { PassThrough } from "node:stream";
 import { createContext } from "../src/core/context.ts";
+import type { Config } from "../src/core/config.ts";
 import { captureIO } from "../src/core/io.ts";
 import type { HttpRequest, HttpResponse } from "../src/core/http.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
@@ -13,7 +14,7 @@ import { isYes, listFlagsFrom, promptConfirm, requireId, runGet, runList, runInv
 import { staticCommands } from "../src/commands/index.ts";
 import { run } from "../src/cli.ts";
 
-const CONFIG = { env: "demo", baseUrl: "https://example.test/rest" };
+const CONFIG: Config = { env: "demo", baseUrl: "https://example.test/rest", issuer: null, clientId: "test-client", oauthBaseUrlOk: false };
 const JSON_OUTPUT = { json: true, quiet: false, raw: false };
 const TOKEN_ID = "7f0c1b9e-3c3a-4a63-9a43-2d6c1a0e8b51";
 

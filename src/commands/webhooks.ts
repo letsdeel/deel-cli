@@ -5,7 +5,6 @@
 import { defineCommand } from "citty";
 import type { ArgsDef } from "citty";
 import { createInterface } from "node:readline";
-import { resolveToken, requireToken } from "../core/auth.ts";
 import { createContext } from "../core/context.ts";
 import type { Ctx } from "../core/context.ts";
 import { envelope, render } from "../core/output.ts";
@@ -32,7 +31,7 @@ import {
   updateWebhook,
 } from "../core/webhooks.ts";
 import type { CreateWebhookBody, ListFlags, SimulateWebhookBody, UpdateWebhookBody, WebhookSimulation, WriteFlags } from "../core/webhooks.ts";
-import { commonArgs, configFrom, gatherFlagValues, nullableBoolean, nullableString, outputOpts, readHidden } from "./shared.ts";
+import { commandToken, commonArgs, configFrom, gatherFlagValues, nullableBoolean, nullableString, outputOpts, readHidden } from "./shared.ts";
 import type { Args } from "./shared.ts";
 
 type CittyCtx = { args: unknown; rawArgs: string[] };
@@ -116,8 +115,7 @@ function contextFor(cittyCtx: CittyCtx): Ctx {
   setLoggingEnabled(args.log !== false);
   setLogBodiesEnabled(args["log-bodies"] === true);
   const config = configFrom(args, cittyCtx.rawArgs);
-  const token = requireToken(resolveToken({ tokenStdin: Boolean(args["token-stdin"]), env: config.env }));
-  return createContext({ config, token });
+  return createContext({ config, token: commandToken(args, config) });
 }
 
 async function renderWebhooks(ctx: Ctx, payload: unknown, output: OutputOpts, meta?: Record<string, unknown>): Promise<void> {

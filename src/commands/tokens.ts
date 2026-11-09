@@ -2,7 +2,6 @@
 
 import { createInterface } from "node:readline";
 import { defineCommand } from "citty";
-import { resolveToken, requireToken } from "../core/auth.ts";
 import { createContext } from "../core/context.ts";
 import type { Ctx } from "../core/context.ts";
 import { envelope, render } from "../core/output.ts";
@@ -23,7 +22,7 @@ import {
   validateReason,
 } from "../core/api-tokens.ts";
 import type { TokenListFlags } from "../core/api-tokens.ts";
-import { commonArgs, configFrom, outputOpts, readHidden } from "./shared.ts";
+import { commandToken, commonArgs, configFrom, outputOpts, readHidden } from "./shared.ts";
 import type { Args } from "./shared.ts";
 
 type CittyCtx = { args: unknown; rawArgs: string[] };
@@ -77,8 +76,7 @@ function contextFor(cittyCtx: CittyCtx): Ctx {
   setLoggingEnabled(args.log !== false);
   setLogBodiesEnabled(args["log-bodies"] === true);
   const config = configFrom(args, cittyCtx.rawArgs);
-  const token = requireToken(resolveToken({ tokenStdin: Boolean(args["token-stdin"]), env: config.env }));
-  return createContext({ config, token });
+  return createContext({ config, token: commandToken(args, config) });
 }
 
 // The id of a single-token command: the positional, or --id=<id> for an id that starts with '-'.
