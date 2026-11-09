@@ -1,11 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { TestContext } from "node:test";
-import { positionals, runDescribe, runRun, runSearch } from "../src/commands/app.ts";
+import { runCommand } from "citty";
+import { createAppCommand, positionals, runDescribe, runRun, runSearch } from "../src/commands/app.ts";
 import type { AppDeps } from "../src/commands/app.ts";
 import { staticCommands } from "../src/commands/index.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
-import { resolveConfig, resolveMcpUrl } from "../src/core/config.ts";
 import type { CliError } from "../src/core/errors.ts";
 import type { HttpRequest, HttpResponse, Transport } from "../src/core/http.ts";
 import type { IOStreams } from "../src/core/io.ts";
@@ -90,16 +90,6 @@ function deps(transport: Transport, store: CredentialStore, io: IOStreams): AppD
 test("app is a static command and a reserved name", () => {
   assert.ok(staticCommands.app);
   assert.ok(RESERVED_COMMANDS.has("app"));
-});
-
-test("the MCP URL is /mcp on the API host, or DEEL_MCP_URL", (t) => {
-  isolated(t);
-  assert.equal(resolveMcpUrl(resolveConfig({ env: "prod" })), MCP);
-  assert.equal(resolveMcpUrl(resolveConfig({ env: "demo" })), "https://api-staging.letsdeel.com/mcp");
-  process.env.DEEL_MCP_URL = "https://mcp.example.test/mcp/";
-  assert.equal(resolveMcpUrl(resolveConfig({ env: "prod" })), "https://mcp.example.test/mcp");
-  process.env.DEEL_MCP_URL = "http://mcp.example.test/mcp";
-  assert.throws(() => resolveMcpUrl(resolveConfig({ env: "prod" })), (error: CliError) => error.code === "config.mcp");
 });
 
 test("search prints the actions with the request id", async (t) => {
@@ -216,11 +206,63 @@ test("an HTTP 401 renews the stored login and retries with the new token", async
   assert.deepEqual(io.json().data, { actions: [] });
 });
 
-test("DEEL_MCP_URL points the commands at another /mcp", async (t) => {
-  isolated(t, { DEEL_MCP_URL: "https://mcp.example.test/mcp" });
+test("DEEL_MCP_URL points a DEEL_TOKEN at another /mcp", async (t) => {
+  isolated(t, { DEEL_MCP_URL: "https://mcp.example.test/mcp", DEEL_TOKEN: ACCESS });
   const { transport, requests } = server(() => ({ texts: ['{"actions":[]}'] }));
   await runSearch({ ...ARGS, _: ["x"] }, [], deps(transport, loggedIn(), captureIO().io));
   assert.equal(requests[0].url, "https://mcp.example.test/mcp");
+  assert.equal(requests[0].headers.authorization, `Bearer ${ACCESS}`);
+});
+
+test("DEEL_MCP_URL on the API host works with the stored login", async (t) => {
+  isolated(t, { DEEL_MCP_URL: `${ISSUER}/alt/mcp` });
+  const { transport, requests } = server(() => ({ texts: ['{"actions":[]}'] }));
+  await runSearch({ ...ARGS, _: ["x"] }, [], deps(transport, loggedIn(), captureIO().io));
+  assert.equal(requests[0].url, `${ISSUER}/alt/mcp`);
+});
+
+test("DEEL_MCP_URL on another host never receives the stored login", async (t) => {
+  isolated(t, { DEEL_MCP_URL: "https://attacker.example.test/mcp" });
+  const { transport, requests } = server(() => assert.fail("no call expected"));
+  await assert.rejects(() => runSearch({ ...ARGS, _: ["x"] }, [], deps(transport, loggedIn(), captureIO().io)), (error: CliError) => error.code === "auth.base_url");
+  assert.equal(requests.length, 0);
+});
+
+test("the citty command runs search, describe and run with their words and flags", async (t) => {
+  isolated(t);
+  const actions: Record<string, object> = { list_widgets: LIST };
+  const { transport, tools } = server((tool, args) => ({ texts: [tool === "get_action" ? JSON.stringify(actions[String(args.name)]) : tool === "search_actions" ? '{"actions":[{"name":"list_widgets"}]}' : '{"ok":true}'] }));
+  const io = captureIO();
+  const command = createAppCommand(deps(transport, loggedIn(), io.io));
+  await runCommand(command, { rawArgs: ["search", "pending", "widgets", "--limit", "3", "--json"] });
+  await runCommand(command, { rawArgs: ["describe", "list_widgets", "--json"] });
+  await runCommand(command, { rawArgs: ["run", "list_widgets", "--input", "query={status=open}", "--json"] });
+  assert.deepEqual(tools(), [
+    { name: "search_actions", arguments: { query: "pending widgets", limit: 3 } },
+    { name: "get_action", arguments: { name: "list_widgets" } },
+    { name: "get_action", arguments: { name: "list_widgets" } },
+    { name: "run_read_action", arguments: { name: "list_widgets", query: { status: "open" } } },
+  ]);
+});
+
+test("flags a command would ignore are refused, before any call", async (t) => {
+  isolated(t);
+  const { transport, requests } = server(() => assert.fail("no call expected"));
+  const d = deps(transport, loggedIn(), captureIO().io);
+  const usage = (error: CliError) => error.code === "usage.app";
+  await assert.rejects(() => runRun({ ...ARGS, _: ["approve_widget"] }, ["run", "approve_widget", "--generate-input"], d), usage);
+  await assert.rejects(() => runRun({ ...ARGS, _: ["approve_widget"] }, ["run", "approve_widget", "--idempotency-key=k"], d), usage);
+  await assert.rejects(() => runRun({ ...ARGS, _: ["approve_widget"] }, ["run", "approve_widget", "--file", "a=@b"], d), usage);
+  await assert.rejects(() => runSearch({ ...ARGS, _: ["x"] }, ["search", "x", "--input", "a=1"], d), usage);
+  await assert.rejects(() => runDescribe({ ...ARGS, _: ["x"] }, ["describe", "x", "--dry-run"], d), usage);
+  assert.equal(requests.length, 0);
+});
+
+test("run keeps shorthand numbers exact, typed by the action's schema", async (t) => {
+  isolated(t);
+  const { transport, tools } = server((tool) => ({ texts: [tool === "get_action" ? JSON.stringify(APPROVE) : "{}"] }));
+  await runRun({ ...ARGS, _: ["approve_widget"], input: "path_params={widget_id=00123}" }, ["run", "approve_widget"], deps(transport, loggedIn(), captureIO().io));
+  assert.deepEqual(tools()[1], { name: "run_write_action", arguments: { name: "approve_widget", path_params: { widget_id: "00123" } } });
 });
 
 test("the value of the hidden --base-url flag is not a positional word", () => {

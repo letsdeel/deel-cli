@@ -300,6 +300,7 @@ deel app run <name> --input ... --dry-run             # print the call, run noth
 
 - `--input` is one object with `path_params`, `query` and `body`, in any of the [`--input` forms](#request-input). The server checks it against the action's schema and names each field that's wrong.
 - `run` asks the server whether the action reads or writes (`run_with` from `describe`) and calls it without a confirmation step. Writes are never retried; when a write gets no answer, the error says so and asks you to check with a read before running it again.
+- Shorthand values in `--input` stay text until the action's schema says a field is a number (so `00123`, `1.10` and ids past 2^53 arrive unchanged). Flags `deel app` doesn't use (`--file`, `--form`, `--idempotency-key`, `--debug`) are refused rather than ignored.
 - Responses over 100 KB are cut by the server. The output then holds the text that came back, `meta.truncated` says how much, and stderr has a warning.
 - A login that hides sensitive data, or one without the action's scope, gets an error naming the next step (`deel auth login`, or `deel auth login --scopes ...`).
 
@@ -360,7 +361,7 @@ All failure detail lives in the error envelope printed to stderr — never encod
 
 Each HTTP exchange is written as NDJSON to a size-capped, rotating local log (separate from any network telemetry). **By default only metadata is logged** — command, method, URL path (query string omitted), status, request id, duration, and request headers (the `Authorization` header masked to `Bearer ***`). **Response bodies are not written by default.**
 
-Opt in to full response bodies with `--log-bodies` per command, or `DEEL_LOG_BODIES=1` globally. When bodies are logged, keys whose names look sensitive (`token`, `password`, `email`, `iban`, `tax_id`, and similar) are masked — but a response body may still contain personal data, so enable this only when you need it. Disable logging entirely per-command with `--no-log`, or globally with `DEEL_LOG=off`.
+Opt in to full response bodies with `--log-bodies` per command, or `DEEL_LOG_BODIES=1` globally. When bodies are logged, keys whose names look sensitive (`token`, `password`, `email`, `iban`, `tax_id`, and similar) are masked — but a response body may still contain personal data, so enable this only when you need it. `deel app run` never logs response bodies, since an action's output is a JSON string the masking can't look into. Disable logging entirely per-command with `--no-log`, or globally with `DEEL_LOG=off`.
 
 Location: `~/Library/Logs/deel/deel.log` (macOS),
 `%LOCALAPPDATA%\deel\logs` (Windows), `$XDG_STATE_HOME/deel/logs` (Linux).
@@ -371,7 +372,7 @@ Location: `~/Library/Logs/deel/deel.log` (macOS),
 | ------------------- | ----------------------------------------------------------- |
 | `DEEL_TOKEN`        | PAT value                                                   |
 | `DEEL_ENV`          | Default environment (`prod` / `demo`)                       |
-| `DEEL_MCP_URL`      | MCP endpoint for `deel app` (https; default `/mcp` on the API host) |
+| `DEEL_MCP_URL`      | MCP endpoint for `deel app` (https; default `/mcp` on the API host). A saved login is only sent to the API host or the issuer's host; use `DEEL_TOKEN` or `--token-stdin` for another |
 | `DEEL_LOG`          | `off` to disable local logging                              |
 | `DEEL_LOG_BODIES`   | `1` to include response bodies in the local log (off by default) |
 | `DEEL_LOG_DIR`      | Override the log directory                                  |

@@ -26,7 +26,7 @@ const TRUNCATION_NOTICE = /^\[Response truncated: the action returned (\d+) byte
 const TRANSIENT_CODES = new Set(["UPSTREAM_UNAVAILABLE", "UPSTREAM_TIMEOUT", "UPSTREAM_SERVER_ERROR"]);
 const NO_RESPONSE_CODES = new Set(["UPSTREAM_TIMEOUT", "UPSTREAM_UNAVAILABLE"]);
 
-export type JsonSchema = { type?: string; properties?: Record<string, JsonSchema>; required?: string[]; enum?: unknown[]; [key: string]: unknown };
+export type JsonSchema = { type?: string | string[]; properties?: Record<string, JsonSchema>; required?: string[]; enum?: unknown[]; [key: string]: unknown };
 
 export type ActionSummary = { name: string; title?: string; description?: string; method?: string; scopes?: string[] };
 export type ActionDetail = ActionSummary & { run_with?: string; input_schema?: JsonSchema };
@@ -152,12 +152,14 @@ function mapFailure(failure: ToolFailure, context: FailureContext): CliError {
     case "WRONG_ACTION_KIND":
       return new CliError("app.wrong_kind", message);
   }
-  if (context.write && (code === undefined || NO_RESPONSE_CODES.has(code) || failure.statusCode >= 500)) {
-    const sentence = /[.!?]$/.test(message) ? message : `${message}.`;
-    return new CliError("app.outcome_unknown", `${sentence} The action may or may not have run.`, "Check the result with a read action before running it again.");
-  }
+  if (context.write && ((code !== undefined && NO_RESPONSE_CODES.has(code)) || failure.statusCode >= 500)) return outcomeUnknown(message);
   const suffix = code ? code.toLowerCase().replace(/[^a-z0-9_]/g, "_") : `http_${failure.statusCode}`;
   return new CliError(`app.${suffix}`, message);
+}
+
+function outcomeUnknown(message: string): CliError {
+  const sentence = /[.!?]$/.test(message) ? message : `${message}.`;
+  return new CliError("app.outcome_unknown", `${sentence} The action may or may not have run.`, "Check the result with a read action before running it again.");
 }
 
 function failed(result: ToolResult, context: FailureContext): never {
@@ -174,6 +176,30 @@ function jsonText(result: ToolResult): unknown {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function malformed(result: ToolResult, what: string): CliError {
+  const error = new CliError("mcp.response", `The MCP endpoint sent ${what} in an unexpected shape.`);
+  error.requestId = result.requestId;
+  return error;
+}
+
+function asActionSummary(value: unknown, result: ToolResult): ActionSummary {
+  if (!isRecord(value) || typeof value.name !== "string" || !value.name) throw malformed(result, "an action");
+  return value as ActionSummary;
+}
+
+function asActionDetail(value: unknown, result: ToolResult): ActionDetail {
+  const action = asActionSummary(value, result) as ActionDetail & Record<string, unknown>;
+  const scopes = action.scopes as unknown;
+  if (scopes !== undefined && !(Array.isArray(scopes) && scopes.every((scope) => typeof scope === "string"))) throw malformed(result, "an action");
+  if (action.run_with !== undefined && typeof action.run_with !== "string") throw malformed(result, "an action");
+  if (action.input_schema !== undefined && !isRecord(action.input_schema)) throw malformed(result, "an action");
+  return action;
+}
+
 // ---------------- operations ----------------
 
 export async function searchActions(client: AppClient, query: string, limit?: number): Promise<{ actions: ActionSummary[]; requestId: string }> {
@@ -183,50 +209,68 @@ export async function searchActions(client: AppClient, query: string, limit?: nu
   }
   const result = await client.call(APP_TOOL.search, { query, ...(limit !== undefined ? { limit } : {}) }, { retryable: true });
   if (result.isError) failed(result, {});
-  const payload = jsonText(result) as { actions?: unknown };
-  return { actions: Array.isArray(payload.actions) ? (payload.actions as ActionSummary[]) : [], requestId: result.requestId };
+  const payload = jsonText(result);
+  if (!isRecord(payload) || (payload.actions !== undefined && !Array.isArray(payload.actions))) throw malformed(result, "the action list");
+  return { actions: (payload.actions ?? []).map((item) => asActionSummary(item, result)), requestId: result.requestId };
 }
 
 export async function getAction(client: AppClient, name: string): Promise<{ action: ActionDetail; requestId: string }> {
   const result = await client.call(APP_TOOL.get, { name }, { retryable: true });
   if (result.isError) failed(result, { action: name });
-  return { action: jsonText(result) as ActionDetail, requestId: result.requestId };
+  return { action: asActionDetail(jsonText(result), result), requestId: result.requestId };
 }
 
 // --input for `run`: the whole {path_params, query, body} object.
 export function actionInput(value: unknown): ActionInput {
   if (value === undefined) return {};
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  if (!isRecord(value)) {
     throw new CliError("usage.app_input", "--input must be an object with path_params, query and/or body.", "Try: --input 'path_params={id=123}'");
   }
   const extra = Object.keys(value).filter((key) => !(INPUT_KEYS as readonly string[]).includes(key));
   if (extra.length > 0) {
     throw new CliError("usage.app_input", `Unknown --input key(s): ${extra.join(", ")}. Use path_params, query and body.`, "See the input with 'deel app describe <name>'.");
   }
+  for (const key of ["path_params", "query"] as const) {
+    if (value[key] !== undefined && !isRecord(value[key])) throw new CliError("usage.app_input", `--input ${key} must be an object.`, "Try: --input 'path_params={id=123}'");
+  }
   return value as ActionInput;
 }
 
-// The CLI parses `id=123` as a number; path and query values the schema declares as strings are sent as strings,
-// and numeric strings the schema declares as numbers are sent as numbers. Everything else is left to the server.
-function coerceSection(values: Record<string, unknown> | undefined, schema: JsonSchema | undefined): Record<string, unknown> | undefined {
-  if (!values || typeof values !== "object" || Array.isArray(values)) return values;
-  const coerced: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(values)) {
-    const type = schema?.properties?.[key]?.type;
-    if (type === "string" && (typeof value === "number" || typeof value === "boolean")) coerced[key] = String(value);
-    else if ((type === "integer" || type === "number") && typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value))) coerced[key] = Number(value);
-    else coerced[key] = value;
+const DECIMAL = /^-?\d+(\.\d+)?$/;
+
+// The schema's type, with OpenAPI 3.1's `["integer", "null"]` read as its first non-null entry.
+function typeOf(schema: JsonSchema | undefined): string | undefined {
+  const type: unknown = schema?.type;
+  return Array.isArray(type) ? type.find((item): item is string => typeof item === "string" && item !== "null") : typeof type === "string" ? type : undefined;
+}
+
+// `--input` shorthand arrives as text (so `00123`, `1.10` and ids past 2^53 survive); this types it by the
+// action's schema: text the schema declares a number becomes one when that is exact, through objects and lists.
+// With `stringify`, numbers and booleans the schema declares a string are sent as strings. What the schema doesn't
+// describe is left to the server.
+function coerceValue(value: unknown, schema: JsonSchema | undefined, stringify: boolean): unknown {
+  if (Array.isArray(value)) return value.map((item) => coerceValue(item, isRecord(schema?.items) ? (schema.items as JsonSchema) : undefined, stringify));
+  if (isRecord(value)) {
+    const properties = isRecord(schema?.properties) ? (schema.properties as Record<string, JsonSchema>) : {};
+    return Object.fromEntries(Object.entries(value).map(([key, nested]) => [key, coerceValue(nested, properties[key], stringify)]));
   }
-  return coerced;
+  const type = typeOf(schema);
+  if (stringify && type === "string" && (typeof value === "number" || typeof value === "boolean")) return String(value);
+  if ((type === "number" || type === "integer") && typeof value === "string" && DECIMAL.test(value.trim())) {
+    const number = Number(value);
+    if (type === "number" ? Number.isFinite(number) : Number.isSafeInteger(number)) return number;
+  }
+  return value;
 }
 
 export function coerceInput(input: ActionInput, schema: JsonSchema | undefined): ActionInput {
-  const path = coerceSection(input.path_params, schema?.properties?.path_params);
-  const query = coerceSection(input.query, schema?.properties?.query);
+  const section = (name: "path_params" | "query") => (input[name] === undefined ? undefined : coerceValue(input[name], schema?.properties?.[name], true));
+  const path = section("path_params");
+  const query = section("query");
   return {
-    ...(path !== undefined ? { path_params: path } : {}),
-    ...(query !== undefined ? { query } : {}),
-    ...(input.body !== undefined ? { body: input.body } : {}),
+    ...(path !== undefined ? { path_params: path as Record<string, unknown> } : {}),
+    ...(query !== undefined ? { query: query as Record<string, unknown> } : {}),
+    ...(input.body !== undefined ? { body: coerceValue(input.body, schema?.properties?.body, false) } : {}),
   };
 }
 
@@ -254,15 +298,36 @@ export function runOutcome(result: ToolResult): RunOutcome {
   return { data, requestId: result.requestId };
 }
 
+// Errors that can happen after a write request left the machine: the action may have run all the same.
+const SENT_UNKNOWN = /^(network\.(timeout|error)|http\.5\d\d|mcp\.response)$/;
+// A JSON-RPC internal or server error (-32603, -32000..-32099) may come after the action started; invalid params
+// and an unknown method are answered before it.
+const RPC_SERVER_ERROR = /\(JSON-RPC -(32603|320\d\d)\)$/;
+const sentWithoutAnswer = (error: CliError) => SENT_UNKNOWN.test(error.code) || (error.code === "mcp.rpc" && RPC_SERVER_ERROR.test(error.message));
+
+async function send(client: AppClient, call: RunCall): Promise<ToolResult> {
+  const write = call.tool === APP_TOOL.runWrite;
+  try {
+    return await client.call(call.tool, call.arguments, { retryable: !write });
+  } catch (error) {
+    if (write && error instanceof CliError && sentWithoutAnswer(error)) {
+      const unknown = outcomeUnknown(error.message);
+      unknown.requestId = error.requestId;
+      throw unknown;
+    }
+    throw error;
+  }
+}
+
 export async function runAction(client: AppClient, action: ActionDetail, input: ActionInput): Promise<RunOutcome> {
   let call = runCall(action, input);
   const context = (tool: string): FailureContext => ({ action: action.name, scopes: action.scopes, write: tool === APP_TOOL.runWrite });
-  let result = await client.call(call.tool, call.arguments, { retryable: call.tool === APP_TOOL.runRead });
+  let result = await send(client, call);
   if (result.isError && toolFailure(result).code === "WRONG_ACTION_KIND") {
     // The catalog changed between get_action and the run; the check runs before anything is called, so the
     // other tool is safe to try once.
     call = { ...call, tool: call.tool === APP_TOOL.runRead ? APP_TOOL.runWrite : APP_TOOL.runRead };
-    result = await client.call(call.tool, call.arguments, { retryable: call.tool === APP_TOOL.runRead });
+    result = await send(client, call);
   }
   if (result.isError) failed(result, context(call.tool));
   return runOutcome(result);
@@ -270,14 +335,34 @@ export async function runAction(client: AppClient, action: ActionDetail, input: 
 
 // ---------------- describe --generate-input ----------------
 
+// One schema from `allOf`: the parent's own keywords and every part, with `properties` and `required` combined.
+function mergeAllOf(schema: JsonSchema): JsonSchema {
+  const { allOf, ...own } = schema;
+  const parts = [own as JsonSchema, ...(allOf as unknown[]).filter(isRecord).map((part) => (Array.isArray(part.allOf) ? mergeAllOf(part as JsonSchema) : (part as JsonSchema)))];
+  const merged: JsonSchema = {};
+  for (const { properties, required, ...rest } of parts) {
+    Object.assign(merged, rest);
+    if (isRecord(properties)) {
+      merged.properties = { ...merged.properties };
+      for (const [key, next] of Object.entries(properties as Record<string, JsonSchema>)) {
+        const previous = merged.properties[key];
+        merged.properties[key] = previous && isRecord(next) ? mergeAllOf({ allOf: [previous, next] }) : next;
+      }
+    }
+    if (Array.isArray(required)) merged.required = [...new Set([...(merged.required ?? []), ...required])];
+  }
+  return merged;
+}
+
 function skeletonOf(schema: JsonSchema | undefined): unknown {
-  if (!schema || typeof schema !== "object") return "";
+  if (!isRecord(schema)) return "";
   if (Array.isArray(schema.enum) && schema.enum.length > 0) return schema.enum[0];
-  if (Array.isArray(schema.allOf)) return skeletonOf({ ...(schema.allOf as JsonSchema[]).reduce((merged, part) => ({ ...merged, ...part }), {}) });
-  switch (schema.type) {
+  if (Array.isArray(schema.allOf)) return skeletonOf(mergeAllOf(schema));
+  const properties = isRecord(schema.properties) ? (schema.properties as Record<string, JsonSchema>) : undefined;
+  switch (typeOf(schema) ?? (properties ? "object" : undefined)) {
     case "object": {
       const skeleton: Record<string, unknown> = {};
-      for (const [key, property] of Object.entries(schema.properties ?? {})) skeleton[key] = skeletonOf(property);
+      for (const [key, property] of Object.entries(properties ?? {})) skeleton[key] = skeletonOf(property);
       return skeleton;
     }
     case "array":

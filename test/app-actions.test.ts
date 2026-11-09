@@ -1,5 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { RETRY_MAX_ATTEMPTS } from "../src/core/constants.ts";
 import {
   APP_TOOL,
   actionInput,
@@ -16,7 +17,7 @@ import {
 } from "../src/core/app-actions.ts";
 import type { ActionDetail, AppClient } from "../src/core/app-actions.ts";
 import type { ResolvedToken } from "../src/core/auth.ts";
-import type { CliError } from "../src/core/errors.ts";
+import { CliError } from "../src/core/errors.ts";
 import type { HttpRequest, HttpResponse, Transport } from "../src/core/http.ts";
 import type { ToolResult } from "../src/core/mcp.ts";
 import type { OAuthSource } from "../src/core/oauth.ts";
@@ -135,6 +136,22 @@ test("a login is renewed at most once per call, across an HTTP 401 and an isErro
   assert.equal(renewals, 1);
 });
 
+test("a read retries a transient failure up to the attempt cap, then returns it", async () => {
+  const { appClient, requests, sleeps } = client([1, 2, 3, 4].map(() => content([failure(503, "UPSTREAM_UNAVAILABLE")], true)));
+  assert.equal((await appClient.call(APP_TOOL.search, { query: "x" }, { retryable: true })).isError, true);
+  assert.equal(requests.length, RETRY_MAX_ATTEMPTS);
+  assert.equal(sleeps.length, RETRY_MAX_ATTEMPTS - 1);
+});
+
+test("a login the client can't renew leaves the AUTHENTICATION_REQUIRED failure as the answer", async () => {
+  let renewals = 0;
+  const { appClient, requests } = client([content([failure(401, "AUTHENTICATION_REQUIRED")], true)], { renew: async () => (renewals++, false) });
+  const result = await appClient.call(APP_TOOL.search, { query: "x" }, { retryable: true });
+  assert.equal(result.isError, true);
+  assert.equal(renewals, 1);
+  assert.equal(requests.length, 1);
+});
+
 // ---------------- errors ----------------
 
 test("the server's error codes map to CLI errors with a next step", () => {
@@ -173,6 +190,8 @@ test("a write that got no answer has an unknown outcome", () => {
     assert.match(error.next ?? "", /read action/);
   }
   assert.equal(appError({ statusCode: 400, code: "UPSTREAM_CLIENT_ERROR", message: "bad" }, "r", { write: true }).code, "app.upstream_client_error");
+  // A 4xx without a code is a definitive rejection, not an unknown outcome.
+  for (const statusCode of [400, 404, 422]) assert.equal(appError({ statusCode, message: "no" }, "r", { write: true }).code, `app.http_${statusCode}`);
   assert.equal(appError({ statusCode: 504, code: "UPSTREAM_TIMEOUT", message: "The action timed out" }, "r", { write: true }).message, "The action timed out. The action may or may not have run.");
   assert.equal(appError({ statusCode: 504, code: "UPSTREAM_TIMEOUT", message: "No answer." }, "r", { write: true }).message, "No answer. The action may or may not have run.");
 });
@@ -199,6 +218,13 @@ test("search maps an isError result and rejects a result that isn't JSON", async
   assert.deepEqual((await searchActions(scripted(ok("{}")).client, "x")).actions, []);
 });
 
+test("a result in an unexpected shape is mcp.response, with the request id", async () => {
+  const bad = (text: string, run: (client: AppClient) => Promise<unknown>) => assert.rejects(() => run(scripted(ok(text)).client), (error: CliError) => error.code === "mcp.response" && error.requestId === "req", text);
+  for (const text of ["[]", "7", '{"actions":"x"}', '{"actions":[1]}', '{"actions":[{"title":"no name"}]}']) await bad(text, (c) => searchActions(c, "x"));
+  for (const text of ["[]", '"x"', "{}", '{"name":"a","scopes":"x"}', '{"name":"a","scopes":[1]}', '{"name":"a","run_with":1}', '{"name":"a","input_schema":[]}']) await bad(text, (c) => getAction(c, "a"));
+  assert.deepEqual((await searchActions(scripted(ok("{}")).client, "x")).actions, []);
+});
+
 test("getAction returns the action and names it in errors", async () => {
   assert.deepEqual((await getAction(scripted(ok(JSON.stringify(LIST))).client, "list_widgets")).action, LIST);
   await assert.rejects(() => getAction(scripted(err(404, "ACTION_NOT_FOUND")).client, "nope"), (error: CliError) => error.code === "app.action_not_found" && /"nope"/.test(error.message));
@@ -210,6 +236,7 @@ test("--input must be an object of path_params, query and body", () => {
   assert.deepEqual(actionInput(undefined), {});
   assert.deepEqual(actionInput({ path_params: { a: 1 }, body: [] }), { path_params: { a: 1 }, body: [] });
   for (const bad of ["x", [1], null]) assert.throws(() => actionInput(bad), (error: CliError) => error.code === "usage.app_input");
+  for (const bad of [{ path_params: "x" }, { query: [1] }, { path_params: null }]) assert.throws(() => actionInput(bad), (error: CliError) => error.code === "usage.app_input" && /must be an object/.test(error.message));
   assert.throws(() => actionInput({ widget_id: 1 }), (error: CliError) => error.code === "usage.app_input" && /widget_id/.test(error.message));
 });
 
@@ -218,6 +245,33 @@ test("path and query values follow the schema's string or number types; the body
   assert.deepEqual(coerceInput(input, APPROVE.input_schema), { path_params: { widget_id: "123" }, query: { limit: 5, note: "true", other: 7 }, body: { reason: 1 } });
   assert.deepEqual(coerceInput({ query: { limit: "many" } }, APPROVE.input_schema), { query: { limit: "many" } });
   assert.deepEqual(coerceInput({}, undefined), {});
+});
+
+test("shorthand text is typed by the schema through the body, objects and lists; JSON values are left as they are", () => {
+  const schema: ActionDetail["input_schema"] = {
+    type: "object",
+    properties: {
+      path_params: { type: "object", properties: { version: { type: "string" } } },
+      body: { type: "object", properties: { price: { type: "number" }, qty: { type: "integer" }, ids: { type: "array", items: { type: "integer" } }, nested: { type: "object", properties: { rate: { type: ["number", "null"] } } }, note: { type: "string" } } },
+    },
+  };
+  assert.deepEqual(
+    coerceInput({ path_params: { version: "1.10" }, body: { price: "1.50", qty: "3", ids: ["1", "2"], nested: { rate: "0.5" }, note: "007", other: "9" } }, schema),
+    { path_params: { version: "1.10" }, body: { price: 1.5, qty: 3, ids: [1, 2], nested: { rate: 0.5 }, note: "007", other: "9" } },
+  );
+  assert.deepEqual(coerceInput({ body: { qty: 3, note: 5 } }, schema), { body: { qty: 3, note: 5 } });
+});
+
+test("a number-typed field only takes decimal text: hex and exponent forms stay text", () => {
+  const schema: ActionDetail["input_schema"] = { type: "object", properties: { query: { type: "object", properties: { a: { type: "integer" }, b: { type: "number" } } } } };
+  assert.deepEqual(coerceInput({ query: { a: "0x10", b: "1e3" } }, schema), { query: { a: "0x10", b: "1e3" } });
+});
+
+test("ids a number can't hold stay text, and integers only coerce when exact", () => {
+  assert.deepEqual(coerceInput({ path_params: { code: "00123" }, query: { id: "12345678901234567890", n: "007", ratio: "1.50" } }, { type: "object", properties: { path_params: { type: "object", properties: { code: { type: "string" } } }, query: { type: "object", properties: { id: { type: "integer" }, n: { type: "integer" }, ratio: { type: "number" } } } } }), {
+    path_params: { code: "00123" },
+    query: { id: "12345678901234567890", n: 7, ratio: 1.5 },
+  });
 });
 
 test("run uses the tool get_action names in run_with, and a write when it names none", () => {
@@ -248,6 +302,28 @@ test("a failed run carries the action's scopes into the next step", async () => 
   await assert.rejects(() => runAction(scripted(err(504, "UPSTREAM_TIMEOUT")).client, APPROVE, {}), (error: CliError) => error.code === "app.outcome_unknown");
 });
 
+test("a write that fails after it was sent has an unknown outcome; a read, and a failure before it ran, keep their own error", async () => {
+  const failing = (error: CliError): AppClient => ({ call: async () => { throw error; } });
+  for (const code of ["network.timeout", "network.error", "http.502", "http.504", "mcp.response"]) {
+    const sent = new CliError(code, "Connection reset");
+    sent.requestId = "r9";
+    await assert.rejects(() => runAction(failing(sent), APPROVE, {}), (error: CliError) => error.code === "app.outcome_unknown" && error.requestId === "r9" && /may or may not have run/.test(error.message), code);
+    await assert.rejects(() => runAction(failing(sent), LIST, {}), (error: CliError) => error.code === code, code);
+  }
+  const rpc = (code: number) => new CliError("mcp.rpc", `boom (JSON-RPC ${code})`);
+  for (const code of [-32603, -32000, -32099]) await assert.rejects(() => runAction(failing(rpc(code)), APPROVE, {}), (error: CliError) => error.code === "app.outcome_unknown", String(code));
+  for (const code of [-32602, -32601]) await assert.rejects(() => runAction(failing(rpc(code)), APPROVE, {}), (error: CliError) => error.code === "mcp.rpc", String(code));
+  for (const code of ["auth.expired", "http.400", "http.429", "network.tls", "app.unavailable"]) {
+    await assert.rejects(() => runAction(failing(new CliError(code, "x")), APPROVE, {}), (error: CliError) => error.code === code, code);
+  }
+});
+
+test("the retry with the other tool is also checked for an unknown outcome", async () => {
+  let calls = 0;
+  const flaky: AppClient = { call: async () => (++calls === 1 ? err(400, "WRONG_ACTION_KIND") : Promise.reject(new CliError("network.timeout", "timed out"))) };
+  await assert.rejects(() => runAction(flaky, LIST, {}), (error: CliError) => error.code === "app.outcome_unknown");
+});
+
 test("a run returns the body as JSON when it parses, as text otherwise", () => {
   assert.deepEqual(runOutcome(ok('{"id":"w1"}')), { data: { id: "w1" }, requestId: "req" });
   assert.deepEqual(runOutcome(ok("plain text")), { data: "plain text", requestId: "req" });
@@ -271,4 +347,30 @@ test("the input skeleton follows the schema", () => {
   assert.deepEqual(inputSkeleton({ name: "x" }), {});
   const combined: ActionDetail = { name: "x", input_schema: { type: "object", properties: { path_params: { type: "object", properties: { id: { allOf: [{ type: "string" }, { pattern: "x" }] }, tags: { type: "array" }, n: { type: "number" } } } } } };
   assert.deepEqual(inputSkeleton(combined), { path_params: { id: "", tags: [], n: 0 } });
+});
+
+test("allOf parts are merged, with the parent's own keywords, not replaced by the last part", () => {
+  const schema: ActionDetail["input_schema"] = {
+    type: "object",
+    properties: {
+      body: {
+        type: "object",
+        properties: { own: { type: "boolean" } },
+        allOf: [
+          { type: "object", properties: { a: { type: "string" } }, required: ["a"] },
+          { properties: { b: { type: "integer" } }, required: ["b"] },
+          { allOf: [{ properties: { c: { enum: ["x", "y"] } } }] },
+        ],
+      },
+    },
+  };
+  assert.deepEqual(inputSkeleton({ name: "x", input_schema: schema }), { body: { own: false, a: "", b: 0, c: "x" } });
+  assert.deepEqual(inputSkeleton({ name: "x", input_schema: { allOf: [{ properties: { a: { type: "string" } } }, { properties: { b: { type: "string" } } }] } }), { a: "", b: "" });
+  assert.deepEqual(inputSkeleton({ name: "x", input_schema: { type: "object", properties: "oops" as never } }), {});
+  // The same property in two parts is merged too, and a nullable type list reads as its non-null type.
+  assert.deepEqual(
+    inputSkeleton({ name: "x", input_schema: { allOf: [{ properties: { a: { type: "object", properties: { x: { type: "string" } } } } }, { properties: { a: { properties: { y: { type: "integer" } } } } }] } }),
+    { a: { x: "", y: 0 } },
+  );
+  assert.deepEqual(inputSkeleton({ name: "x", input_schema: { type: ["object", "null"], properties: { n: { type: ["null", "integer"] } } } }), { n: 0 });
 });

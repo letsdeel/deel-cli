@@ -6,6 +6,13 @@ export const HTTP_TIMEOUT_MS = 30_000;
 export const RETRY_MAX_ATTEMPTS = 3;
 export const RETRY_BASE_DELAY_MS = 200;
 
+// --- Process exit ---
+// How long a process with nothing left to write may stay up before it is forced to exit.
+export const FORCED_EXIT_MS = 5_000;
+
+// --- MCP ---
+export const MCP_ACCEPT = "application/json, text/event-stream";
+
 // --- Local logging ---
 export const LOG_MAX_BYTES_DEFAULT = 10 * 1024 * 1024;
 export const LOG_MAX_FILES_DEFAULT = 5;

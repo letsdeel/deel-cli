@@ -3,10 +3,8 @@
 // and a JSON text payload; this module returns it as data and leaves its meaning to the caller.
 
 import { CliError } from "./errors.ts";
-import { HEADER } from "./constants.ts";
+import { HEADER, MCP_ACCEPT } from "./constants.ts";
 import type { Transport } from "./http.ts";
-
-export const MCP_ACCEPT = "application/json, text/event-stream";
 
 export type ToolResult = {
   isError: boolean;
@@ -53,8 +51,8 @@ export function parseRpcBody(text: string, contentType: string | undefined, id: 
     return messages.find((message) => message.id === id) ?? null;
   }
   try {
-    const message = JSON.parse(text) as RpcMessage;
-    return message && typeof message === "object" ? message : null;
+    const message: unknown = JSON.parse(text);
+    return message && typeof message === "object" && !Array.isArray(message) ? (message as RpcMessage) : null;
   } catch {
     return null;
   }
@@ -77,6 +75,8 @@ export async function callTool(opts: CallToolOpts): Promise<ToolResult> {
       },
       body: JSON.stringify({ jsonrpc: "2.0", id, method: "tools/call", params: { name: opts.name, arguments: opts.args } }),
       retryable: opts.retryable,
+      // The reply carries the action's output as a JSON string, so the log's key masking can't see into it.
+      omitBodyFromLog: true,
       meta: { command: opts.command ?? "mcp", tool: opts.name },
     });
 
@@ -101,8 +101,15 @@ export async function callTool(opts: CallToolOpts): Promise<ToolResult> {
     throw withRequestId(new CliError("mcp.rpc", `${text} (JSON-RPC ${String(message.error.code ?? "error")})`), opts.requestId);
   }
 
-  const result = (message.result ?? {}) as { isError?: unknown; content?: unknown };
-  const content = Array.isArray(result.content) ? result.content : [];
+  // A gateway's own 200 (`{}`, a plain message) is not a tool result, and must not read as an empty success.
+  if (!message.result || typeof message.result !== "object" || Array.isArray(message.result)) {
+    throw withRequestId(new CliError("mcp.response", "The MCP endpoint sent a response without a tool result."), opts.requestId);
+  }
+  const result = message.result as { isError?: unknown; content?: unknown };
+  if (!Array.isArray(result.content)) {
+    throw withRequestId(new CliError("mcp.response", "The MCP endpoint sent a tool result without content."), opts.requestId);
+  }
+  const content = result.content;
   const texts = content
     .filter((item): item is { type: string; text: string } => Boolean(item) && (item as { type?: unknown }).type === "text" && typeof (item as { text?: unknown }).text === "string")
     .map((item) => item.text);

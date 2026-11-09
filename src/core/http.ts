@@ -17,6 +17,8 @@ export type HttpRequest = {
   timeoutMs?: number;
   retryable?: boolean;
   meta?: Record<string, unknown>; // extra fields for logging (command, idempotency key, ...)
+  // Never log the response body, not even under --log-bodies: it carries data under keys the log can't mask.
+  omitBodyFromLog?: boolean;
 };
 
 export type HttpResponse = {
@@ -150,6 +152,7 @@ export function withLogging(logger: Logger, clock: () => number): Middleware {
     const startedAt = clock();
     const response = await next(request);
     const withBodies = bodyLoggingEnabled();
+    const logBody = withBodies && !request.omitBodyFromLog;
     const entry: Record<string, unknown> = {
       kind: "request",
       ...(request.meta ?? {}),
@@ -160,7 +163,7 @@ export function withLogging(logger: Logger, clock: () => number): Middleware {
       duration_ms: clock() - startedAt,
       headers: redactHeaders(request.headers),
     };
-    if (withBodies) entry.response = response.json;
+    if (logBody) entry.response = response.json;
     logger(entry);
     return response;
   };

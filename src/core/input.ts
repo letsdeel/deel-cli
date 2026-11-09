@@ -9,14 +9,16 @@ import { CliError } from "./errors.ts";
 
 export type ParsedInput = unknown;
 
-export function parseInput(raw: string, bodyProps: CliParam[]): ParsedInput {
+export type ParseOpts = { exactScalars?: boolean };
+
+export function parseInput(raw: string, bodyProps: CliParam[], opts: ParseOpts = {}): ParsedInput {
   const value = readRawValue(raw);
   const trimmed = value.trimStart();
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
     return coerceTopLevel(parseJson(value), bodyProps, false);
   }
   if (value.includes("=")) {
-    return coerceTopLevel(parseShorthandObject(value), bodyProps, true);
+    return coerceTopLevel(parseShorthandObject(value, Boolean(opts.exactScalars)), bodyProps, true);
   }
   throw new CliError(
     "input.unrecognized",
@@ -78,7 +80,7 @@ function unescape(text: string): string {
   return text.replace(/\\(.)/g, "$1");
 }
 
-function parseShorthandObject(text: string): Record<string, unknown> {
+function parseShorthandObject(text: string, exact: boolean): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   for (const pair of splitTopLevel(text, ",")) {
     if (pair.trim() === "") continue;
@@ -87,7 +89,7 @@ function parseShorthandObject(text: string): Record<string, unknown> {
       throw new CliError("input.shorthand", `Malformed shorthand segment (expected key=value): "${pair}"`);
     }
     const key = unescape(pair.slice(0, equalsIndex).trim());
-    result[key] = parseValue(pair.slice(equalsIndex + 1));
+    result[key] = parseValue(pair.slice(equalsIndex + 1), exact);
   }
   return result;
 }
@@ -107,25 +109,26 @@ function firstTopLevelEquals(text: string): number {
   return -1;
 }
 
-function parseValue(raw: string): unknown {
+function parseValue(raw: string, exact: boolean): unknown {
   const value = raw.trim();
-  if (value.startsWith("{") && value.endsWith("}")) return parseShorthandObject(value.slice(1, -1));
+  if (value.startsWith("{") && value.endsWith("}")) return parseShorthandObject(value.slice(1, -1), exact);
   if (value.startsWith("[") && value.endsWith("]")) {
     return splitTopLevel(value.slice(1, -1), ",")
       .filter((item) => item.trim() !== "")
-      .map((item) => parseValue(item));
+      .map((item) => parseValue(item, exact));
   }
   // Space-separated scalar list (e.g. tags=a b c) — spaces not inside braces/brackets.
   const parts = splitTopLevel(value, " ").filter((part) => part.trim() !== "");
-  if (parts.length > 1) return parts.map((part) => parseScalar(unescape(part.trim())));
-  return parseScalar(unescape(value));
+  if (parts.length > 1) return parts.map((part) => parseScalar(unescape(part.trim()), exact));
+  return parseScalar(unescape(value), exact);
 }
 
-// Heuristic scalar coercion for nested values (top-level is re-coerced against the schema).
-function parseScalar(text: string): unknown {
+// Heuristic scalar coercion for nested values (top-level is re-coerced against the schema). With `exact`, numbers
+// stay text (`00123`, `1.10`, ids past 2^53 would not survive a round trip) for the caller to type by its schema.
+function parseScalar(text: string, exact: boolean): unknown {
   if (text === "true") return true;
   if (text === "false") return false;
-  if (text !== "" && !Number.isNaN(Number(text)) && /^-?\d+(\.\d+)?$/.test(text)) return Number(text);
+  if (!exact && text !== "" && !Number.isNaN(Number(text)) && /^-?\d+(\.\d+)?$/.test(text)) return Number(text);
   return text;
 }
 

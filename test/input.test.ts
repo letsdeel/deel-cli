@@ -72,3 +72,12 @@ test("a JSON string \"null\" on a nullable field stays text; only shorthand maps
   assert.deepEqual(parseInput('{"note":"null"}', props), { note: "null" });
   assert.deepEqual(parseInput("note=null", props), { note: null });
 });
+
+test("exact shorthand keeps every number as text, nested and in lists; booleans are still parsed", () => {
+  const exact = { exactScalars: true };
+  assert.deepEqual(parseInput("path_params={code=00123,id=12345678901234567890},query={v=1.10,n=-0,on=true,ids=[1,2],tags=3 4}", [], exact), {
+    path_params: { code: "00123", id: "12345678901234567890" },
+    query: { v: "1.10", n: "-0", on: true, ids: ["1", "2"], tags: ["3", "4"] },
+  });
+  assert.deepEqual(parseInput("a={n=5}", []), { a: { n: 5 } }); // the default is unchanged
+});

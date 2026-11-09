@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { MCP_ACCEPT, callTool, parseRpcBody, toolFailure } from "../src/core/mcp.ts";
+import { MCP_ACCEPT } from "../src/core/constants.ts";
+import { callTool, parseRpcBody, toolFailure } from "../src/core/mcp.ts";
 import type { CliError } from "../src/core/errors.ts";
 import type { HttpRequest, HttpResponse, Transport } from "../src/core/http.ts";
 
@@ -84,6 +85,23 @@ test("another HTTP status is http.<status>", async () => {
 test("a body that is not JSON-RPC is mcp.response", async () => {
   const { transport } = recording(reply(200, "<html></html>", "text/html"));
   await assert.rejects(() => call(transport), (error: CliError) => error.code === "mcp.response");
+});
+
+test("a 200 reply with no tool result is mcp.response, not an empty success", async () => {
+  for (const body of [{}, [], { message: "Service Unavailable" }, { jsonrpc: "2.0", id: 1 }, { jsonrpc: "2.0", id: 1, result: "ok" }, { jsonrpc: "2.0", id: 1, result: [] }, { jsonrpc: "2.0", id: 1, result: {} }, { jsonrpc: "2.0", id: 1, result: { content: "x" } }]) {
+    const { transport } = recording(reply(200, body));
+    await assert.rejects(() => call(transport), (error: CliError) => error.code === "mcp.response" && error.requestId === "req-1", JSON.stringify(body));
+  }
+});
+
+test("parseRpcBody rejects a JSON array", () => {
+  assert.equal(parseRpcBody("[]", "application/json", 1), null);
+});
+
+test("the request keeps the reply out of the local log", async () => {
+  const { transport, requests } = recording(reply(200, result(["ok"])));
+  await call(transport);
+  assert.equal(requests[0].omitBodyFromLog, true);
 });
 
 test("an unknown tool means app actions are off on the server", async () => {

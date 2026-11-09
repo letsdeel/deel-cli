@@ -3,7 +3,7 @@
 // which makes output capturable in tests and TTY handling consistent.
 
 import { readFileSync } from "node:fs";
-import { AGENT_ENV_SIGNALS } from "./constants.ts";
+import { AGENT_ENV_SIGNALS, FORCED_EXIT_MS } from "./constants.ts";
 
 export type IOStreams = {
   out(text: string): void;
@@ -29,9 +29,6 @@ export function realIO(): IOStreams {
     interactive: isTTY && !isAgentEnv(env),
   };
 }
-
-// How long a process with nothing left to write may stay up before it is forced to exit.
-export const FORCED_EXIT_MS = 5_000;
 
 export type ExitOpts = {
   streams?: Array<Pick<NodeJS.WriteStream, "write">>;

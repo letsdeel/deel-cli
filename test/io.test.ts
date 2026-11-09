@@ -1,8 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { FORCED_EXIT_MS, exitAfterFlush } from "../src/core/io.ts";
+import { FORCED_EXIT_MS } from "../src/core/constants.ts";
+import { exitAfterFlush } from "../src/core/io.ts";
 
 const IO_MODULE = fileURLToPath(new URL("../src/core/io.ts", import.meta.url));
 
@@ -39,11 +40,19 @@ test("exitAfterFlush with no streams schedules the forced exit at once", () => {
   assert.deepEqual(exits, [0]);
 });
 
-test("a large output piped to a slow reader arrives whole", () => {
+test("a large output nobody is reading yet still arrives whole", { timeout: 30_000 }, async () => {
   const size = 300_000; // well past the 64 KB a pipe holds
-  const script = `import { exitAfterFlush } from ${JSON.stringify(IO_MODULE)}; process.stdout.write("x".repeat(${size})); exitAfterFlush(0);`;
-  const reader = `import sys, time; time.sleep(0.3); print(len(sys.stdin.read()))`;
-  const result = spawnSync("sh", ["-c", `"${process.execPath}" --input-type=module -e '${script}' | python3 -c '${reader}'`], { encoding: "utf8" });
-  assert.equal(result.status, 0, result.stderr);
-  assert.equal(result.stdout.trim(), String(size));
+  // The child queues its output, then says so on stderr; only then does the parent start reading stdout.
+  const script = `import { exitAfterFlush } from ${JSON.stringify(IO_MODULE)}; process.stdout.write("x".repeat(${size})); process.stderr.write("queued"); exitAfterFlush(0);`;
+  const child = spawn(process.execPath, ["--input-type=module", "-e", script], { stdio: ["ignore", "pipe", "pipe"] });
+  let received = 0;
+  let reading = false;
+  child.stderr.on("data", () => {
+    if (reading) return;
+    reading = true;
+    child.stdout.on("data", (chunk: Buffer) => (received += chunk.length));
+  });
+  const code = await new Promise((resolve) => child.on("close", resolve));
+  assert.equal(code, 0);
+  assert.equal(received, size);
 });
