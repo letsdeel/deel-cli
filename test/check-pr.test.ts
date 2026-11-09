@@ -114,3 +114,11 @@ test("bot PRs skip the body checks entirely", () => {
 test("CRLF bodies are normalised before matching", () => {
   assert.deepEqual(validate(pr({ body: GOOD_BODY.replace(/\n/g, "\r\n") })).errors, []);
 });
+
+test("the public API sync PR may change only the generated commands, the command map and the version, even from a bot", () => {
+  const sync = (files: string[]) => validate(pr({ head: "bot/public-api-sync", author: "deel-committer[bot]", files }));
+  assert.deepEqual(sync(["src/public-api/manifest.json", "src/public-api/commands.json", "package.json", "src/version.ts"]).errors, []);
+  assert.match(sync(["src/public-api/manifest.json", "src/commands.map.ts"]).errors.join(), /sync PR may only change .*; it also changes src\/commands\.map\.ts/);
+  // Any other branch is not held to the list.
+  assert.deepEqual(validate(pr({ head: "feature", files: ["src/commands.map.ts", "test/x.test.ts"] })).errors, []);
+});

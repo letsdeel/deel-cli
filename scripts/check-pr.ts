@@ -10,7 +10,7 @@
 // Usage (local pre-flight):
 //   node scripts/check-pr.ts --title "Add ..." --body-file /tmp/body.md --labels bug,ai-assisted \
 //                            --files <(git diff --name-only origin/dev...HEAD)
-// Usage (CI): PR_TITLE, PR_BODY, PR_LABELS (JSON array or comma list), PR_AUTHOR, PR_IS_FORK, PR_BASE
+// Usage (CI): PR_TITLE, PR_BODY, PR_LABELS (JSON array or comma list), PR_AUTHOR, PR_IS_FORK, PR_BASE, PR_HEAD
 //             env vars, plus --files <path> with one changed file per line.
 import { readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
@@ -22,6 +22,7 @@ export type PrInput = {
   author: string;
   isFork: boolean;
   base: string;
+  head?: string; // the PR's branch
   files: string[];
 };
 
@@ -33,6 +34,12 @@ export type PrResult = {
 
 export const TYPE_LABELS = ["bug", "enhancement", "refactor", "documentation", "chore"] as const;
 export const GENERATED_MANIFEST = "src/manifest.generated.ts";
+// The public API sync PR (deel-cli-release keeps one open on this branch) may change only the generated
+// commands, the command map and the version; the hand-picked files and everything else are off limits.
+export const SYNC_BRANCH = "bot/public-api-sync";
+export const SYNC_FILES = new Set([
+  "src/public-api/manifest.json", "src/public-api/commands.json", "package.json", "package-lock.json", "src/version.ts", "scripts/doctor-hashes.json",
+]);
 
 const TEST_FILE = /(^|\/)test\/|\.test\.|\.spec\./;
 const HOW_I_TESTED = /^\s*(?:\*\*)?\s*(?:#{2,6}\s*)?How I Tested\s*:?\s*(?:\*\*)?\s*:?\s*(.*)$/im;
@@ -82,6 +89,12 @@ function howITested(testingSection: string): string {
 export function validate(pr: PrInput): PrResult {
   const result: PrResult = { errors: [], warnings: [], notices: [] };
   const who = pr.isFork ? "fork" : "Deel branch";
+
+  // Before the bot skip: the sync PR is opened by a bot.
+  if (pr.head === SYNC_BRANCH) {
+    const outside = pr.files.filter((file) => !SYNC_FILES.has(file));
+    if (outside.length) result.errors.push(`the public API sync PR may only change ${[...SYNC_FILES].join(", ")}; it also changes ${outside.join(", ")}`);
+  }
 
   if (/\[bot\]$/.test(pr.author)) {
     result.notices.push(`author ${pr.author} is a bot — PR-body checks skipped`);
@@ -188,6 +201,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     author: arg("--author") ?? env.PR_AUTHOR ?? "",
     isFork: process.argv.includes("--fork") || env.PR_IS_FORK === "true",
     base: arg("--base") ?? env.PR_BASE ?? "dev",
+    head: arg("--head") ?? env.PR_HEAD,
     files: readLines(arg("--files"), env.PR_FILES),
   };
 

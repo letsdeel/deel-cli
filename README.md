@@ -379,6 +379,7 @@ scripts/
   install-rcodesign.sh     # fetch the pinned rcodesign used for signing on Linux
   pack-npm.ts              # assemble the npm launcher + platform packages from dist/
   check-manifest.ts        # assert manifest ↔ command map consistency
+  check-public-api.ts      # keep public API data public: manifest allowlist, map ⊆ manifest, no definitions URL, no id-token
   check-lockfile.ts        # assert package-lock.json carries every bun platform binary
   check-version.ts         # assert package.json ↔ src/version.ts, clean semver
   check-macho-signature.ts # verify a macOS binary's embedded code signature (any OS)
