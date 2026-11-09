@@ -86,7 +86,8 @@ export function printFormsHelp(descriptors: Descriptor[]): void {
   const cmd = descriptors[0].command.join(" ");
   out(`\n${cmd} — the flags pick the endpoint:\n\n`);
   for (const d of descriptors) out(`  ${usageOf(d)}\n      ${d.method} ${d.path}${d.summary ? `  — ${d.summary}` : ""}\n`);
-  out(`\nHelp:  add --help to one of the lines above\n\n`);
+  const example = [cmd, ...descriptors[0].form!.positionals.map((p) => p.label.toUpperCase()), "--help"].join(" ");
+  out(`\nHelp:  type one of the lines above with your values in place of <…>, then --help (e.g. deel ${example})\n\n`);
 }
 
 // The exact command line a caller should type — shared by the human --help USAGE
@@ -347,7 +348,15 @@ export function printRootHelp(root: CommandDef, staticNames: Set<string>, at: De
       out(`  ${(index === 0 ? section : "").padEnd(sectionWidth)}   ${row.name.padEnd(width)}   ${row.description}`.trimEnd() + "\n");
     });
   }
-  out(`\nRun deel <command> --help to see its commands. Search every command: deel commands --filter <text>.\n`);
+  const first = sections.flatMap((section) => grouped.get(section)!).find((row) => !staticNames.has(row.name.split(" ")[0]));
+  out(`\nAdd --help to a command to see its commands${first ? ` (e.g. ${exampleLine([], first.name)})` : ""}. Search every command: deel commands --filter TEXT.\n`);
+}
+
+// A line a reader can paste: the row's <label>s become LABEL, so a shell doesn't read them as redirections,
+// and its optional [--flags] are left out.
+function exampleLine(path: string[], row: string): string {
+  const tokens = row.replace(/\[[^\]]*\]/g, "").split(/\s+/).filter(Boolean).map((t) => (/^<.+>$/.test(t) ? t.slice(1, -1).toUpperCase() : t));
+  return ["deel", ...path, ...tokens, "--help"].join(" ");
 }
 
 // What the flags that pick an endpoint mean, shown under a group whose lines use them.
@@ -367,7 +376,9 @@ export function printGroupHelp(cmd: CommandDef, path: string[], title: string, a
   out(rowLines(rows));
   const used = Object.keys(PICKING_LEGEND).filter((flag) => rows.some((row) => row.name.includes(`--${flag} `) || row.name.endsWith(`--${flag}`)));
   if (used.length) out(`\nFlags that pick the endpoint:\n${used.map((flag) => `  ${PICKING_LEGEND[flag]}\n`).join("")}`);
-  out(`\nRun deel ${path.join(" ")} <command> --help for ${apiCommands ? "its arguments, flags and request body" : "its flags"}.\n`);
+  const what = apiCommands ? "its arguments, flags and request body" : "its flags";
+  const example = rows[0] ? ` (e.g. ${exampleLine(path, rows[0].name)})` : "";
+  out(`\nFor one line's ${what.replace(/^its /, "")}, type it with your values in place of <…> and add --help${example}.\n`);
 }
 
 // The title of a group's help: a top-level domain's description, else its path.
