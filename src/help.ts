@@ -84,7 +84,8 @@ export function printFormsHelp(descriptors: Descriptor[]): void {
   const cmd = descriptors[0].command.join(" ");
   out(`\n${cmd} — the flags pick the endpoint:\n\n`);
   for (const d of descriptors) out(`  ${usageOf(d)}\n      ${d.method} ${d.path}${d.summary ? `  — ${d.summary}` : ""}\n`);
-  out(`\nHelp:  add --help to one of the lines above\n\n`);
+  const example = [cmd, ...descriptors[0].form!.positionals.map((p) => p.label.toUpperCase()), "--help"].join(" ");
+  out(`\nHelp:  type one of the lines above with your values in place of <…>, then --help (e.g. deel ${example})\n\n`);
 }
 
 // The exact command line a caller should type — shared by the human --help USAGE

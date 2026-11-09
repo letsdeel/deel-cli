@@ -249,10 +249,12 @@ function descriptorFor(positionals: string[], matched: number, argv: string[]): 
   const candidates = descriptorsFor(positionals, matched);
   if (candidates.length === 0) return undefined;
   if (candidates.length === 1) return candidates[0];
-  // Until a selector or scope flag is typed, --help lists every endpoint: the bare command is a name, not a default.
+  // The words alone list every endpoint: the bare command is a name, not a default. Once a picking flag or an
+  // argument is typed, help shows the endpoint that command line would call.
   if (candidates[0].form) {
     const normalized = joinSwitchValues(argv, switchesOf(candidates));
-    return candidates.some((d) => pickingFlags(d.form!).some((flag) => argvMentionsFlag(normalized, flag))) ? matchForm(candidates, normalized) : undefined;
+    const picked = candidates.some((d) => pickingFlags(d.form!).some((flag) => argvMentionsFlag(normalized, flag)));
+    return picked || positionals.length > matched ? matchForm(candidates, normalized) : undefined;
   }
   for (const candidate of candidates) {
     if (candidate.variant && argvEnables(argv, candidate.variant)) return candidate;
