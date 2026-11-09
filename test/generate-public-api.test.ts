@@ -137,6 +137,7 @@ test("without --previous the released names come from the manifest committed nex
   for (const entry of ["scripts", "src", ".claude/skills/deel-cli-extractor", "package.json"]) cpSync(join(ROOT, entry), join(repo, entry), { recursive: true });
   symlinkSync(join(ROOT, "node_modules"), join(repo, "node_modules"));
   cpSync(fixture("widgets-map.json"), join(repo, "src/public-api/commands.json"));
+  writeFileSync(join(repo, "src/public-api/manifest.json"), JSON.stringify({ generator: "scripts/generate-public-api.ts", descriptors: [] }));
   const run = (extra: string[] = []) => {
     const result = spawnSync(process.execPath, ["scripts/generate-public-api.ts", "--from", fixture("widgets.json"), ...extra], { cwd: repo, encoding: "utf8" });
     return { code: result.status, stderr: result.stderr };
