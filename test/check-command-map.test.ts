@@ -27,22 +27,29 @@ test("a command line must parse, with lowercase kebab-case words", () => {
 
 test("every path ID needs an argument, in path order", () => {
   assert.match(failures([entry("GET", "/a/{a_id}/b/{b_id}", "deel things get <b>")]).join(), /path param \{a_id\} of \/a\/\{a_id\}\/b\/\{b_id\} has no argument/);
-  assert.deepEqual(failures([entry("GET", "/a/{a_id}/b/{b_id}", "deel things get <a> <b>")]), []);
-  assert.match(failures([entry("GET", "/a/{a_id}/b/{b_id}", "deel things get <b> <a>")]).join(), /arguments must follow the path order/);
+  assert.deepEqual(failures([entry("GET", "/a/{a_id}/b/{b_id}", "deel things get <a_id> <b_id>")]), []);
+  assert.match(failures([entry("GET", "/a/{a_id}/b/{b_id}", "deel things get <b_id> <a_id>")]).join(), /arguments must follow the path order/);
   assert.match(failures([entry("GET", "/a", "deel things get <thing>")]).join(), /<thing> matches no path param/);
   assert.deepEqual(failures([entry("GET", "/benefits", "deel benefits offerings list --country <country>")]), []);
 });
 
+test("an argument is named after the path param it fills, ignoring case", () => {
+  assert.match(failures([entry("GET", "/a/{contract_id}", "deel things get <contract>")]).join(), /<contract> fills \{contract_id\}, so it is written <contract_id>/);
+  assert.deepEqual(failures([entry("GET", "/a/{roleid}", "deel things get <roleId>")]), []);
+  assert.match(failures([entry("GET", "/a/{contract_id}/b", "deel things b list --contract <contract>"), entry("GET", "/b", "deel things b list")]).join(), /<contract> fills \{contract_id\}/);
+  assert.deepEqual(failures([entry("GET", "/benefits", "deel benefits offerings list --country <country_code>")]), []);
+});
+
 test("a flag that picks an endpoint never takes a global flag's name", () => {
   assert.match(failures([entry("POST", "/shifts/raw", "deel shifts create --raw")]).join(), /--raw is a global flag/);
-  assert.match(failures([entry("GET", "/x/{id}", "deel things get --json <thing>")]).join(), /--json is a global flag/);
+  assert.match(failures([entry("GET", "/x/{id}", "deel things get --json <id>")]).join(), /--json is a global flag/);
 });
 
 test("command lines and endpoints are unique, unless two entries share a collapse key", () => {
-  assert.match(failures([entry("POST", "/a/{id}/stop", "deel things stop <thing>"), entry("POST", "/a/{id}/end", "deel things stop <thing>")]).join(), /same command line as \/a\/\{id\}\/stop/);
-  assert.match(failures([entry("GET", "/a/{id}", "deel things get <thing>"), entry("GET", "/a/{key}", "deel things show <thing>")]).join(), /same endpoint as \/a\/\{id\}/);
+  assert.match(failures([entry("POST", "/a/{id}/stop", "deel things stop <id>"), entry("POST", "/a/{id}/end", "deel things stop <id>")]).join(), /same command line as \/a\/\{id\}\/stop/);
+  assert.match(failures([entry("GET", "/a/{id}", "deel things get <id>"), entry("GET", "/a/{key}", "deel things show <key>")]).join(), /same endpoint as \/a\/\{id\}/);
   assert.deepEqual(failures([entry("GET", "/a", "deel things list"), entry("GET", "/eor/a", "deel things list --worker-type eor")]), []);
-  const collapsed = checkMap([entry("POST", "/a/{id}/stop", "deel things stop <thing>", { collapse: "stop" }), entry("POST", "/b/{id}/stop", "deel things stop <thing>", { collapse: "stop" })]);
+  const collapsed = checkMap([entry("POST", "/a/{id}/stop", "deel things stop <id>", { collapse: "stop" }), entry("POST", "/b/{ref}/stop", "deel things stop <id>", { collapse: "stop" })]);
   assert.deepEqual([collapsed.failures.length, collapsed.warnings.length], [0, 1]);
 });
 
@@ -52,9 +59,9 @@ test("names: the map may not take a hand-picked or static name, and a released c
   assert.match(clash.map((f) => f.message).join(), /"deel jobs list".*clashes with a hand-picked command/);
   assert.match(checkMap([entry("GET", "/auth/x", "deel auth things list")], { reserved }).failures.map((f) => f.message).join(), /shadow the static "deel auth"/);
 
-  const released = [{ command: ["things", "get"], method: "GET", path: "/things/{id}", params: [], form: { positionals: [{ label: "thing", param: "id" }], scopes: [], selectors: [] } }] as unknown as Descriptor[];
-  assert.deepEqual(checkMap([entry("GET", "/things/{id}", "deel things get <thing>")], { released }).failures, []);
-  assert.match(checkMap([entry("GET", "/things/{id}", "deel things show <thing>")], { released }).failures.map((f) => f.message).join(), /released as "deel things get <thing>", the map now says "deel things show <thing>"/);
+  const released = [{ command: ["things", "get"], method: "GET", path: "/things/{id}", params: [], form: { positionals: [{ label: "id", param: "id" }], scopes: [], selectors: [] } }] as unknown as Descriptor[];
+  assert.deepEqual(checkMap([entry("GET", "/things/{id}", "deel things get <id>")], { released }).failures, []);
+  assert.match(checkMap([entry("GET", "/things/{id}", "deel things show <id>")], { released }).failures.map((f) => f.message).join(), /released as "deel things get <id>", the map now says "deel things show <id>"/);
   assert.match(checkMap([entry("GET", "/other", "deel other list")], { released }).failures.map((f) => f.message).join(), /removed from the map/);
 });
 
