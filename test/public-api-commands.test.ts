@@ -365,10 +365,16 @@ test("the wrong number of arguments, an empty one or an unknown flag sends nothi
   }
 });
 
-test("--help lists every endpoint until a selector picks one, then shows that endpoint's help", async () => {
+test("--help on shared words is one page with every endpoint's full help; a selector narrows it to one", async () => {
   const all = await capture(["ships", "get", "--help"], fleet.manifest.descriptors);
   assert.equal(all.code, EXIT.OK);
+  assert.match(all.out, /^ships get — 3 endpoints; the flags pick one$/m);
   for (const line of ["deel ships get <ship>\n", "deel ships get <ship> --worker-type eor\n", "deel ships get <ship> --file-format pdf --as worker\n"]) assert.ok(all.out.includes(line), all.out);
+  // Each endpoint's own section: its usage, arguments and response, with no value typed.
+  assert.equal(all.out.match(/^── \d of 3: /gm)?.length, 3);
+  for (const usage of ["USAGE  deel ships get <ship> [GLOBAL OPTIONS]", "USAGE  deel ships get <ship> --worker-type eor [GLOBAL OPTIONS]"]) assert.ok(all.out.includes(usage), all.out);
+  assert.match(all.out, /^GET \/eor\/fleet\/\{ship_id\}$/m);
+  assert.match(all.out, /^One endpoint only: add its flags before --help \(deel ships get --file-format pdf --as worker --help\)\.$/m);
   const one = await capture(["ships", "get", "--worker-type", "eor", "--help"], fleet.manifest.descriptors);
   assert.match(one.out, /USAGE  deel ships get <ship> --worker-type eor \[GLOBAL OPTIONS\]/);
   const json = JSON.parse((await capture(["ships", "benefits", "list", "--help", "--json"], fleet.manifest.descriptors)).out);
@@ -383,9 +389,6 @@ test("--help after the arguments shows the endpoint that command line calls, the
   assert.match(typed.out, /USAGE  deel ships get <ship> --worker-type eor \[GLOBAL OPTIONS\]/);
   const json = JSON.parse((await capture(["ships", "get", "s1", "--help", "--json"], fleet.manifest.descriptors)).out);
   assert.equal(json.usage, "deel ships get <ship> [GLOBAL OPTIONS]");
-  // The words alone still list every endpoint, with a hint that shows how to pick one.
-  const all = await capture(["ships", "get", "--help"], fleet.manifest.descriptors);
-  assert.match(all.out, /e\.g\. deel ships get SHIP --help/);
 });
 
 test("--generate-input needs the endpoint picked first when several share the words", async () => {
@@ -447,7 +450,7 @@ test("a valued selector without its value, or a short flag, is refused instead o
   assert.equal(bare.sent.length + short.sent.length, 0);
 });
 
-test("--help --json describes a form's arguments, scopes and selectors, and lists the forms until one is picked", async () => {
+test("--help --json describes a form's arguments, scopes and selectors, and gives every form's contract until one is picked", async () => {
   const one = JSON.parse((await capture(["ships", "list", "--help", "--json"], fleet.manifest.descriptors)).out);
   assert.deepEqual([one.arguments, one.scopes, one.selectors], [[], [{ flag: "crew", name: "crew", param: "crew_id", in: "path" }], [{ flag: "worker-type", value: "gp", optional: true }]]);
   assert.ok(!one.params.some((param: { name: string }) => param.name === "crew_id"));
@@ -455,5 +458,7 @@ test("--help --json describes a form's arguments, scopes and selectors, and list
   assert.deepEqual([get.arguments, get.path], [[{ name: "ship", param: "ship_id" }], "/eor/fleet/{ship_id}"]);
   const forms = JSON.parse((await capture(["ships", "get", "--help", "--json"], fleet.manifest.descriptors)).out);
   assert.equal(forms.command, "ships get");
-  assert.deepEqual(forms.forms.map((f: { usage: string }) => f.usage).sort(), ["deel ships get <ship>", "deel ships get <ship> --file-format pdf --as worker", "deel ships get <ship> --worker-type eor"]);
+  assert.deepEqual(forms.forms.map((f: { usage: string }) => f.usage).sort(), ["deel ships get <ship> --file-format pdf --as worker [GLOBAL OPTIONS]", "deel ships get <ship> --worker-type eor [GLOBAL OPTIONS]", "deel ships get <ship> [GLOBAL OPTIONS]"]);
+  // Each form carries its full contract, as a picked one does.
+  for (const form of forms.forms) assert.deepEqual(Object.keys(form).filter((k) => ["arguments", "params", "body", "response", "method", "path"].includes(k)).sort(), ["arguments", "body", "method", "params", "path", "response"]);
 });
