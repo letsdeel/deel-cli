@@ -218,20 +218,21 @@ function buildRoot(): CommandDef {
   });
 }
 
-// The first word after the `matched` command words, skipping a global string flag's value (`--env demo`), the
-// hidden --base-url's included.
-function strayWord(options: string[], matched: number): string | undefined {
-  const takesValue = (token: string | undefined) =>
-    token !== undefined && token.startsWith("--") && !token.includes("=") &&
-    (token === "--base-url" || (commonArgs as Record<string, { type?: string }>)[token.slice(2)]?.type === "string");
-  let words = 0;
-  for (let index = 0; index < options.length; index++) {
-    const token = options[index];
-    if (token.startsWith("-") || takesValue(options[index - 1])) continue;
-    if (words++ === matched) return token;
-  }
-  return undefined;
+// The names of the flags that take a value, as `args` declares them (a switch takes none), the hidden --base-url included.
+function valuedFlags(args: ArgsDef): string[] {
+  return ["base-url", ...Object.entries(args).filter(([, def]) => (def as { type?: string }).type !== "boolean").map(([name]) => name)];
 }
+
+// The words in argv: the tokens that are neither a flag nor the value of one that takes a value (`--env demo`),
+// in order — the command's words, then its arguments. A `--flag=value` carries its own value.
+function wordsOf(argv: string[], valued: string[]): string[] {
+  const takesValue = (token: string | undefined) =>
+    token !== undefined && token.startsWith("--") && !token.includes("=") && valued.some((flag) => acceptsFlag(flag, token.slice(2)));
+  return argv.filter((token, index) => !token.startsWith("-") && !takesValue(argv[index - 1]));
+}
+
+// The first word after the `matched` command words.
+const strayWord = (options: string[], matched: number): string | undefined => wordsOf(options, valuedFlags(commonArgs))[matched];
 
 // Walk the tree by the leading positional tokens to find the target command.
 function resolve(root: CommandDef, argv: string[]): { cmd: CommandDef; parent?: CommandDef; matched: number } {
@@ -268,7 +269,9 @@ function descriptorFor(positionals: string[], matched: number, argv: string[]): 
   if (candidates[0].form) {
     const normalized = joinSwitchValues(argv, switchesOf(candidates));
     const picked = candidates.some((d) => pickingFlags(d.form!).some((flag) => argvMentionsFlag(normalized, flag)));
-    return picked || positionals.length > matched ? matchForm(candidates, normalized) : undefined;
+    // A flag's value (--env demo, --limit 5) is not an argument.
+    const valued = candidates.flatMap((d) => valuedFlags(argsForDescriptor(d)));
+    return picked || wordsOf(normalized, valued).length > matched ? matchForm(candidates, normalized) : undefined;
   }
   for (const candidate of candidates) {
     if (candidate.variant && argvEnables(argv, candidate.variant)) return candidate;
@@ -294,10 +297,7 @@ export async function run(argv: string[]): Promise<number> {
   const hasPositional = options.some((token) => !token.startsWith("-"));
   const isGroup = typeof cmd.run !== "function";
 
-  if (hasPositional && matched === 0) {
-    process.stderr.write(`Unknown command. Run 'deel --help' to see available commands.\n`);
-    return EXIT.ERROR;
-  }
+  if (hasPositional && matched === 0) throw new CliError("usage.command", `Unknown command '${first}'.`, "Run 'deel --help' to see available commands.");
   // A word after a group that names none of its commands (a removed or mistyped one) fails instead of showing the
   // group's help and exiting 0.
   const stray = isGroup ? strayWord(options, matched) : undefined;
@@ -305,9 +305,8 @@ export async function run(argv: string[]): Promise<number> {
     const group = options.filter((token) => !token.startsWith("-")).slice(0, matched).join(" ");
     const subCommands = cmd.subCommands as Record<string, CommandDef> | undefined;
     // The word is a command of the group, so an option between the words stopped the walk.
-    if (subCommands && Object.hasOwn(subCommands, stray)) process.stderr.write(`Options go after the command: write 'deel ${group} ${stray} …' with the options at the end.\n`);
-    else process.stderr.write(`Unknown command 'deel ${group} ${stray}'. Run 'deel ${group} --help' to see its commands.\n`);
-    return EXIT.ERROR;
+    if (subCommands && Object.hasOwn(subCommands, stray)) throw new CliError("usage.command", `Options go after the command: write 'deel ${group} ${stray} …' with the options at the end.`);
+    throw new CliError("usage.command", `Unknown command 'deel ${group} ${stray}'.`, `Run 'deel ${group} --help' to see its commands.`);
   }
 
   const positionals = options.filter((token) => !token.startsWith("-"));
@@ -319,8 +318,7 @@ export async function run(argv: string[]): Promise<number> {
   // --generate-input on a variant group without a variant flag → guide the user.
   if (variantCandidates.length > 1 && !descriptor && argvEnables(options, "generate-input")) {
     const hint = isForms ? `\n${variantCandidates.map((c) => `  ${usageOf(c)}`).join("\n")}` : variantCandidates.map((c) => `--${c.variant}`).join(", ");
-    process.stderr.write(`Specify a variant first: ${hint}\n`);
-    return EXIT.ERROR;
+    throw new CliError("usage.variant", `Specify a variant first: ${hint}`);
   }
 
   // Offline discovery — handled here so citty's required-arg enforcement is bypassed.

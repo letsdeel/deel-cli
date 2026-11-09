@@ -271,6 +271,11 @@ const fleetDefinitions = parseDefinitions(
     ["POST", "/fleet/{ship_id}/reviews", []],
     ["GET", "/fleet/benefits", [{ name: "country_code", in: "query", required: true, schema: { type: "string" } }, { name: "team", in: "query", schema: { type: "string" } }]],
     ["GET", "/gp/crews/{crew_id}/ships", []],
+    ["GET", "/fleet/{ship_id}/logs", [
+      { name: "since", in: "query", required: true, schema: { type: "string" } },
+      { name: "level", in: "query", schema: { type: "string", enum: ["info", "error"] } },
+      { name: "tag", in: "query", schema: { type: "array", items: { type: "string" } } },
+    ]],
   ].map(([method, path, parameters]) => ({
     api: "rest", method, path, version: "2026-01-01", beta_until: null, sunset_at: null,
     operation: { summary: `${method} ${path}`, parameters, ...(method === "POST" ? { requestBody: { content: { "application/json": { schema: { type: "object", properties: { note: { type: "string" } } } } } } } : {}), responses: { "200": { description: "ok" } } },
@@ -287,12 +292,13 @@ const fleet = generate(fleetDefinitions, {
     { method: "POST", path: "/fleet/{ship_id}/reviews", command: "deel ships reviews create <ship>" },
     { method: "GET", path: "/fleet/benefits", command: "deel ships benefits list --country <country>" },
     { method: "GET", path: "/gp/crews/{crew_id}/ships", command: "deel ships list --crew <crew> [--worker-type gp]" },
+    { method: "GET", path: "/fleet/{ship_id}/logs", command: "deel ships logs list <ship>" },
   ],
 });
 
 test("the fleet fixture generates cleanly", () => {
   assert.deepEqual(fleet.errors, []);
-  assert.equal(fleet.manifest.descriptors.length, 7);
+  assert.equal(fleet.manifest.descriptors.length, 8);
 });
 
 test("the bare command calls the endpoint whose path names no worker type, and --worker-type picks the typed one", async () => {
@@ -382,7 +388,7 @@ test("--help after the arguments shows the endpoint that command line calls, the
 });
 
 test("--generate-input needs the endpoint picked first when several share the words", async () => {
-  const group = await capture(["ships", "reviews", "create", "--generate-input"], fleet.manifest.descriptors);
+  const group = await callApi(["ships", "reviews", "create", "--generate-input"], fleet.manifest.descriptors);
   assert.notEqual(group.code, EXIT.OK);
   assert.match(group.err, /Specify a variant first: \n  deel ships reviews create --bulk/);
   const picked = await capture(["ships", "reviews", "create", "--bulk", "--generate-input"], fleet.manifest.descriptors);
@@ -431,6 +437,69 @@ test("a valued selector without its value, or a short flag, is refused instead o
   assert.notEqual(short.code, EXIT.OK);
   assert.match(short.err, /has no flag -x/);
   assert.equal(bare.sent.length + short.sent.length, 0);
+});
+
+test("a flag value that starts with - is taken only as --flag=value, never as a separate token", async () => {
+  const attached = await callApi(["ships", "list", "--crew=-c1"], fleet.manifest.descriptors);
+  assert.equal(attached.code, EXIT.OK, attached.err);
+  assert.equal(attached.sent[0].url.pathname, "/rest/gp/crews/-c1/ships");
+  const lists = fleet.manifest.descriptors.filter((d) => d.command.join(" ") === "ships list");
+  assert.equal(selectForm(lists, ["--crew=-abc"]).path, "/gp/crews/{crew_id}/ships");
+  assert.equal(selectForm(lists, ["--crew", "x", "--worker-type=gp"]).path, "/gp/crews/{crew_id}/ships");
+  const separate = await callApi(["ships", "list", "--crew", "-c1"], fleet.manifest.descriptors);
+  assert.notEqual(separate.code, EXIT.OK);
+  assert.match(separate.err, /--crew needs a value/);
+  const empty = await callApi(["ships", "list", "--crew="], fleet.manifest.descriptors);
+  assert.match(empty.err, /--crew needs a value/);
+  // A selector's value is checked the same way: attached, it is a value, and a wrong one is named as such.
+  const wrong = await callApi(["ships", "get", "s1", "--worker-type=-x"], fleet.manifest.descriptors);
+  assert.match(wrong.err, /has no --worker-type -x\. Valid values: eor\./);
+  assert.equal(attached.sent.length + separate.sent.length + empty.sent.length + wrong.sent.length, 1);
+});
+
+test("an enum, a required and an array flag of a form are checked and sent like any generated command's", async () => {
+  const ok = await callApi(["ships", "logs", "list", "s1", "--since", "d1", "--level", "error", "--tag", "a", "--tag=b"], fleet.manifest.descriptors);
+  assert.equal(ok.code, EXIT.OK, ok.err);
+  assert.equal(ok.sent[0].url.pathname, "/rest/fleet/s1/logs");
+  assert.equal(ok.sent[0].url.searchParams.get("since"), "d1");
+  assert.equal(ok.sent[0].url.searchParams.get("level"), "error");
+  assert.deepEqual(ok.sent[0].url.searchParams.getAll("tag"), ["a", "b"]);
+  const badEnum = await callApi(["ships", "logs", "list", "s1", "--since", "d1", "--level", "bogus"], fleet.manifest.descriptors);
+  assert.notEqual(badEnum.code, EXIT.OK);
+  const missing = await callApi(["ships", "logs", "list", "s1"], fleet.manifest.descriptors);
+  assert.notEqual(missing.code, EXIT.OK);
+  assert.equal(badEnum.sent.length + missing.sent.length, 0);
+});
+
+test("--help counts a flag's value as no argument: the words alone list every endpoint, an ID picks the bare one", async () => {
+  for (const argv of [["--env", "demo"], ["--base-url", "https://example.test/rest"], ["--env=demo"]]) {
+    const all = await capture(["ships", "get", ...argv, "--help"], fleet.manifest.descriptors);
+    assert.match(all.out, /the flags pick the endpoint/, argv.join(" "));
+    const bare = await capture(["ships", "get", "s1", ...argv, "--help"], fleet.manifest.descriptors);
+    assert.match(bare.out, /USAGE  deel ships get <ship> \[GLOBAL OPTIONS\]/, argv.join(" "));
+  }
+  // A form's own valued flag is not an argument either.
+  const logs = await capture(["ships", "logs", "list", "--since", "d1", "--help"], fleet.manifest.descriptors);
+  assert.match(logs.out, /USAGE  deel ships logs list <ship> \[GLOBAL OPTIONS\] --since=<string>/);
+});
+
+test("--help never lists a response field the CLI withholds", async () => {
+  const webhook = thing([{ name: "id", in: "path", type: "string", required: true }], {
+    command: ["hooks", "get"], path: "/hooks/{id}", responseKind: "object",
+    responseFields: [{ name: "id", in: "body", type: "string", required: false }, { name: "signing_key", in: "body", type: "string", required: false, description: "Secret" }],
+  });
+  const human = await capture(["hooks", "get", "--help"], [webhook]);
+  assert.match(human.out, /^ {2}id /m);
+  assert.doesNotMatch(human.out, /signing_key/);
+  const json = JSON.parse((await capture(["hooks", "get", "--help", "--json"], [webhook])).out);
+  assert.deepEqual(json.response.fields.map((field: { name: string }) => field.name), ["id"]);
+});
+
+test("people custom-fields delete takes the field first and the worker as --person, like its siblings", async () => {
+  const committed = await loadGeneratedDescriptors();
+  const { code, err, sent } = await callApi(["people", "custom-fields", "delete", "field-1", "--person", "worker-1"], committed);
+  assert.equal(code, EXIT.OK, err);
+  assert.deepEqual([sent[0].method, sent[0].url.pathname], ["DELETE", "/rest/people/worker-1/custom_fields/field-1"]);
 });
 
 test("--help --json describes a form's arguments, scopes and selectors, and gives every form's contract until one is picked", async () => {

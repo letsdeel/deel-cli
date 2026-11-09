@@ -33,6 +33,14 @@ export function argvFlagValue(argv: string[], flag: string): string | undefined 
   return value === undefined || value === true ? undefined : String(value);
 }
 
+// Whether argv writes the flag's value attached (--flag=value), the one form a value that starts with - can take.
+export function argvAttachesValue(argv: string[], flag: string, value: string): boolean {
+  return argv.some((token) => {
+    const at = token.indexOf("=");
+    return token.startsWith("--") && at > 2 && acceptsFlag(flag, token.slice(2, at)) && token.slice(at + 1) === value;
+  });
+}
+
 // `--bulk true` reads as the switch plus an argument "true"; join such a value onto its switch (--bulk=true).
 export function joinSwitchValues(argv: string[], switches: string[]): string[] {
   const out: string[] = [];

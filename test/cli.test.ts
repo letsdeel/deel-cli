@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { run, unknownFlag } from "../src/cli.ts";
-import { EXIT } from "../src/core/errors.ts";
+import { CliError, EXIT } from "../src/core/errors.ts";
 import { printContract, printContractJson } from "../src/help.ts";
 import type { Descriptor } from "../src/types.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
@@ -10,7 +10,8 @@ import { generatedDescriptors, setGeneratedDescriptorsForTests } from "../src/pu
 
 // Capture direct process.stdout/stderr writes for the offline routing paths
 // (version, help, generate-input, unknown command) — none of these hit the network.
-async function capture(argv: string[]): Promise<{ code: number; out: string; err: string }> {
+// A CliError run() throws is what main.ts prints as the stderr envelope and exits 1 on, so it is reported the same way: `error`.
+async function capture(argv: string[]): Promise<{ code: number; out: string; err: string; error?: CliError }> {
   const out: string[] = [];
   const err: string[] = [];
   const origOut = process.stdout.write;
@@ -20,6 +21,9 @@ async function capture(argv: string[]): Promise<{ code: number; out: string; err
   try {
     const code = await run(argv);
     return { code, out: out.join(""), err: err.join("") };
+  } catch (error) {
+    if (!(error instanceof CliError)) throw error;
+    return { code: EXIT.ERROR, out: out.join(""), err: `${err.join("")}${error.message}`, error };
   } finally {
     process.stdout.write = origOut;
     process.stderr.write = origErr;
@@ -111,7 +115,8 @@ test("variant group --generate-input with an explicit variant succeeds", async (
 test("a word under a group that names none of its commands fails instead of printing the group's help", async () => {
   const removed = await capture(["adjustments", "nope"]);
   assert.equal(removed.code, EXIT.ERROR);
-  assert.match(removed.err, /Unknown command 'deel adjustments nope'\. Run 'deel adjustments --help'/);
+  assert.match(removed.err, /Unknown command 'deel adjustments nope'\./);
+  assert.deepEqual([removed.error?.code, removed.error?.next], ["usage.command", "Run 'deel adjustments --help' to see its commands."]);
   assert.equal((await capture(["adjustments", "constructor"])).code, EXIT.ERROR);
   assert.equal((await capture(["constructor"])).code, EXIT.ERROR);
   // An option between the command words is named as the problem, not the command it stopped at.
@@ -119,15 +124,17 @@ test("a word under a group that names none of its commands fails instead of prin
     const misplaced = await capture(argv);
     assert.equal(misplaced.code, EXIT.ERROR, argv.join(" "));
     assert.match(misplaced.err, /^Options go after the command: write 'deel adjustments create …'/, argv.join(" "));
+    assert.equal(misplaced.error?.code, "usage.command", argv.join(" "));
   }
   // The group alone, its --help, and a global flag's value after it still show the help.
   for (const argv of [["adjustments"], ["adjustments", "--help"], ["adjustments", "--env", "demo"]]) assert.equal((await capture(argv)).code, EXIT.OK, argv.join(" "));
 });
 
 test("an unknown command reports an error", async () => {
-  const { code, err } = await capture(["definitely-not-a-command"]);
+  const { code, err, error } = await capture(["definitely-not-a-command"]);
   assert.equal(code, EXIT.ERROR);
-  assert.match(err, /Unknown command/);
+  assert.match(err, /Unknown command 'definitely-not-a-command'/);
+  assert.equal(error?.code, "usage.command");
 });
 
 function captureStdout(run: () => void): string {

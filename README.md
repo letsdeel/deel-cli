@@ -271,6 +271,8 @@ deel dev tokens revocations create <token_id> --input reason=rotated   # invalid
 deel dev logs tokens list                              # what each token has been used for
 ```
 
+There is no confirmation prompt and no `--yes`: `revocations create` invalidates the token as soon as it is typed. Check the ID with `deel dev tokens get <token_id>` first.
+
 ## Idempotency
 
 Every mutating request (`POST`/`PUT`/`PATCH`/`DELETE`) carries an `Idempotency-Key`. By default it is a **deterministic UUIDv5** derived from a canonicalized form of the request (method + path + query + body), so re-running the identical command sends the identical key and the server can dedupe a retry. Override it with `--idempotency-key <value>` when you want a fresh attempt. The exception is a call that must act every time it runs, such as `deel webhooks test`: it is sent once, with no retry and no derived key (an explicit `--idempotency-key` is still sent).
@@ -285,6 +287,8 @@ deel webhooks update <id> --input status=disabled       # changes only the given
 deel webhooks delete <id>
 deel webhooks test <webhook_id> --input event_type=contract.created --beta   # Deel delivers a test event to the receiver
 ```
+
+Like every generated command, `delete` runs as soon as it is typed: there is no confirmation prompt and no `--yes`, so check the ID with `deel webhooks get <id>` first.
 
 A webhook id can start with `-`, which the argument parser reads as a flag. Put it after `--`, which ends the options: `deel webhooks get -- -WZ1uT2DFF01`. The same works for any generated command.
 

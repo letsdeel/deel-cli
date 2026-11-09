@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { writeFileSync, mkdtempSync } from "node:fs";
+import { writeFileSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { errorFromResponse, execute, withholdSecrets } from "../src/core/executor.ts";
@@ -10,6 +10,7 @@ import type { Descriptor } from "../src/types.ts";
 import type { HttpRequest, HttpResponse } from "../src/core/http.ts";
 import type { Config } from "../src/core/config.ts";
 import { HEADER } from "../src/core/constants.ts";
+import { log, setLoggingEnabled, setLogBodiesEnabled } from "../src/core/logging.ts";
 
 const CONFIG: Config = { env: "demo", baseUrl: "https://example.test/rest", issuer: null, clientId: "test-client", oauthBaseUrlOk: false };
 
@@ -497,6 +498,24 @@ test("a webhook's signing key is never printed, from one webhook or a list, and 
     assert.ok(!out.includes("sk_secret"), out);
     assert.match(out, /"w1"/);
     assert.match((io as any).stderr.join(""), /signing_key is not printed: reveal the signing key in Developer Center/);
+  }
+});
+
+test("with --log-bodies the local log masks a webhook's signing_key too", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "deel-log-"));
+  process.env.DEEL_LOG_DIR = dir;
+  setLoggingEnabled(true);
+  setLogBodiesEnabled(true);
+  try {
+    const json = { data: { id: "w1", signing_key: "sk_secret" } };
+    const ctx = createContext({ config: CONFIG, token: "tok_SECRET", io: captureIO({}), clock: () => 1000, rng: () => "req-fixed-id", logger: log, baseTransport: async () => ({ status: 200, headers: {}, text: "", json }) });
+    await execute(logsGetDescriptor, { flags: { request_id: "w1" }, files: {} }, ctx, JSON_OUT);
+    const content = readFileSync(join(dir, "deel.log"), "utf8");
+    assert.ok(!content.includes("sk_secret"), content);
+    assert.equal(JSON.parse(content.trim().split("\n").pop()!).response.data.signing_key, "***");
+  } finally {
+    setLogBodiesEnabled(false);
+    delete process.env.DEEL_LOG_DIR;
   }
 });
 

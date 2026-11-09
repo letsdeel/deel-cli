@@ -27,6 +27,8 @@ export function parseCommand(command: string): ParsedCommand {
   const words: string[] = [];
   let index = 1;
   while (index < tokens.length && !/^[<\[-]/.test(tokens[index])) words.push(tokens[index++]);
+  const stray = words.find((word) => /[<>\[\]]/.test(word));
+  if (stray) throw new Error(`"${command}": "${stray}" is not a command word`);
   if (words.length < 2) throw new Error(`"${command}" needs a domain and a verb`);
   const labels: ParsedCommand["labels"] = [];
   const selectors: FormSelector[] = [];
@@ -42,19 +44,22 @@ export function parseCommand(command: string): ParsedCommand {
     flag = flag.replace(/\]$/, "");
     if (!/^--[a-z][a-z0-9-]*$/.test(flag)) throw new Error(`"${command}": "${token}" is not a positional or a flag`);
     const next = tokens[index];
-    if (!closed && next !== undefined && isLabel(next.replace(/\]$/, ""))) {
+    const nextText = next?.replace(/\]$/, "");
+    if (!closed && next !== undefined && isLabel(nextText!)) {
       if (optional) throw new Error(`"${command}": a scope flag can't be optional (${flag})`);
-      labels.push({ label: next.slice(1, -1), flag: flag.slice(2) });
+      if (next.endsWith("]")) throw new Error(`"${command}": "${next}" closes a bracket it never opened`);
+      labels.push({ label: nextText!.slice(1, -1), flag: flag.slice(2) });
       index++;
       continue;
     }
     let value: string | undefined;
     if (!closed && next !== undefined && !/^[<\[-]/.test(next)) {
-      value = next.replace(/\]$/, "");
+      value = nextText;
+      if (/[\[\]]/.test(value!)) throw new Error(`"${command}": "${next}" is not a selector value`);
       closed = next.endsWith("]");
       index++;
     }
-    if (optional && !closed) throw new Error(`"${command}": "${token}" opens a bracket it never closes`);
+    if (optional !== closed) throw new Error(`"${command}": "${token}" ${optional ? "opens a bracket it never closes" : "closes a bracket it never opened"}`);
     selectors.push({ flag: flag.slice(2), ...(value !== undefined ? { value } : {}), ...(optional ? { optional: true } : {}) });
   }
   return { words, labels, selectors };
