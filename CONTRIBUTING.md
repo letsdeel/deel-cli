@@ -69,10 +69,10 @@ say a minute later.
 ## The command map
 
 Each entry in `src/public-api/commands.json` names one endpoint:
-`{ "method": "GET", "path": "/contracts/{contract_id}", "command": "deel contracts get <contract>" }`.
-A command line is `deel <domain> <resources…> <verb>`, then one `<label>` per path ID in path order, then
+`{ "method": "GET", "path": "/contracts/{contract_id}", "command": "deel contracts get <contract_id>" }`.
+A command line is `deel <domain> <resources…> <verb>`, then one `<param>` per path ID in path order, named as the API path names it, then
 any flags that pick this endpoint among those sharing the words: a scope flag with a label
-(`--contract <contract>`), a fixed selector (`--worker-type eor`, `--as worker`), or an optional one in
+(`--contract <contract_id>`), a fixed selector (`--worker-type eor`, `--as worker`), or an optional one in
 brackets (`[--worker-type eor]`). Two more keys are allowed:
 
 | Key | Meaning |
