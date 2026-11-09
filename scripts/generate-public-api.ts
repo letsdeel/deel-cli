@@ -78,11 +78,14 @@ async function main(argv: string[]): Promise<number> {
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  // exitCode, not exit(): a long warning list fills the stderr pipe, and exit() would drop what is still queued.
   main(process.argv.slice(2)).then(
-    (code) => process.exit(code),
+    (code) => {
+      process.exitCode = code;
+    },
     (error) => {
       process.stderr.write(`[error] ${(error as Error).message}\n`);
-      process.exit(1);
+      process.exitCode = 1;
     },
   );
 }
