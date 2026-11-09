@@ -47,6 +47,7 @@ jobs:
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           PR_IS_FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
           PR_BASE: ${{ github.event.pull_request.base.ref }}
+          PR_HEAD: ${{ github.event.pull_request.head.ref }}
         run: node scripts/check-pr.ts --files "$RUNNER_TEMP/pr-files.txt"
 
   check:
@@ -70,6 +71,8 @@ jobs:
         run: npm run check:manifest
       - name: Public API command map
         run: npm run check:command-map
+      - name: Generated public API manifest
+        run: npm run check:public-api
       - name: Lockfile carries every bun platform binary
         run: npm run check:lockfile
       - name: package.json ↔ src/version.ts

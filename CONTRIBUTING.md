@@ -28,6 +28,7 @@ Each piece on its own:
 | `npm run test:coverage` | same suite with a coverage floor over `src/**` — lines ≥ 80 %, branches ≥ 75 %, functions ≥ 70 %. The floor only ever moves up. |
 | `npm run check:manifest` | `src/manifest.generated.ts` ↔ `src/commands.map.ts` stay consistent |
 | `npm run check:command-map` | every `src/public-api/commands.json` entry makes a command the CLI can call, takes no hand-picked or static name, and keeps a released command line unchanged |
+| `npm run check:public-api` | `src/public-api/manifest.json` holds only allowlisted fields and rest/scim endpoints; every endpoint the command map names is in it; no tracked file names a definitions URL; no workflow requests `id-token: write` |
 | `npm run check:lockfile` | `package-lock.json` still carries every bun platform binary (an `npm install` against an existing `node_modules` can silently drop them) |
 | `npm run check:version` | `package.json` and `src/version.ts` agree and are a clean `X.Y.Z` |
 | `npm run check:shell` | `packaging/install.sh` (POSIX sh — users pipe it into `sh`), build scripts and hooks pass `sh -n`/`bash -n` and shellcheck |
@@ -106,7 +107,7 @@ are reviewed by the maintainers; when you're unsure of one, ask in the PR.
 
 | Job | Runs |
 |-----|------|
-| `validate-pr` | `scripts/check-pr.ts` against the PR title, body, labels and changed files |
+| `validate-pr` | `scripts/check-pr.ts` against the PR title, body, labels and changed files; the public API sync PR (`bot/public-api-sync`) may change only the generated commands, the command map and the version |
 | `check` | `npm run check`, one step per script so the failure names itself |
 | `build-smoke` | `npm run build`, then `dist/deel --version` must equal the package version and `--help` must render |
 | | …then cross-compiles both macOS targets (`scripts/build-all.sh --only darwin`), which signs them with `rcodesign` and fails if the signature does not verify |
