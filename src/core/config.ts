@@ -100,6 +100,15 @@ export function resolveConfig(opts: { env?: string; baseUrl?: string; beta?: boo
   return config;
 }
 
+// The MCP endpoint the `deel app` commands call: `/mcp` on the API host, or DEEL_MCP_URL (https) for a test
+// environment that serves it on its own host. The override is the user's explicit choice of server, like
+// --base-url, so the login is sent there too.
+export function resolveMcpUrl(config: Config): string {
+  const override = httpsOverride("DEEL_MCP_URL");
+  if (override.error) throw new CliError("config.mcp", override.error);
+  return override.value ?? `${new URL(config.baseUrl).origin}/mcp`;
+}
+
 // The legacy PAT stored under the bare env name belongs to the environment's own server. Talking to another
 // server (an issuer override or a different API host) must never read or touch it.
 export function ownsLegacyPat(config: Config): boolean {

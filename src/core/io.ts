@@ -30,6 +30,33 @@ export function realIO(): IOStreams {
   };
 }
 
+// How long a process with nothing left to write may stay up before it is forced to exit.
+export const FORCED_EXIT_MS = 5_000;
+
+export type ExitOpts = {
+  streams?: Array<Pick<NodeJS.WriteStream, "write">>;
+  setExitCode?: (code: number) => void;
+  exit?: (code: number) => void;
+  schedule?: (run: () => void, ms: number) => void;
+};
+
+// End the process without dropping output. process.exit() right after a write drops what is still queued for a
+// pipe (it stops at 64 KB on macOS), so a large output piped into jq or a file would be cut. Under Node an
+// empty write's callback runs once earlier writes are flushed; under Bun it can run before, so the process
+// isn't exited directly: it sets the exit code and ends by itself once its writes are done. An unref'd timer
+// still forces the exit if something else keeps the event loop alive.
+export function exitAfterFlush(code: number, opts: ExitOpts = {}): void {
+  const streams = opts.streams ?? [process.stdout, process.stderr];
+  const setExitCode = opts.setExitCode ?? ((value: number) => void (process.exitCode = value));
+  const exit = opts.exit ?? process.exit;
+  const schedule = opts.schedule ?? ((run: () => void, ms: number) => void setTimeout(run, ms).unref());
+  setExitCode(code);
+  let pending = streams.length;
+  const flushed = () => schedule(() => exit(code), FORCED_EXIT_MS);
+  if (pending === 0) return flushed();
+  for (const stream of streams) stream.write("", () => --pending === 0 && flushed());
+}
+
 // Test double: captures writes into buffers; feed stdin via `stdin`.
 export function captureIO(opts: { stdin?: string; isTTY?: boolean } = {}): IOStreams & { stdout: string[]; stderr: string[] } {
   const stdout: string[] = [];

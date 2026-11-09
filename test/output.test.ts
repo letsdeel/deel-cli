@@ -97,3 +97,9 @@ test("render --jq and --quiet keep operating on data only (page is not printed)"
   await render(io2, paged, opts({ quiet: true }));
   assert.equal(io2.stdout.join("").trim(), "a\nb");
 });
+
+test("--jq gets a text payload as a string, not as JSON to parse", async () => {
+  const io = captureIO();
+  await render(io, envelope('{"cut": "text'), { json: true, jq: "type", raw: true, quiet: false });
+  assert.equal(io.stdout.join(""), "string\n");
+});

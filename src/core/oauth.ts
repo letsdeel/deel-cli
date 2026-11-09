@@ -350,6 +350,9 @@ export type OAuthSourceOpts = {
 export type OAuthSource = {
   // A valid access token, refreshed first when it is close to expiry.
   token: () => Promise<string>;
+  // A new access token after the server rejected `rejected` before its expiry: refreshed now, unless another
+  // process already stored a different one.
+  renew: (rejected: string) => Promise<string>;
   current: () => OAuthEntry;
 };
 
@@ -362,7 +365,7 @@ export function createOAuthSource(opts: OAuthSourceOpts): OAuthSource {
   let entry = opts.entry;
   let inflight: Promise<OAuthEntry> | null = null;
 
-  async function refresh(): Promise<OAuthEntry> {
+  async function refresh(rejected?: string): Promise<OAuthEntry> {
     return withLock(
       lockPath(opts.issuer),
       async () => {
@@ -370,7 +373,8 @@ export function createOAuthSource(opts: OAuthSourceOpts): OAuthSource {
         // would make the server revoke the whole login, so always re-read before refreshing.
         const latest = readOAuthEntry(opts.store, opts.issuer);
         if (!latest) throw expired();
-        if (isFresh(latest, now())) return latest;
+        const usable = rejected === undefined ? isFresh(latest, now()) : latest.access_token !== rejected;
+        if (usable) return latest;
         const metadata = await discover(opts.issuer, opts.transport);
         const response = await postForm(opts.transport, metadata.token_endpoint, {
           grant_type: "refresh_token",
@@ -406,6 +410,10 @@ export function createOAuthSource(opts: OAuthSourceOpts): OAuthSource {
         inflight = null;
       });
       entry = await inflight;
+      return entry.access_token;
+    },
+    async renew(rejected) {
+      entry = await refresh(rejected);
       return entry.access_token;
     },
   };
