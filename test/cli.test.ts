@@ -1,9 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { run } from "../src/cli.ts";
+import { run, unknownFlag } from "../src/cli.ts";
 import { EXIT } from "../src/core/errors.ts";
 import { printContract, printContractJson } from "../src/help.ts";
 import type { Descriptor } from "../src/types.ts";
+import { RESERVED_COMMANDS } from "../src/core/constants.ts";
+import { staticCommands } from "../src/commands/index.ts";
+import { generatedDescriptors, setGeneratedDescriptorsForTests } from "../src/public-api/commands.ts";
 
 // Capture direct process.stdout/stderr writes for the offline routing paths
 // (version, help, generate-input, unknown command) — none of these hit the network.
@@ -105,6 +108,18 @@ test("variant group --generate-input with an explicit variant succeeds", async (
   assert.ok("contract_id" in skeleton);
 });
 
+test("a word under a group that names none of its commands fails instead of printing the group's help", async () => {
+  const removed = await capture(["adjustments", "nope"]);
+  assert.equal(removed.code, EXIT.ERROR);
+  assert.match(removed.err, /Unknown command 'nope' under 'deel adjustments'/);
+  assert.equal((await capture(["adjustments", "constructor"])).code, EXIT.ERROR);
+  assert.equal((await capture(["constructor"])).code, EXIT.ERROR);
+  // A global flag's value between or after the words is skipped, so the command still resolves.
+  for (const argv of [["adjustments"], ["adjustments", "--help"], ["adjustments", "--env", "demo"], ["adjustments", "--env", "demo", "create", "--help"]]) {
+    assert.equal((await capture(argv)).code, EXIT.OK, argv.join(" "));
+  }
+});
+
 test("an unknown command reports an error", async () => {
   const { code, err } = await capture(["definitely-not-a-command"]);
   assert.equal(code, EXIT.ERROR);
@@ -164,4 +179,29 @@ test("--help --json carries nullable on the fields that have it", () => {
   const fields = JSON.parse(out).body.fields;
   assert.equal(fields.find((f: { name: string }) => f.name === "note").nullable, true);
   assert.equal("nullable" in fields.find((f: { name: string }) => f.name === "title"), false);
+});
+
+test("unknownFlag accepts every spelling and negation of a known flag and names the first unknown one", () => {
+  assert.equal(unknownFlag(["--worker-type", "eor", "--workerType=eor", "--no-json", "--json=false"], ["worker-type", "json"]), undefined);
+  assert.equal(unknownFlag(["a", "--limit", "5", "--other"], ["json"]), "--limit");
+  assert.equal(unknownFlag(["-x", "s1"], ["json"]), "-x");
+  assert.equal(unknownFlag(["--", "--limit"], []), undefined);
+});
+
+test("every static command is a reserved name, so the generator and the committed-manifest check can see it", () => {
+  assert.deepEqual(Object.keys(staticCommands).sort(), [...RESERVED_COMMANDS].sort());
+});
+
+test("--version and the static commands never load the generated manifest; a generated command does", async () => {
+  setGeneratedDescriptorsForTests(undefined);
+  try {
+    for (const argv of [["--version"], ["job", "--help"], ["auth", "--help"]]) {
+      assert.equal((await capture(argv)).code, EXIT.OK, argv.join(" "));
+      assert.deepEqual(generatedDescriptors(), [], `${argv.join(" ")} loaded the manifest`);
+    }
+    assert.equal((await capture(["contracts", "get", "--help"])).code, EXIT.OK);
+    assert.ok(generatedDescriptors().length > 0);
+  } finally {
+    setGeneratedDescriptorsForTests(undefined);
+  }
 });

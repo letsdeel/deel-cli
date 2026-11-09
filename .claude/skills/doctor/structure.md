@@ -29,11 +29,13 @@ Flag as **misplaced**:
 ## 2. What counts as "implementation" (needs a test)
 
 Needs a test when a pending file adds or changes behaviour: anything in `src/core/`, `src/commands/`,
-`src/cli.ts`, `src/help.ts`, `src/main.ts`, and any `scripts/*.ts` with branching logic.
+`src/cli.ts`, `src/help.ts`, `src/main.ts`, `src/public-api/commands.ts`, and any `scripts/*.ts` or
+`scripts/public-api/*.ts` with branching logic.
 
 Does **not** need a dedicated test on its own: `src/types.ts` (type-only), `src/constants.ts` and
 `src/version.ts` (plain values), `src/manifest.generated.ts` and `src/commands.map.ts` (data,
-validated by `check:manifest`), Markdown, `.github/`, `.husky/`, `package.json`, `package-lock.json`.
+validated by `check:manifest`), `src/public-api/commands.json` (data, validated by `check:command-map`),
+`src/public-api/manifest.json` (written by `npm run generate:public-api`), Markdown, `.github/`, `.husky/`, `package.json`, `package-lock.json`.
 Shell scripts are covered by `check:shell` (syntax + shellcheck); a behaviour change in
 `packaging/install.sh` still deserves a manual run noted in the PR's "How I Tested".
 

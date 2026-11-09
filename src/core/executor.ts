@@ -12,7 +12,7 @@ import { CliError } from "./errors.ts";
 import { flagOf } from "./flags.ts";
 import { apiBaseUrl } from "./config.ts";
 import { envelope, render } from "./output.ts";
-import { HEADER, WITHHELD_RESPONSE_FIELDS } from "./constants.ts";
+import { HEADER, OUTCOME_ROUTES, SEND_ONCE_ROUTES, WITHHELD_RESPONSE_FIELDS } from "./constants.ts";
 import type { VersionChoice, VersionFlags } from "./versions.ts";
 import { BETA_ACCESS_HINT, BETA_ERROR, betaFallback, chooseVersion } from "./versions.ts";
 
@@ -174,13 +174,16 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
     }
   }
 
+  // A send-once call acts again every time, so a key derived from the request would make the API replay the first.
+  const route = routeOf(descriptor);
+  const sendOnce = SEND_ONCE_ROUTES.has(route);
   let idempotencyKey: string | undefined;
   if (mutating) {
     idempotencyKey =
       call.idempotencyKey ??
-      deriveIdempotencyKey({ method: descriptor.method, path, query, body: effectiveKind === "multipart" ? await multipartFingerprint(descriptor, call) : wrapBody(descriptor, call.body) });
-    headers[HEADER.idempotencyKey] = idempotencyKey;
-    if (opts.debug) ctx.io.err(`[debug] idempotency-key: ${idempotencyKey}${call.idempotencyKey ? " (override)" : " (derived)"}\n`);
+      (sendOnce ? undefined : deriveIdempotencyKey({ method: descriptor.method, path, query, body: effectiveKind === "multipart" ? await multipartFingerprint(descriptor, call) : wrapBody(descriptor, call.body) }));
+    if (idempotencyKey !== undefined) headers[HEADER.idempotencyKey] = idempotencyKey;
+    if (opts.debug && idempotencyKey !== undefined) ctx.io.err(`[debug] idempotency-key: ${idempotencyKey}${call.idempotencyKey ? " (override)" : " (derived)"}\n`);
   }
 
   const send = (requestHeaders: Record<string, string>) =>
@@ -189,7 +192,7 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
       url: url.toString(),
       headers: requestHeaders,
       body,
-      retryable: !mutating || Boolean(idempotencyKey),
+      retryable: !sendOnce && (!mutating || Boolean(idempotencyKey)),
       meta: { command: descriptor.command.join(" "), idempotency_key: idempotencyKey },
     });
   const debugSent = (status: number) => {
@@ -230,6 +233,18 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   const { kept, withheld } = withholdSecrets(data);
   for (const field of withheld) ctx.io.err(`[note] ${field} is not printed: ${WITHHELD_RESPONSE_FIELDS[field]}.\n`);
   await render(ctx.io, envelope(kept, { request_id: requestId }, page), opts.output);
+  // A 2xx can still report that the call didn't work (a test delivery that failed): print it, then fail.
+  const outcome = Object.hasOwn(OUTCOME_ROUTES, route) ? OUTCOME_ROUTES[route] : undefined;
+  if (outcome && isPlainObject(kept) && kept[outcome.field] === false) {
+    const error = new CliError("api.unsuccessful", `The response reports ${outcome.field}: false.`, outcome.hint);
+    error.requestId = requestId;
+    throw error;
+  }
+}
+
+// The key SEND_ONCE_ROUTES and OUTCOME_ROUTES use: "METHOD /path" with the path params as {}.
+function routeOf(descriptor: Descriptor): string {
+  return `${descriptor.method.toUpperCase()} ${descriptor.path.replace(/\{[^}]+\}/g, "{}")}`;
 }
 
 // Drop the secret response fields from one record or from each record of a list, without mutating the response.
@@ -237,7 +252,7 @@ export function withholdSecrets(data: unknown): { kept: unknown; withheld: strin
   const withheld = new Set<string>();
   const strip = (item: unknown): unknown => {
     if (!isPlainObject(item)) return item;
-    const secrets = Object.keys(item).filter((key) => key in WITHHELD_RESPONSE_FIELDS);
+    const secrets = Object.keys(item).filter((key) => Object.hasOwn(WITHHELD_RESPONSE_FIELDS, key));
     if (!secrets.length) return item;
     for (const key of secrets) withheld.add(key);
     return Object.fromEntries(Object.entries(item).filter(([key]) => !secrets.includes(key)));
