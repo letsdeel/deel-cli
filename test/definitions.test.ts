@@ -10,7 +10,7 @@ const gadget = (extra: Record<string, any>) => ({ api: "rest", method: "GET", pa
 
 test("only the allowlisted operation fields are kept from a definition", () => {
   const [definition] = parseDefinitions([
-    gadget({ operation: gadgetOp({ operationId: "x", description: "d", tags: ["t"], deprecated: true, "x-owner-team": "team-that-must-not-leak", servers: [{ url: "http://internal" }], callbacks: {}, security: [{ k: [] }] }) }),
+    gadget({ operation: gadgetOp({ operationId: "x", description: "d", tags: ["t"], deprecated: true, "x-extension": "dropped", servers: [{ url: "https://example.invalid" }], callbacks: {}, security: [{ k: [] }] }) }),
   ]);
   assert.deepEqual(Object.keys(definition.operation).sort(), ["deprecated", "description", "operationId", "responses", "summary", "tags"]);
 });
