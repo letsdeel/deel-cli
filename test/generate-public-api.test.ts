@@ -26,6 +26,16 @@ test("it needs --from", () => {
   assert.match(none.stderr, /Usage: generate-public-api\.ts --from <file\|url>/);
 });
 
+test("a --map that is not an array of entries is an error, and nothing is written", () => {
+  const dir = mkdtempSync(join(tmpdir(), "generate-public-api-"));
+  const map = join(dir, "map.json");
+  writeFileSync(map, JSON.stringify({ entries: [] }));
+  const { code, stderr } = generate(["--from", fixture("widgets.json"), "--map", map, "--out", dir, "--previous", EMPTY]);
+  assert.equal(code, 1);
+  assert.match(stderr, /map\.json is not a command map \(an array of entries\)/);
+  assert.equal(existsSync(join(dir, "manifest.json")), false);
+});
+
 test("--from writes the manifest to --out and the summary to --summary", () => {
   const dir = mkdtempSync(join(tmpdir(), "generate-public-api-"));
   const summary = join(dir, "summary.json");

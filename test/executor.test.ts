@@ -500,6 +500,48 @@ test("a webhook's signing key is never printed, from one webhook or a list, and 
   }
 });
 
+test("withholdSecrets reads only its own keys, so a field named like an Object method is kept", () => {
+  const data = JSON.parse('{"id":"a","constructor":"c","toString":"t","signing_key":"k"}');
+  const { kept, withheld } = withholdSecrets(data);
+  assert.deepEqual(kept, { id: "a", constructor: "c", toString: "t" });
+  assert.deepEqual(withheld, ["signing_key"]);
+});
+
+const simulateDescriptor: Descriptor = {
+  ...createDescriptor,
+  command: ["webhooks", "test"],
+  path: "/webhooks/{webhook_id}/simulate",
+  params: [{ name: "webhook_id", in: "path", type: "string", required: true }],
+  bodyProps: [{ name: "event_type", in: "body", type: "string", required: true }],
+};
+const simulateCall = { flags: { webhook_id: "wh_1" }, body: { event_type: "contract.created" }, files: {} };
+const quiet = { output: { json: true, quiet: false, raw: false }, debug: false, form: false };
+
+test("a send-once call goes out once, with no derived Idempotency-Key, so a repeat acts again", async () => {
+  const failing = ctxWith(() => ({ status: 503, headers: {}, text: "", json: { error: { message: "busy" } } }));
+  await assert.rejects(execute(simulateDescriptor, simulateCall, failing.ctx, quiet));
+  assert.equal(failing.seen.length, 1);
+  assert.equal(failing.seen[0].headers["idempotency-key"], undefined);
+  // An explicit key is sent, and still no retry: the call acts again each time.
+  const keyed = ctxWith(() => ({ status: 503, headers: {}, text: "", json: { error: { message: "busy" } } }));
+  await assert.rejects(execute(simulateDescriptor, { ...simulateCall, idempotencyKey: "k-1" }, keyed.ctx, quiet));
+  assert.equal(keyed.seen.length, 1);
+  assert.equal(keyed.seen[0].headers["idempotency-key"], "k-1");
+});
+
+test("a 2xx whose response reports is_success: false prints the response, then fails", async () => {
+  const { ctx, io } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { is_success: false, delivery: { response_status_code: 500 } } } }));
+  await assert.rejects(execute(simulateDescriptor, simulateCall, ctx, quiet), (err: any) => err.code === "api.unsuccessful" && /is_success: false/.test(err.message) && err.requestId === "req-fixed-id");
+  assert.equal(JSON.parse((io as any).stdout.join("")).data.delivery.response_status_code, 500);
+  const ok = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { is_success: true } } }));
+  await execute(simulateDescriptor, simulateCall, ok.ctx, quiet);
+  const list = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: [{ is_success: false }] } }));
+  await execute(simulateDescriptor, simulateCall, list.ctx, quiet);
+  // Only the routes that report an outcome fail on it; another endpoint's is_success is just data.
+  const other = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { is_success: false } } }));
+  await execute(createDescriptor, { flags: { contract_id: "AC1" }, body: { amount: 1 }, files: {} }, other.ctx, quiet);
+});
+
 test("withholdSecrets leaves a response without secrets untouched", () => {
   const data = [{ id: "a" }, "text", null];
   const { kept, withheld } = withholdSecrets(data);

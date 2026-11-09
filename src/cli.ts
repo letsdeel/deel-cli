@@ -235,7 +235,8 @@ function flagTakesValue(token: string, next: string | undefined, cmd: CommandDef
   if (name === "base-url") return true;
   const declared = (commonArgs[name] ?? (name.startsWith("no-") ? commonArgs[name.slice(3)] : undefined)) as { type?: string } | undefined;
   if (declared) return declared.type === "string";
-  return !(cmd?.subCommands as Record<string, CommandDef> | undefined)?.[next];
+  const subCommands = cmd?.subCommands as Record<string, CommandDef> | undefined;
+  return !(subCommands && Object.hasOwn(subCommands, next));
 }
 
 // The argv indexes of the command words and the arguments after them, skipping every flag value.
@@ -245,7 +246,8 @@ function wordIndexes(argv: string[], root: CommandDef): number[] {
   for (let i = 0; i < argv.length; i++) {
     if (!argv[i].startsWith("-")) {
       indexes.push(i);
-      cmd = (cmd?.subCommands as Record<string, CommandDef> | undefined)?.[argv[i]];
+      const subCommands = cmd?.subCommands as Record<string, CommandDef> | undefined;
+      cmd = subCommands && Object.hasOwn(subCommands, argv[i]) ? subCommands[argv[i]] : undefined;
     } else if (flagTakesValue(argv[i], argv[i + 1], cmd)) i++;
   }
   return indexes;
@@ -258,7 +260,7 @@ function resolve(root: CommandDef, positionals: string[]): { cmd: CommandDef; pa
   let matched = 0;
   for (const token of positionals) {
     const subCommands = cmd.subCommands as Record<string, CommandDef> | undefined;
-    if (subCommands && subCommands[token]) {
+    if (subCommands && Object.hasOwn(subCommands, token)) {
       parent = cmd;
       cmd = subCommands[token];
       matched++;
@@ -302,9 +304,9 @@ export async function run(argv: string[]): Promise<number> {
     return EXIT.OK;
   }
 
-  // A static command (auth, job, tokens) never needs the generated manifest.
+  // A static command (auth, job) never needs the generated manifest.
   const first = options.find((token) => !token.startsWith("-"));
-  if (!(first && first in staticCommands)) await loadGeneratedDescriptors();
+  if (!(first && Object.hasOwn(staticCommands, first))) await loadGeneratedDescriptors();
   const root = buildRoot();
   const words = wordIndexes(options, root);
   const positionals = words.map((i) => options[i]);
@@ -320,7 +322,6 @@ export async function run(argv: string[]): Promise<number> {
     printUnknownCommand(positionals[matched], positionals.slice(0, matched), cmd);
     return EXIT.ERROR;
   }
-
   const variantCandidates = descriptorsFor(positionals, matched);
   const descriptor = descriptorFor(positionals, matched, options);
 

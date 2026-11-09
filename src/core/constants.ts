@@ -15,6 +15,15 @@ export const WITHHELD_RESPONSE_FIELDS: Record<string, string> = {
   signing_key: "reveal the signing key in Developer Center → Webhooks",
 };
 
+// Endpoints whose every call acts again (a test delivery): sent once, with no retry and no derived Idempotency-Key,
+// so running the command again sends a new one. Keyed "METHOD /path" with the path params as {}.
+export const SEND_ONCE_ROUTES = new Set(["POST /webhooks/{}/simulate"]);
+// Endpoints whose 2xx response says whether the call worked: when that field is false, the response is printed and
+// the command then exits 1 with the hint. Keyed like SEND_ONCE_ROUTES.
+export const OUTCOME_ROUTES: Record<string, { field: string; hint: string }> = {
+  "POST /webhooks/{}/simulate": { field: "is_success", hint: "The test delivery did not succeed; the printed response shows what the receiver answered." },
+};
+
 export const LOG_DIR_MODE = 0o700;  // owner read/write/enter; no group or other access
 export const LOG_FILE_MODE = 0o600; // owner read/write only
 // Substrings matched (case-insensitive) against keys; a match masks the value.
