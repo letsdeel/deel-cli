@@ -9,6 +9,12 @@ export const RETRY_BASE_DELAY_MS = 200;
 // --- Local logging ---
 export const LOG_MAX_BYTES_DEFAULT = 10 * 1024 * 1024;
 export const LOG_MAX_FILES_DEFAULT = 5;
+// Response fields that are secrets the CLI never prints: a webhook's signing key comes back on every webhook read
+// and write, and stays viewable in Developer Center. Removed from the top level of data and of each array item.
+export const WITHHELD_RESPONSE_FIELDS: Record<string, string> = {
+  signing_key: "reveal the signing key in Developer Center → Webhooks",
+};
+
 export const LOG_DIR_MODE = 0o700;  // owner read/write/enter; no group or other access
 export const LOG_FILE_MODE = 0o600; // owner read/write only
 // Substrings matched (case-insensitive) against keys; a match masks the value.
@@ -29,7 +35,7 @@ export const IDEMPOTENCY_NAMESPACE = "8f4b6c1e-3d2a-4f9c-9a1b-7e5d0c2a1f00";
 export const AGENT_ENV_SIGNALS = ["CI", "CLAUDE_CODE", "CURSOR", "CODEX"] as const;
 
 // --- Command resolver vocabulary ---
-export const RESERVED_COMMANDS = new Set(["job", "auth", "webhooks", "tokens"]);
+export const RESERVED_COMMANDS = new Set(["job", "auth", "tokens"]);
 export const COMMAND_SUFFIX_MODIFIERS = ["-bulk", "-async"];
 
 // --- Header names (lowercase; fetch normalizes) ---

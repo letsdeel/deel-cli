@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { gatherFlagValues, gatherFiles, nullableBoolean, nullableNumber, nullableObject, nullableString } from "../src/commands/shared.ts";
+import { gatherFlagValues, gatherFiles, nullableBoolean, nullableNumber, nullableObject, nullableString, readHidden } from "../src/commands/shared.ts";
 
 test("gatherFlagValues reads a repeatable flag in every spelling the parser accepts, in the order typed", () => {
   assert.deepEqual(gatherFlagValues(["--job-ids", "a", "--job-ids=b"], "job_ids"), ["a", "b"]);
@@ -47,4 +47,12 @@ test("nullable helpers send null for the literal null, the typed value otherwise
   assert.deepEqual(nullableObject('{"a":1}', "--o"), { a: 1 });
   assert.throws(() => nullableObject("[1]", "--o"), usage);
   assert.throws(() => nullableObject("{bad", "--o"), usage);
+});
+
+test("readHidden reads --base-url in every spelling the parser accepts (kebab and camel), and stops at --", () => {
+  for (const argv of [["--base-url", "https://a.test"], ["--baseUrl=https://a.test"], ["--baseUrl", "https://a.test"], ["x", "--base-url=https://a.test"]]) {
+    assert.equal(readHidden(argv, "base-url"), "https://a.test", argv.join(" "));
+  }
+  assert.equal(readHidden(["--", "--base-url", "https://a.test"], "base-url"), undefined);
+  assert.equal(readHidden(["--base-urls", "https://a.test"], "base-url"), undefined);
 });

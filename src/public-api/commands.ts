@@ -3,18 +3,22 @@
 import type { CommandForm, Descriptor, GeneratedManifest } from "../types.ts";
 import { argvEnables, argvFlagValue, argvMentionsFlag } from "../core/flags.ts";
 import { CliError } from "../core/errors.ts";
-import generated from "./manifest.json" with { type: "json" };
 
-export const generatedManifest = generated as GeneratedManifest;
+// The manifest is parsed only when a command needs it, so --version and the static commands don't pay for it.
+let descriptors: Descriptor[] | undefined;
 
-let descriptors: Descriptor[] = generatedManifest.descriptors;
-
-export function generatedDescriptors(): Descriptor[] {
+export async function loadGeneratedDescriptors(): Promise<Descriptor[]> {
+  descriptors ??= ((await import("./manifest.json", { with: { type: "json" } })).default as GeneratedManifest).descriptors;
   return descriptors;
 }
 
+// The loaded descriptors; empty until loadGeneratedDescriptors() has run.
+export function generatedDescriptors(): Descriptor[] {
+  return descriptors ?? [];
+}
+
 export function setGeneratedDescriptorsForTests(next: Descriptor[] | undefined): void {
-  descriptors = next ?? generatedManifest.descriptors;
+  descriptors = next;
 }
 
 // The command line a user types for one endpoint, e.g. "deel contracts get <contract> --worker-type eor".
@@ -35,7 +39,16 @@ export function pickingFlags(form: CommandForm): string[] {
   return [...form.selectors.map((s) => s.flag), ...form.scopes.map((s) => s.flag)];
 }
 
-function matches(form: CommandForm, argv: string[], foreign: string[]): boolean {
+type Picking = { flag: string; isSwitch: boolean };
+
+// Whether argv gives a picking flag: a switch only when it is on (--no-bulk and --bulk=false pick the form without it).
+const gives = (argv: string[], { flag, isSwitch }: Picking) => (isSwitch ? argvEnables(argv, flag) : argvMentionsFlag(argv, flag));
+
+function pickingOf(form: CommandForm): Picking[] {
+  return [...form.selectors.map((s) => ({ flag: s.flag, isSwitch: s.value === undefined })), ...form.scopes.map((s) => ({ flag: s.flag, isSwitch: false }))];
+}
+
+function matches(form: CommandForm, argv: string[], foreign: Picking[]): boolean {
   for (const selector of form.selectors) {
     if (selector.value === undefined) {
       if (!argvEnables(argv, selector.flag)) return false;
@@ -45,20 +58,26 @@ function matches(form: CommandForm, argv: string[], foreign: string[]): boolean 
     if (value === undefined ? !selector.optional : value !== selector.value) return false;
   }
   if (form.scopes.some((scope) => argvFlagValue(argv, scope.flag) === undefined)) return false;
-  return !foreign.some((flag) => argvMentionsFlag(argv, flag));
+  return !foreign.some((picking) => gives(argv, picking));
 }
 
 // The one endpoint whose selectors and scopes the argv gives; undefined when none or several do.
 export function matchForm(candidates: Descriptor[], argv: string[]): Descriptor | undefined {
-  const all = new Set(candidates.flatMap((d) => pickingFlags(d.form!)));
+  const all = new Map(candidates.flatMap((d) => pickingOf(d.form!)).map((p) => [p.flag, p]));
   const found = candidates.filter((d) => {
     const own = new Set(pickingFlags(d.form!));
-    return matches(d.form!, argv, [...all].filter((flag) => !own.has(flag)));
+    return matches(d.form!, argv, [...all.values()].filter((p) => !own.has(p.flag)));
   });
   return found.length === 1 ? found[0] : undefined;
 }
 
 export function selectForm(candidates: Descriptor[], argv: string[]): Descriptor {
+  // A valued picking flag typed without its value would otherwise take the next flag as the value.
+  for (const { flag, isSwitch } of candidates.flatMap((d) => pickingOf(d.form!))) {
+    if (isSwitch || !argvMentionsFlag(argv, flag)) continue;
+    const value = argvFlagValue(argv, flag);
+    if (!value || value.startsWith("-")) throw new CliError("usage.flag_value", `--${flag} needs a value.`, `Write --${flag}=<value>; run it with --help to see the values.`);
+  }
   const found = matchForm(candidates, argv);
   if (found) return found;
   const words = candidates[0].command.join(" ");

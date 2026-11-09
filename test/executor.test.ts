@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { writeFileSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { errorFromResponse, execute } from "../src/core/executor.ts";
+import { errorFromResponse, execute, withholdSecrets } from "../src/core/executor.ts";
 import { createContext } from "../src/core/context.ts";
 import { captureIO } from "../src/core/io.ts";
 import type { Descriptor } from "../src/types.ts";
@@ -487,4 +487,22 @@ test("a SCIM command calls the /scim base path and renders the unwrapped SCIM bo
   assert.equal(seen[0].url, "https://example.test/scim/Users");
   const parsed = JSON.parse((io as any).stdout.join(""));
   assert.equal(parsed.data.Resources[0].id, "u1");
+});
+
+test("a webhook's signing key is never printed, from one webhook or a list, and a note says where to find it", async () => {
+  for (const json of [{ data: { id: "w1", signing_key: "sk_secret" } }, { data: [{ id: "w1", signing_key: "sk_secret" }, { id: "w2" }] }]) {
+    const { ctx, io } = ctxWith(() => ({ status: 200, headers: {}, text: "", json }));
+    await execute(logsGetDescriptor, { flags: { request_id: "w1" }, files: {} }, ctx, JSON_OUT);
+    const out = (io as any).stdout.join("");
+    assert.ok(!out.includes("sk_secret"), out);
+    assert.match(out, /"w1"/);
+    assert.match((io as any).stderr.join(""), /signing_key is not printed: reveal the signing key in Developer Center/);
+  }
+});
+
+test("withholdSecrets leaves a response without secrets untouched", () => {
+  const data = [{ id: "a" }, "text", null];
+  const { kept, withheld } = withholdSecrets(data);
+  assert.deepEqual(kept, data);
+  assert.deepEqual(withheld, []);
 });

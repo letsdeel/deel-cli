@@ -72,6 +72,12 @@ export function printVariantGroupHelp(descriptors: Descriptor[]): void {
   out(`Help:  deel ${cmd} --<variant> --help\n\n`);
 }
 
+// The --help --json for a generated command whose words several endpoints share: each endpoint's command line.
+export function printFormsJson(descriptors: Descriptor[]): void {
+  const forms = descriptors.map((d) => ({ usage: usageOf(d), method: d.method, path: d.path, ...(d.summary ? { summary: d.summary } : {}) }));
+  process.stdout.write(JSON.stringify({ command: descriptors[0].command.join(" "), forms }, null, 2) + "\n");
+}
+
 // Help for a generated command whose words several endpoints share: one line per endpoint.
 export function printFormsHelp(descriptors: Descriptor[]): void {
   const out = process.stdout.write.bind(process.stdout);
@@ -84,7 +90,7 @@ export function printFormsHelp(descriptors: Descriptor[]): void {
 // The exact command line a caller should type — shared by the human --help USAGE
 // line and the --json contract's `usage` field, so both stay in sync by construction.
 function buildUsage(descriptor: Descriptor): string {
-  const required = descriptor.params.filter((param) => param.required && !(descriptor.form && (param.in === "path" || descriptor.form.scopes.some((s) => s.param === param.name)))).map((param) => `--${flagOf(param)}=<${param.type}>`).join(" ");
+  const required = flagParams(descriptor).filter((param) => param.required).map((param) => `--${flagOf(param)}=<${param.type}>`).join(" ");
   const bodyHint =
     descriptor.bodyKind === "multipart"
       ? " [--input k=v] [--file f=@path]"
@@ -112,13 +118,27 @@ function fieldsToJson(fields: CliParam[]): unknown[] {
   }));
 }
 
+// The flags a command takes: for a command-map form, its path params and scope-bound params are arguments instead.
+const flagParams = (descriptor: Descriptor) =>
+  descriptor.params.filter((param) => !(descriptor.form && (param.in === "path" || descriptor.form.scopes.some((s) => s.param === param.name))));
+
 export function printContractJson(descriptor: Descriptor): void {
+  const form = descriptor.form;
   const contract = {
     command: descriptor.command.join(" "),
     ...(descriptor.variant ? { variant: descriptor.variant } : {}),
     usage: buildUsage(descriptor),
     version: descriptor.version,
-    params: descriptor.params.map((param) => ({ name: param.name, ...(param.flag ? { flag: param.flag } : {}), in: param.in, type: param.type, required: param.required, enum: param.enum, description: param.description })),
+    ...(form
+      ? {
+          method: descriptor.method,
+          path: descriptor.path,
+          arguments: form.positionals.map((p) => ({ name: p.label, param: p.param })),
+          scopes: form.scopes.map((s) => ({ flag: s.flag, name: s.label, param: s.param, in: s.in ?? "path" })),
+          selectors: form.selectors,
+        }
+      : {}),
+    params: flagParams(descriptor).map((param) => ({ name: param.name, ...(param.flag ? { flag: param.flag } : {}), in: param.in, type: param.type, required: param.required, enum: param.enum, description: param.description })),
     body: {
       kind: descriptor.bodyKind,
       fields: fieldsToJson(descriptor.bodyProps),
@@ -146,7 +166,7 @@ export function printActionHelp(descriptor: Descriptor): void {
     for (const s of descriptor.form.scopes) out(`  --${s.flag} <${s.label}>   ${s.in === "query" ? `the ${s.param} query parameter` : `the {${s.param}} in ${descriptor.path}`}\n`);
   }
 
-  const options = descriptor.params.filter((param) => !(descriptor.form && (param.in === "path" || descriptor.form.scopes.some((s) => s.param === param.name))));
+  const options = flagParams(descriptor);
   if (options.length) {
     out(`\nOPTIONS\n`);
     for (const param of options) {

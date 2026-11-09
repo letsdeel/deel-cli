@@ -252,6 +252,20 @@ export function generate(definitions: Definition[], options: GenerateOptions): G
     byCommand.set(name, [...(byCommand.get(name) ?? []), descriptor]);
   }
 
+  // The flags that pick an endpoint are read before the endpoint is known, so none may be another endpoint's own flag:
+  // `list --status archived` next to a `list` that has a status query param would leave that param unusable.
+  for (const [name, group] of byCommand) {
+    if (group.length < 2) continue;
+    const ownFlags = new Map<string, Descriptor>();
+    for (const d of group) for (const param of d.params) if (param.in !== "path" && !d.form!.scopes.some((s) => s.param === param.name)) ownFlags.set(squash(param.flag ?? param.name), d);
+    for (const d of group) {
+      for (const flag of [...d.form!.selectors.map((s) => s.flag), ...d.form!.scopes.map((s) => s.flag)]) {
+        const other = ownFlags.get(squash(flag));
+        if (other && other !== d) errors.push(`"${usage(d)}": --${flag} picks this endpoint, but it is also a flag of "${usage(other)}" (${keyOf(other)}). Name one of them differently.`);
+      }
+    }
+  }
+
   // A word can't be both a command and a group.
   const leaves = new Set(byCommand.keys());
   for (const name of leaves) {

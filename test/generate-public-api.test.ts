@@ -127,9 +127,9 @@ test("without --map the committed command map names the endpoints, and an unmapp
 
 test("a path that has a hand-picked command is reported as a warning on stderr", () => {
   const map = join(mkdtempSync(join(tmpdir(), "generate-public-api-map-")), "map.json");
-  writeFileSync(map, JSON.stringify([{ method: "GET", path: "/logs/tokens", command: "deel dev logs tokens list" }]));
-  const { stderr } = generate(["--from", definitionsFile([{ method: "GET", path: "/logs/tokens" }]), "--out", mkdtempSync(join(tmpdir(), "generate-public-api-")), "--previous", EMPTY, "--map", map]);
-  assert.match(stderr, /\[warn\] GET \/logs\/tokens has a hand-picked command/);
+  writeFileSync(map, JSON.stringify([{ method: "GET", path: "/jobs", command: "deel dev jobs list" }]));
+  const { stderr } = generate(["--from", definitionsFile([{ method: "GET", path: "/jobs" }]), "--out", mkdtempSync(join(tmpdir(), "generate-public-api-")), "--previous", EMPTY, "--map", map]);
+  assert.match(stderr, /\[warn\] GET \/jobs has a hand-picked command/);
 });
 
 test("without --previous the released names come from the manifest committed next to the script", () => {

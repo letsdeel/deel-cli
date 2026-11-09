@@ -10,7 +10,7 @@ import { EXIT } from "../src/core/errors.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
 import { staticCommands } from "../src/commands/index.ts";
 import { manifest as handPicked } from "../src/manifest.generated.ts";
-import { generatedManifest, matchForm, selectForm, setGeneratedDescriptorsForTests } from "../src/public-api/commands.ts";
+import { generatedDescriptors, loadGeneratedDescriptors, matchForm, selectForm, setGeneratedDescriptorsForTests } from "../src/public-api/commands.ts";
 import { unknownFlag } from "../src/cli.ts";
 import { parseDefinitions } from "../scripts/public-api/definitions.ts";
 import { generate, reservedClashes } from "../scripts/public-api/generate.ts";
@@ -118,7 +118,10 @@ async function callApi(argv: string[], descriptors = manifest.descriptors) {
     return Response.json({ data: [] });
   }) as typeof fetch;
   try {
-    return { ...(await capture([...argv, "--base-url", "https://example.test/rest"], descriptors)), sent };
+    // Options go before a -- terminator, which ends them.
+    const end = argv.indexOf("--");
+    const withBase = end === -1 ? [...argv, "--base-url", "https://example.test/rest"] : [...argv.slice(0, end), "--base-url", "https://example.test/rest", ...argv.slice(end)];
+    return { ...(await capture(withBase, descriptors)), sent };
   } catch (error) {
     // main.ts prints a CliError and exits non-zero; the test sees the same outcome.
     return { code: EXIT.ERROR, out: "", err: (error as Error).message, sent };
@@ -176,9 +179,14 @@ test("--generate-input in every spelling prints the skeleton and sends nothing",
   }
 });
 
-test("the committed manifest doesn't shadow static or hand-picked commands", () => {
-  const names = generatedManifest.descriptors.map((descriptor) => descriptor.command.join(" "));
+test("the committed manifest loads only when asked, and doesn't shadow static or hand-picked commands", async () => {
+  setGeneratedDescriptorsForTests(undefined);
+  assert.deepEqual(generatedDescriptors(), []);
+  const loaded = await loadGeneratedDescriptors();
+  assert.equal(generatedDescriptors(), loaded);
+  const names = loaded.map((descriptor) => descriptor.command.join(" "));
   assert.deepEqual(reservedClashes(names, { commands: handPicked.descriptors, topLevel: RESERVED_COMMANDS }), []);
+  setGeneratedDescriptorsForTests(undefined);
 });
 
 test("reservedClashes finds a name that shadows, replaces, groups or is grouped by a reserved command", () => {
@@ -392,6 +400,47 @@ test("matchForm and selectForm pick by selectors and scopes, and refuse a flag o
 
 test("unknownFlag accepts every spelling and negation of a known flag and names the first unknown one", () => {
   assert.equal(unknownFlag(["--worker-type", "eor", "--workerType=eor", "--no-json", "--json=false"], ["worker-type", "json"]), undefined);
-  assert.equal(unknownFlag(["a", "--limit", "5", "--other"], ["json"]), "limit");
+  assert.equal(unknownFlag(["a", "--limit", "5", "--other"], ["json"]), "--limit");
+  assert.equal(unknownFlag(["-x", "s1"], ["json"]), "-x");
   assert.equal(unknownFlag(["--", "--limit"], []), undefined);
+});
+
+test("an ID that starts with - goes after --, where --help is an argument too", async () => {
+  const dash = await callApi(["ships", "get", "--", "-abc"], fleet.manifest.descriptors);
+  assert.equal(dash.code, EXIT.OK, dash.err);
+  assert.equal(dash.sent[0].url.pathname, "/rest/fleet/-abc");
+  const help = await callApi(["ships", "get", "--", "--help"], fleet.manifest.descriptors);
+  assert.equal(help.code, EXIT.OK, help.err);
+  assert.equal(help.sent[0].url.pathname, "/rest/fleet/--help");
+});
+
+test("a switch selector reads --no-x and =false as off and takes true or false as its value", async () => {
+  for (const argv of [["s1", "--no-bulk"], ["s1", "--bulk=false"], ["s1", "--bulk", "false"]]) {
+    const { code, err, sent } = await callApi(["ships", "reviews", "create", ...argv, "--input", "note=x"], fleet.manifest.descriptors);
+    assert.equal(code, EXIT.OK, `${argv.join(" ")}: ${err}`);
+    assert.equal(sent[0].url.pathname, "/rest/fleet/s1/reviews", argv.join(" "));
+  }
+  const on = await callApi(["ships", "reviews", "create", "--bulk", "true", "--input", "note=x"], fleet.manifest.descriptors);
+  assert.equal(on.sent[0].url.pathname, "/rest/fleet/reviews/many");
+});
+
+test("a valued selector without its value, or a short flag, is refused instead of swallowing the next token", async () => {
+  const bare = await callApi(["ships", "get", "s1", "--worker-type", "--json"], fleet.manifest.descriptors);
+  assert.notEqual(bare.code, EXIT.OK);
+  assert.match(bare.err, /--worker-type needs a value/);
+  const short = await callApi(["ships", "get", "s1", "-x"], fleet.manifest.descriptors);
+  assert.notEqual(short.code, EXIT.OK);
+  assert.match(short.err, /has no flag -x/);
+  assert.equal(bare.sent.length + short.sent.length, 0);
+});
+
+test("--help --json describes a form's arguments, scopes and selectors, and lists the forms until one is picked", async () => {
+  const one = JSON.parse((await capture(["ships", "list", "--help", "--json"], fleet.manifest.descriptors)).out);
+  assert.deepEqual([one.arguments, one.scopes, one.selectors], [[], [{ flag: "crew", name: "crew", param: "crew_id", in: "path" }], [{ flag: "worker-type", value: "gp", optional: true }]]);
+  assert.ok(!one.params.some((param: { name: string }) => param.name === "crew_id"));
+  const get = JSON.parse((await capture(["ships", "get", "--worker-type", "eor", "--help", "--json"], fleet.manifest.descriptors)).out);
+  assert.deepEqual([get.arguments, get.path], [[{ name: "ship", param: "ship_id" }], "/eor/fleet/{ship_id}"]);
+  const forms = JSON.parse((await capture(["ships", "get", "--help", "--json"], fleet.manifest.descriptors)).out);
+  assert.equal(forms.command, "ships get");
+  assert.deepEqual(forms.forms.map((f: { usage: string }) => f.usage).sort(), ["deel ships get <ship>", "deel ships get <ship> --file-format pdf --as worker", "deel ships get <ship> --worker-type eor"]);
 });

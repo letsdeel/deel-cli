@@ -70,8 +70,22 @@ say a minute later.
 
 Each entry in `src/public-api/commands.json` names one endpoint:
 `{ "method": "GET", "path": "/contracts/{contract_id}", "command": "deel contracts get <contract>" }`.
-`npm run check:command-map` checks the map against these rules, and the generator checks that every
-argument fills a parameter.
+`npm run check:command-map` checks the map against these rules, that no entry takes a hand-picked or
+static command's name, and that a released command line (one in `src/public-api/manifest.json`) never
+changes. The generator also checks that every argument fills a parameter and that a flag that picks an
+endpoint isn't another endpoint's own flag.
+
+Other keys an entry can carry:
+
+| Key | Meaning |
+|-----|---------|
+| `api` | `"scim"` for a SCIM endpoint; REST when absent |
+| `case` | the R2 case when the verb isn't the method's (`read`, `removal`, `overwrite`, `state`, `action`) |
+| `registry` | `true` when the verb is an R3 registry verb |
+| `literals` | words that are neither plural nor declared singletons, accepted for this entry only (R5) |
+| `worker_type` | a worker type the path doesn't name but the endpoint has (R8) |
+| `collapse` | entries with the same key are one operation under one command line; the first is called (R9) |
+| `required_exception` | `--worker-type` stays required although this is the only endpoint with these words (R8) |
 
 - **R1 One grammar.** `deel <domain> <resources…> <verb> <arguments> [flags]`, lowercase kebab-case,
   resources from parent to child, exactly one verb.
@@ -92,14 +106,22 @@ argument fills a parameter.
   (`location`, `holder`, `preview`, …); new singletons are added to the checker's list.
 - **R6 Deel's own names.** Use the product's names (`custom-fields`, `form-definition`), not the path's
   when they differ.
-- **R7 Arguments and scopes.** Every path ID is an argument, in path order (`<contract>`), or a scope
-  flag (`--contract <contract>`) when it narrows a collection that also exists unscoped.
+- **R7 Arguments and scopes.** Every path ID is an argument, in path order (`<contract>`). It is a scope
+  flag (`--contract <contract>`) instead only when it tells endpoints of one resource apart: another is
+  unscoped or has another parent (`ats notes create --application|--candidate|--job`). A scope flag can
+  also name a required query param (`benefits offerings list --country <country>`).
+  **R7b:** arguments may differ between worker types only when `--worker-type` is required, and help
+  then shows one line per type.
 - **R8 Variant flags.** `--worker-type <eor|gp|daas|contractor|employee>` (taken from the path only:
   `/eor/…`, `/gp/…`, `/payouts/contractors/…`, an `ic` segment), `--as worker` for worker-login
   endpoints, `--file-format pdf|csv`, `--bulk`. When several endpoints share the words the flag is
   required and the bare command calls the endpoint whose path names no type; when only one does it is
-  optional (`[--worker-type eor]`). A variant flag never takes a global flag's name (`--raw`, `--json`,
-  `--fields`, …).
+  optional (`[--worker-type eor]`). Beyond these, a flag may pick an endpoint only if it is in the
+  checker's reviewed list (`VARIANT_FLAGS` in `scripts/check-command-map.ts`): `--status <value>` for R2's
+  state case, `--external-id` when the argument is an external ID, and the exceptions the map uses
+  (`--type`, `--manual`, `--external`, `--current`, `--deel`, `--dynamic`, `--replace`,
+  `--without-contract`). A new one goes in that list with its reason in the PR. A variant flag never
+  takes a global flag's name (`--raw`, `--json`, `--fields`, …).
 - **R9 Unique.** Words, flags and flag values are unique together. Two entries may share a command line
   only when they are the same operation and both carry the same `collapse` key; the first is called.
 - **R10 Files.** Upload is `create`, download is `get`, a rendered form is `get --file-format pdf`.

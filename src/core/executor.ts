@@ -12,7 +12,7 @@ import { CliError } from "./errors.ts";
 import { flagOf } from "./flags.ts";
 import { apiBaseUrl } from "./config.ts";
 import { envelope, render } from "./output.ts";
-import { HEADER } from "./constants.ts";
+import { HEADER, WITHHELD_RESPONSE_FIELDS } from "./constants.ts";
 
 export type ParsedCall = {
   flags: Record<string, string | string[]>; // path + query values (arrays for repeatable query params)
@@ -82,7 +82,9 @@ function buildPath(descriptor: Descriptor, flags: ParsedCall["flags"]): string {
         const text = String(value); // path params are always scalar
         // An empty value, a dot segment or a swallowed flag would send the request to another endpoint (the collection, or a parent path).
         const dots = segment === `{${name}}` && (text === "." || text === "..");
-        if (text.trim() === "" || dots || text.startsWith("--")) {
+        // A flag's value that starts with -- is a flag that lost its value; an argument can only start with -- after a -- terminator, on purpose.
+        const swallowed = text.startsWith("--") && !descriptor.form?.positionals.some((p) => p.param === name);
+        if (text.trim() === "" || dots || swallowed) {
           throw new CliError("usage.path_param", `Invalid value for path parameter ${flagFor(name)}: "${text}"`, `Pass the id the endpoint expects; a value that starts with -- is taken for a flag that lost its value.`);
         }
         return encodeURIComponent(text);
@@ -195,7 +197,22 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   // Paginated list responses carry `page: { cursor, has_next_page }` next to `data`. Surface it in
   // the envelope (only when `data` was unwrapped from one) so the caller can page with --cursor.
   const page = hasDataEnvelope && isPlainObject(payload.page) ? (payload.page as Record<string, unknown>) : undefined;
-  await render(ctx.io, envelope(data, { request_id: requestId }, page), opts.output);
+  const { kept, withheld } = withholdSecrets(data);
+  for (const field of withheld) ctx.io.err(`[note] ${field} is not printed: ${WITHHELD_RESPONSE_FIELDS[field]}.\n`);
+  await render(ctx.io, envelope(kept, { request_id: requestId }, page), opts.output);
+}
+
+// Drop the secret response fields from one record or from each record of a list, without mutating the response.
+export function withholdSecrets(data: unknown): { kept: unknown; withheld: string[] } {
+  const withheld = new Set<string>();
+  const strip = (item: unknown): unknown => {
+    if (!isPlainObject(item)) return item;
+    const secrets = Object.keys(item).filter((key) => key in WITHHELD_RESPONSE_FIELDS);
+    if (!secrets.length) return item;
+    for (const key of secrets) withheld.add(key);
+    return Object.fromEntries(Object.entries(item).filter(([key]) => !secrets.includes(key)));
+  };
+  return { kept: Array.isArray(data) ? data.map(strip) : strip(data), withheld: [...withheld] };
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

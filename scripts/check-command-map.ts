@@ -5,8 +5,14 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { bindForm, parseCommand } from "./public-api/command-map.ts";
 import type { MapEntry } from "./public-api/command-map.ts";
-import { GLOBAL_FLAGS } from "./public-api/generate.ts";
+import { GLOBAL_FLAGS, reservedClashes } from "./public-api/generate.ts";
+import type { Reserved } from "./public-api/generate.ts";
+import { formUsage } from "../src/public-api/commands.ts";
+import type { Descriptor, GeneratedManifest } from "../src/types.ts";
+import { manifest as handPicked } from "../src/manifest.generated.ts";
+import { RESERVED_COMMANDS } from "../src/core/constants.ts";
 
 const CORE = new Set(["list", "get", "create", "update", "delete"]);
 // R3: registry verbs, with the domains each is scoped to ("*" is every domain) and the last path segments that select it.
@@ -37,8 +43,27 @@ export const SINGLETONS = new Set([
   "time-off", "timeline", "transcript", "vault",
 ]);
 const WORD = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+// R8: the flags that may pick an endpoint, with the values each takes (an empty list is a switch, "*" any value).
+// The four variant flags, --status for R2's state case, --external-id for an argument that is an external ID,
+// and the reviewed exceptions the map already uses. A new one is added here, with its reason in the PR.
+export const VARIANT_FLAGS: Record<string, string[] | "*"> = {
+  "worker-type": [...new Set(Object.values(ALIAS))],
+  as: ["worker", "client"],
+  "file-format": ["pdf", "csv"],
+  bulk: [],
+  status: "*",
+  "external-id": [],
+  type: ["regular"],
+  manual: [],
+  external: [],
+  current: [],
+  deel: [],
+  dynamic: [],
+  replace: [],
+  "without-contract": [],
+};
 
-type Parsed = { domain: string; words: string[]; verb: string; args: string[]; flags: string[]; wt?: string; wtRequired?: boolean };
+type Parsed = { domain: string; words: string[]; verb: string; args: string[]; flags: string[]; scopes: string[]; wt?: string; wtRequired?: boolean };
 
 // Mark-up as the map writes it: a scope flag's <label> counts as an argument, a flag's fixed value goes with the flag.
 function parse(command: string): Parsed {
@@ -47,7 +72,7 @@ function parse(command: string): Parsed {
   const words: string[] = [];
   let index = 2;
   while (index < tokens.length && !/^[<\[-]/.test(tokens[index])) words.push(tokens[index++]);
-  const parsed: Parsed = { domain: tokens[1], words, verb: words[words.length - 1] ?? "", args: [], flags: [] };
+  const parsed: Parsed = { domain: tokens[1], words, verb: words[words.length - 1] ?? "", args: [], flags: [], scopes: [] };
   while (index < tokens.length) {
     const token = tokens[index++];
     if (token.startsWith("<")) {
@@ -56,6 +81,10 @@ function parse(command: string): Parsed {
     }
     const name = token.replace(/^\[|\]$/g, "");
     const next = tokens[index];
+    if (next !== undefined && next.startsWith("<")) {
+      parsed.scopes.push(name); // a scope flag: its <label> is read as an argument next
+      continue;
+    }
     const value = next !== undefined && !/^[<\[-]/.test(next) ? tokens[index++].replace(/^\[|\]$/g, "") : undefined;
     if (name === "--worker-type") {
       parsed.wt = value;
@@ -86,7 +115,14 @@ function triggerVerb(domain: string, segment: string): string | undefined {
 
 export type Finding = { rule: string; entry: string; message: string };
 
-export function checkMap(entries: MapEntry[]): { failures: Finding[]; warnings: Finding[] } {
+export type CheckOptions = {
+  reserved?: Reserved; // hand-picked and static command names, which the map may not take
+  released?: Descriptor[]; // the committed manifest: a released command line never changes
+};
+
+const routeOf = (method: string, path: string, api = "rest") => `${api === "scim" ? "scim " : ""}${method.toUpperCase()} ${path.replace(/\{[^}]+\}/g, "{}")}`;
+
+export function checkMap(entries: MapEntry[], options: CheckOptions = {}): { failures: Finding[]; warnings: Finding[] } {
   const failures: Finding[] = [];
   const warnings: Finding[] = [];
   const parsed = entries.map((entry) => parse(entry.command));
@@ -97,7 +133,7 @@ export function checkMap(entries: MapEntry[]): { failures: Finding[]; warnings: 
     const p = parsed[index];
     const tag = tagOf(entry);
     const fail = (rule: string, message: string) => failures.push({ rule, entry: tag, message });
-    const groupKey = JSON.stringify([p.domain, p.words, [...p.flags].sort()]);
+    const groupKey = JSON.stringify([p.domain, p.words, [...p.flags, ...p.scopes].sort()]);
     groups.set(groupKey, [...(groups.get(groupKey) ?? []), index]);
 
     // R1: one grammar, lowercase kebab-case.
@@ -137,18 +173,32 @@ export function checkMap(entries: MapEntry[]): { failures: Finding[]; warnings: 
     const ids = (entry.path.match(/\{[^}]+\}/g) ?? []).length;
     if (p.args.length < ids) fail("R7", `${ids} IDs in the path but only ${p.args.length} arguments: the command can't be called`);
     else if (p.args.length !== ids) warnings.push({ rule: "R7", entry: tag, message: `${p.args.length} arguments, ${ids} IDs in the path` });
+    else {
+      const form = bindForm(parseCommand(entry.command), entry.path, []).form;
+      const order = form?.positionals.map((positional) => entry.path.indexOf(`{${positional.param}}`)) ?? [];
+      if (order.some((at, i) => i > 0 && at < order[i - 1])) fail("R7", "arguments must follow the path order of their IDs");
+    }
 
     // R8: no global flag names, and the worker type comes from the path.
-    for (const flag of p.flags) {
-      const name = flag.split(" ")[0].replace(/^--/, "");
-      if (GLOBAL_FLAGS.has(name)) fail("R8", `--${name} is a global flag, so it can't pick an endpoint`);
+    for (const scope of p.scopes) {
+      if (GLOBAL_FLAGS.has(scope.replace(/^--/, ""))) fail("R8", `${scope} is a global flag, so it can't take an argument`);
     }
+    for (const flag of p.flags) {
+      const [name, value] = flag.replace(/^--/, "").split(" ");
+      const allowed = VARIANT_FLAGS[name];
+      if (GLOBAL_FLAGS.has(name)) fail("R8", `--${name} is a global flag, so it can't pick an endpoint`);
+      else if (allowed === undefined) fail("R8", `--${name} is not a variant flag (allowed: ${Object.keys(VARIANT_FLAGS).join(", ")})`);
+      else if (Array.isArray(allowed) && (value === undefined ? allowed.length > 0 : !allowed.includes(value))) {
+        fail("R8", allowed.length ? `--${name} takes ${allowed.join(" | ")}` : `--${name} is a switch and takes no value`);
+      }
+    }
+    if (p.wt !== undefined && !(VARIANT_FLAGS["worker-type"] as string[]).includes(p.wt)) fail("R8", `--worker-type takes ${(VARIANT_FLAGS["worker-type"] as string[]).join(" | ")}`);
     const pathType = entry.worker_type ?? pathWorkerType(entry.path);
     if (pathType && p.wt !== pathType) fail("R8", `path names worker type '${pathType}' but the command has ${p.wt ? `'${p.wt}'` : "none"}`);
     if (!pathType && p.wt) fail("R8", `command has --worker-type ${p.wt} but the path names no worker type`);
 
     // R9: words, flags and selector values are unique together.
-    const key = JSON.stringify([p.domain, p.words, [...p.flags].sort(), p.wt ?? null]);
+    const key = JSON.stringify([p.domain, p.words, [...p.flags, ...p.scopes].sort(), p.wt ?? null]);
     const before = seen.get(key);
     if (before) {
       if (entry.collapse && entry.collapse === before.collapse) warnings.push({ rule: "R9", entry: tag, message: `collapsed with ${before.path}: one command, two endpoints` });
@@ -156,6 +206,37 @@ export function checkMap(entries: MapEntry[]): { failures: Finding[]; warnings: 
     }
     seen.set(key, { path: entry.path, collapse: entry.collapse ?? "" });
   });
+
+  // R7: a path ID is a scope flag only when it tells endpoints of one resource apart (another is unscoped or has
+  // another parent); otherwise it is an argument. A scope flag that names a query param documents that param.
+  const pathScopes = entries.map((entry) => {
+    const command = parseCommand(entry.command);
+    const form = bindForm(command, entry.path, command.labels.filter((l) => l.flag).map((l) => l.flag!)).form;
+    return JSON.stringify((form?.scopes ?? []).filter((s) => !s.in).map((s) => s.flag).sort());
+  });
+  const resourceOf = (index: number) => [parsed[index].domain, ...parsed[index].words.slice(0, -1)].join(" ");
+  entries.forEach((entry, index) => {
+    if (pathScopes[index] === "[]") return;
+    const earned = entries.some((_, other) => other !== index && resourceOf(other) === resourceOf(index) && pathScopes[other] !== pathScopes[index]);
+    if (!earned) failures.push({ rule: "R7", entry: tagOf(entry), message: "no other endpoint of this resource is unscoped or has another parent, so the path ID is an argument, not a scope flag" });
+  });
+
+  // Hand-picked and static names stay theirs, and a released command line never changes.
+  if (options.reserved) {
+    const names = [...new Set(parsed.map((p) => [p.domain, ...p.words].join(" ")))];
+    for (const message of reservedClashes(names, options.reserved)) failures.push({ rule: "names", entry: message.match(/"deel ([^"]+)"/)?.[1] ?? "", message });
+  }
+  if (options.released?.length) {
+    const byRoute = new Map(entries.map((entry) => [routeOf(entry.method, entry.path, entry.api), entry]));
+    for (const descriptor of options.released) {
+      if (!descriptor.form) continue;
+      const was = formUsage(descriptor.command, descriptor.form);
+      const entry = byRoute.get(routeOf(descriptor.method, descriptor.path, descriptor.api));
+      const now = entry && bindForm(parseCommand(entry.command), entry.path, descriptor.params.filter((param) => param.in === "query").map((param) => param.name)).form;
+      const usage = entry && now ? formUsage(parseCommand(entry.command).words, now) : undefined;
+      if (usage !== was) failures.push({ rule: "lock", entry: `${descriptor.method} ${descriptor.path}`, message: `released as "${was}"${usage ? `, the map now says "${usage}"` : " and removed from the map"}. Released names never change.` });
+    }
+  }
 
   // R8 and R7b, per set of endpoints sharing words and flags.
   for (const members of groups.values()) {
@@ -179,7 +260,9 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const file = resolve(process.cwd(), process.argv[2] ?? resolve(REPO_ROOT, "src/public-api/commands.json"));
-  const { failures, warnings } = checkMap(JSON.parse(readFileSync(file, "utf8")) as MapEntry[]);
+  const released = (JSON.parse(readFileSync(resolve(REPO_ROOT, "src/public-api/manifest.json"), "utf8")) as GeneratedManifest).descriptors;
+  const reserved = { commands: handPicked.descriptors, topLevel: RESERVED_COMMANDS };
+  const { failures, warnings } = checkMap(JSON.parse(readFileSync(file, "utf8")) as MapEntry[], { reserved, released });
   for (const f of failures) process.stderr.write(`FAIL ${f.rule}  ${f.message}\n     ${f.entry}\n`);
   for (const w of warnings) process.stderr.write(`warn ${w.rule}  ${w.message}\n     ${w.entry}\n`);
   process.stderr.write(`command map: ${failures.length} failure(s), ${warnings.length} warning(s)\n`);

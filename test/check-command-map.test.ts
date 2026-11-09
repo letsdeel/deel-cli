@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { checkMap } from "../scripts/check-command-map.ts";
 import type { MapEntry } from "../scripts/public-api/command-map.ts";
+import type { Descriptor } from "../src/types.ts";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const entry = (method: string, path: string, command: string, extra: Partial<MapEntry> = {}): MapEntry => ({ method, path, command, ...extra });
@@ -45,7 +46,7 @@ test("R5: resource words are plural or declared singletons, and a list ends on a
 
 test("R7: a command with fewer arguments than path IDs can't be called", () => {
   assert.match(rules([entry("GET", "/a/{a_id}/b/{b_id}", "deel things get <b>")]).join(), /R7 2 IDs in the path but only 1 arguments/);
-  assert.deepEqual(rules([entry("GET", "/a/{a_id}/b/{b_id}", "deel things get <b> --a <a>")]), []);
+  assert.deepEqual(rules([entry("GET", "/a/{a_id}/b/{b_id}", "deel things get <a> <b>")]), []);
   const extra = checkMap([entry("GET", "/benefits", "deel benefits list --country <country>")]);
   assert.deepEqual([extra.failures.length, extra.warnings[0].rule], [0, "R7"]);
 });
@@ -59,7 +60,7 @@ test("R8: no global flag names, and the worker type comes from the path, require
   const shared = [entry("GET", "/things", "deel things list"), entry("GET", "/eor/things", "deel things list [--worker-type eor]")];
   assert.match(rules(shared).join(), /shared words, so --worker-type must be required/);
   // An alias names a namespace, so a resource called "employees" deeper in the path is not a worker type.
-  assert.deepEqual(rules([entry("GET", "/benefits/entities/{id}/employees", "deel benefits enrollments list --entity <entity>")]), []);
+  assert.deepEqual(rules([entry("GET", "/benefits/entities/{id}/employees", "deel benefits enrollments list <entity>")]), []);
   assert.deepEqual(rules([entry("GET", "/contracts/{id}/ic-taxes", "deel contracts taxes list <contract> [--worker-type contractor]")]), []);
 });
 
@@ -70,4 +71,36 @@ test("R7b and R9: arguments may differ across types only behind a required flag,
   assert.match(rules(twins()).join(), /R9 same words and flags as \/a\/\{id\}\/stop/);
   const collapsed = checkMap(twins("stop"));
   assert.deepEqual([collapsed.failures.length, collapsed.warnings[0].rule], [0, "R9"]);
+});
+
+test("R7: a scope flag only tells endpoints of one resource apart; otherwise the path ID is an argument", () => {
+  assert.match(rules([entry("GET", "/entities/{entity_id}/events", "deel payroll events list --entity <entity>")]).join(), /R7 no other endpoint of this resource/);
+  assert.deepEqual(rules([entry("GET", "/entities/{entity_id}/events", "deel payroll events list <entity>")]), []);
+  const notes = [entry("POST", "/apps/{application_id}/notes", "deel ats notes create --application <application>"), entry("POST", "/jobs/{job_id}/notes", "deel ats notes create --job <job>")];
+  assert.deepEqual(rules(notes), []);
+  assert.deepEqual(rules([entry("GET", "/benefits", "deel benefits offerings list --country <country>")]), []);
+});
+
+test("R7: arguments follow the path order of their IDs", () => {
+  assert.match(rules([entry("GET", "/a/{a_id}/b/{b_id}", "deel as bs get <b> <a>")]).join(), /arguments must follow the path order/);
+  assert.deepEqual(rules([entry("GET", "/a/{a_id}/b/{b_id}", "deel as bs get <a> <b>")]), []);
+});
+
+test("R8: only the reviewed variant flags pick an endpoint, each with its values", () => {
+  assert.match(rules([entry("GET", "/x/{id}/doc", "deel things get <thing> --file-format docx")]).join(), /--file-format takes pdf \| csv/);
+  assert.match(rules([entry("GET", "/x/{id}/raw", "deel things get <thing> --raw-mode")]).join(), /--raw-mode is not a variant flag/);
+  assert.match(rules([entry("GET", "/x/bulk", "deel things list --bulk yes")]).join(), /--bulk is a switch and takes no value/);
+  assert.match(rules([entry("GET", "/eor/x", "deel things list [--worker-type eor]"), entry("GET", "/x", "deel things list --as admin")]).join(), /--as takes worker \| client/);
+});
+
+test("names: the map may not take a hand-picked or static name, and a released command line never changes", () => {
+  const reserved = { commands: [{ command: ["jobs", "list"], method: "GET", path: "/jobs" }], topLevel: new Set(["auth"]) };
+  const clash = checkMap([entry("GET", "/foo/baz", "deel jobs list")], { reserved }).failures;
+  assert.match(clash.map((f) => f.message).join(), /"deel jobs list".*clashes with a hand-picked command/);
+  assert.match(checkMap([entry("GET", "/auth/x", "deel auth things list")], { reserved }).failures.map((f) => f.message).join(), /shadow the static "deel auth"/);
+
+  const released = [{ command: ["things", "get"], method: "GET", path: "/things/{id}", params: [], form: { positionals: [{ label: "thing", param: "id" }], scopes: [], selectors: [] } }] as unknown as Descriptor[];
+  assert.deepEqual(checkMap([entry("GET", "/things/{id}", "deel things get <thing>")], { released }).failures, []);
+  assert.match(checkMap([entry("GET", "/things/{id}", "deel things show <thing>")], { released }).failures.map((f) => f.message).join(), /released as "deel things get <thing>", the map now says "deel things show <thing>"/);
+  assert.match(checkMap([entry("GET", "/other", "deel other list")], { released }).failures.map((f) => f.message).join(), /removed from the map/);
 });

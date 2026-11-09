@@ -32,3 +32,19 @@ export function argvFlagValue(argv: string[], flag: string): string | undefined 
   const value = (parseArgs(argv, { [flag]: { type: "string" } }) as Record<string, unknown>)[flag];
   return value === undefined || value === true ? undefined : String(value);
 }
+
+// `--bulk true` reads as the switch plus an argument "true"; join such a value onto its switch (--bulk=true).
+export function joinSwitchValues(argv: string[], switches: string[]): string[] {
+  const out: string[] = [];
+  for (let index = 0; index < argv.length; index++) {
+    const token = argv[index];
+    if (token === "--") return [...out, ...argv.slice(index)];
+    const next = argv[index + 1];
+    const key = token.startsWith("--") && !token.includes("=") ? token.slice(2) : undefined;
+    if (key && (next === "true" || next === "false") && switches.some((flag) => acceptsFlag(flag, key))) {
+      out.push(`${token}=${next}`);
+      index++;
+    } else out.push(token);
+  }
+  return out;
+}

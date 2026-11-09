@@ -44,13 +44,16 @@ export function outputOpts(args: Args): OutputOpts {
 }
 
 // --base-url is intentionally NOT a declared citty arg (kept out of --help,
-// internal testing only). Read it from the raw args instead.
+// internal testing only). Read it from the raw args instead, in any spelling the parser
+// accepts (--base-url, --baseUrl), so a respelled one can't be dropped and send the call to prod.
 export function readHidden(rawArgs: string[], name: string): string | undefined {
-  const prefix = `--${name}`;
   for (let index = 0; index < rawArgs.length; index++) {
     const token = rawArgs[index];
-    if (token === prefix) return rawArgs[index + 1];
-    if (token.startsWith(prefix + "=")) return token.slice(prefix.length + 1);
+    if (token === "--") break;
+    if (!token.startsWith("--")) continue;
+    const equals = token.indexOf("=");
+    if (!acceptsFlag(name, token.slice(2, equals === -1 ? undefined : equals))) continue;
+    return equals === -1 ? rawArgs[index + 1] : token.slice(equals + 1);
   }
   return undefined;
 }
