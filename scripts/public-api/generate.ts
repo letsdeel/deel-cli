@@ -103,8 +103,42 @@ function isSunset(entry: Definition, now: Date): boolean {
   return entry.sunset_at !== null && new Date(entry.sunset_at).getTime() <= now.getTime();
 }
 
+// The extractor reads one object schema. Several object variants (an allOf, or an anyOf/oneOf with two or more
+// object members) read as one object: every variant's properties, described by the first variant that has them,
+// a property's enums joined, and a property required only where every variant requires it (where any does, for
+// allOf). A single member plus null stays, since the extractor reads that as nullable; variants that aren't all
+// objects stay too.
+export function mergeVariants(schema: any): any {
+  if (Array.isArray(schema)) return schema.map(mergeVariants);
+  if (!schema || typeof schema !== "object") return schema;
+  let out: AnyObj = Object.fromEntries(Object.entries(schema).map(([key, value]) => [key, mergeVariants(value)]));
+  for (const key of ["allOf", "anyOf", "oneOf"] as const) {
+    const variants: AnyObj[] | undefined = out[key];
+    if (!Array.isArray(variants)) continue;
+    const members = variants.filter((member) => member?.type !== "null");
+    const isObject = (member: AnyObj) => member?.type === "object" || (member?.properties && member.type === undefined);
+    if (!members.length || !members.every(isObject) || (key !== "allOf" && members.length < 2)) continue;
+    const { [key]: _drop, ...outer } = out;
+    const properties: AnyObj = { ...(outer.properties ?? {}) };
+    for (const member of members) {
+      for (const [name, property] of Object.entries<AnyObj>(member.properties ?? {})) {
+        const before = properties[name];
+        // The first variant that names a property describes it; a later one only adds enum values.
+        properties[name] = !before ? property : before.enum && property.enum ? { ...before, enum: [...new Set([...before.enum, ...property.enum])] } : before;
+      }
+    }
+    const requiredOf = members.map((member) => new Set<string>(member.required ?? []));
+    const required = key === "allOf"
+      ? requiredOf.flatMap((names) => [...names])
+      : [...requiredOf[0]].filter((name) => requiredOf.every((names) => names.has(name)));
+    const all = [...new Set([...(outer.required ?? []), ...required])];
+    out = { ...outer, type: "object", properties, ...(all.length ? { required: all } : {}), ...(members.length < variants.length ? { nullable: true } : {}) };
+  }
+  return out;
+}
+
 function toDescriptor(command: string[], primary: Definition, versions: VersionInfo[], beta: boolean): Descriptor {
-  const operation = primary.operation;
+  const operation = mergeVariants(primary.operation);
   const { bodyKind, bodyProps, maxItems, fileFields, supportsMultipart, bodyWrapper } = bodyFrom(operation);
   const { responseKind, responseFields } = responseFrom(operation);
   return {

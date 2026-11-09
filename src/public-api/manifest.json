@@ -836,7 +836,9 @@
      "description": "Identifier of an existing hourly report preset used to link standardized rate and scale metadata to this entry."
     }
    ],
-   "fileFields": [],
+   "fileFields": [
+    "file"
+   ],
    "responseKind": "object",
    "responseFields": [
     {
@@ -27799,10 +27801,397 @@
      "description": "The unique identifier of the employee contract."
     }
    ],
-   "bodyProps": [],
+   "bodyProps": [
+    {
+     "name": "scale",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "hourly",
+      "daily",
+      "weekly",
+      "monthly",
+      "biweekly",
+      "semimonthly",
+      "custom",
+      "annually",
+      "two_weekly",
+      "bi_monthly",
+      "one_off"
+     ],
+     "description": "Defines the scale at which the amount is paid. For example, enter 'hourly' to define the amount per hour. This field can be excluded when creating a Pay-as-you-go task-based or Milestone contracts."
+    },
+    {
+     "name": "amount",
+     "in": "body",
+     "type": "number",
+     "required": false,
+     "description": "Amount to be paid per scale."
+    },
+    {
+     "name": "cycle_end",
+     "in": "body",
+     "type": "number",
+     "required": false,
+     "description": "Day of the month when the cycle ends."
+    },
+    {
+     "name": "frequency",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "weekly",
+      "monthly",
+      "biweekly",
+      "semimonthly",
+      "calendar-month"
+     ],
+     "description": "Scale of the invoice cycle."
+    },
+    {
+     "name": "start_date",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The contract start date in ISO-8601 format (YYYY-MM-DD). Updates the contract's effective date."
+    },
+    {
+     "name": "job_title_id",
+     "in": "body",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "seniority_id",
+     "in": "body",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "currency_code",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Currency code in ISO 4217 format."
+    },
+    {
+     "name": "first_payment",
+     "in": "body",
+     "type": "number",
+     "required": false,
+     "description": "Amount to be paid as the first payment."
+    },
+    {
+     "name": "scope_of_work",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Text to describe the scope of work of the contract."
+    },
+    {
+     "name": "cycle_end_type",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "DAY_OF_WEEK",
+      "DAY_OF_LAST_WEEK",
+      "DAY_OF_MONTH"
+     ],
+     "description": "Cycle end can be weekly 1-7 (Monday = 1) or monthly 1-31."
+    },
+    {
+     "name": "effective_date",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Short date in format ISO-8601 (YYYY-MM-DD). For example: 2022-12-31."
+    },
+    {
+     "name": "job_title_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "You can enter new job title."
+    },
+    {
+     "name": "special_clause",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Text to describe any special clause in contract."
+    },
+    {
+     "name": "payment_due_days",
+     "in": "body",
+     "type": "number",
+     "required": false,
+     "description": "Number of days after the invoice is sent that the payment is due."
+    },
+    {
+     "name": "payment_due_type",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "REGULAR",
+      "WITHIN_MONTH"
+     ],
+     "description": "Type of payment due. If the payment is due on the last day of month, enter 'WITHIN_MONTH'."
+    },
+    {
+     "name": "first_payment_date",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Short date in format ISO-8601 (YYYY-MM-DD). For example: 2022-12-31."
+    },
+    {
+     "name": "pay_before_weekends",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "If the payment due is on a weekend, pay on Friday."
+    },
+    {
+     "name": "end_date",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Short date in format ISO-8601 (YYYY-MM-DD). Required when contract_term is 'definite'."
+    },
+    {
+     "name": "type_of_edit",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "amendment",
+      "direct"
+     ],
+     "description": "Whether the change requires a signature. 'amendment' (default) creates a pending amendment that must be signed via POST /contracts/{contract_id}/amendments/{amendment_id}/sign before it takes effect. 'direct' applies the change immediately, with no signature required."
+    },
+    {
+     "name": "change_reason",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The unique identifier (oid) of a modification reason configured for the organization, not free text. Required by organizations that have modification reasons configured."
+    },
+    {
+     "name": "contract_term",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "definite",
+      "indefinite"
+     ],
+     "description": "Whether the contract has a fixed end date. 'end_date' is required when this is 'definite'."
+    },
+    {
+     "name": "custom_fields",
+     "in": "body",
+     "type": "array",
+     "required": false,
+     "description": "Custom field values to update.",
+     "maxItems": 100
+    },
+    {
+     "name": "payout_currency",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Currency the worker is paid out in."
+    },
+    {
+     "name": "pay_slip_currency",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Currency shown on the payslip."
+    },
+    {
+     "name": "contract_start_date",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Short date in format ISO-8601 (YYYY-MM-DD). The contract start date."
+    },
+    {
+     "name": "base_compensation_type",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "salaried",
+      "hourly",
+      "unpaid",
+      "commission_only"
+     ],
+     "description": "Type of base compensation. Defaults to salaried if base compensation fields are provided and this is omitted."
+    },
+    {
+     "name": "variable_compensations",
+     "in": "body",
+     "type": "array",
+     "required": false,
+     "description": "Variable compensations to add or update alongside the base compensation change.",
+     "maxItems": 50
+    },
+    {
+     "name": "base_compensation_custom_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Custom display name for the base compensation."
+    }
+   ],
    "fileFields": [],
-   "responseKind": "none",
-   "responseFields": [],
+   "responseKind": "object",
+   "responseFields": [
+    {
+     "name": "id",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "The unique identifier of the created amendment."
+    },
+    {
+     "name": "rate",
+     "in": "body",
+     "type": "number",
+     "required": false,
+     "description": "Rate/amount for the amended work statement."
+    },
+    {
+     "name": "scale",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "hourly",
+      "daily",
+      "weekly",
+      "monthly",
+      "biweekly",
+      "semimonthly",
+      "custom",
+      "annually",
+      "two_weekly",
+      "bi_monthly",
+      "one_off"
+     ],
+     "description": "Payment scale for the amended work statement."
+    },
+    {
+     "name": "status",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "enum": [
+      "initial",
+      "pending",
+      "active",
+      "outdated",
+      "approved",
+      "declined",
+      "waiting_for_approval",
+      "waiting_client_sign",
+      "waiting_worker_sign",
+      "signed",
+      "completed",
+      "obsolete",
+      "applied"
+     ],
+     "description": "Status of the amended work statement."
+    },
+    {
+     "name": "created",
+     "in": "body",
+     "type": "boolean",
+     "required": true,
+     "description": "Contract has been successfully amended."
+    },
+    {
+     "name": "job_title",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Job title for the amended work statement."
+    },
+    {
+     "name": "worker_id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The unique identifier of the worker."
+    },
+    {
+     "name": "created_at",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Timestamp when the work statement was created."
+    },
+    {
+     "name": "updated_at",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Timestamp when the work statement was last updated."
+    },
+    {
+     "name": "currency_code",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Currency code for the amended work statement."
+    },
+    {
+     "name": "scope_of_work",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Scope of work for the amended work statement."
+    },
+    {
+     "name": "special_clause",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Special clause for the amended work statement."
+    },
+    {
+     "name": "termination_notice_days",
+     "in": "body",
+     "type": "integer",
+     "required": false,
+     "description": "Number of days notice required for termination. Defaults to 10 if not provided."
+    },
+    {
+     "name": "effective_date",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Short date in format ISO-8601 (YYYY-MM-DD) when the amendment takes effect."
+    },
+    {
+     "name": "base_compensation_type",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "salaried",
+      "hourly",
+      "unpaid",
+      "commission_only"
+     ],
+     "description": "Type of base compensation for the amendment."
+    }
+   ],
    "api": "rest",
    "versions": [
     {
@@ -30238,7 +30627,140 @@
    "bodyProps": [],
    "fileFields": [],
    "responseKind": "array",
-   "responseFields": [],
+   "responseFields": [
+    {
+     "name": "id",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Unique identifier for the work statement."
+    },
+    {
+     "name": "rate",
+     "in": "body",
+     "type": "number",
+     "required": false,
+     "description": "Compensation rate per scale. The amount paid according to the specified scale (e.g., 5000 per month)."
+    },
+    {
+     "name": "scale",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "hourly",
+      "daily",
+      "weekly",
+      "monthly",
+      "biweekly",
+      "semimonthly",
+      "custom",
+      "annually",
+      "two_weekly",
+      "bi_monthly",
+      "one_off"
+     ],
+     "description": "Payment frequency/scale that defines how often the rate is paid."
+    },
+    {
+     "name": "status",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "enum": [
+      "INITIAL",
+      "PENDING",
+      "ACTIVE",
+      "OUTDATED",
+      "APPROVED",
+      "DECLINED",
+      "waiting_for_approval",
+      "waiting_client_sign",
+      "waiting_worker_sign",
+      "signed",
+      "completed",
+      "obsolete"
+     ],
+     "description": "Current status of the work statement."
+    },
+    {
+     "name": "created_at",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Timestamp when the work statement was created."
+    },
+    {
+     "name": "updated_at",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Timestamp when the work statement was last updated."
+    },
+    {
+     "name": "sign_status",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "enum": [
+      "PENDING",
+      "WAITING_FOR_APPROVAL",
+      "APPROVED",
+      "DECLINED"
+     ],
+     "description": "Current sign status of the work statement."
+    },
+    {
+     "name": "contract_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Name of the associated contract."
+    },
+    {
+     "name": "contract_type",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "milestones",
+      "time_based",
+      "ongoing_time_based",
+      "pay_as_you_go_time_based",
+      "commission",
+      "payg_milestones",
+      "payg_tasks"
+     ],
+     "description": "Type of the associated IC contract."
+    },
+    {
+     "name": "currency_code",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Currency code in ISO 4217 format (e.g., USD, EUR, GBP)."
+    },
+    {
+     "name": "effective_date",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Effective date when the work statement becomes active."
+    },
+    {
+     "name": "base_compensation_type",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "salaried",
+      "hourly",
+      "unpaid",
+      "commission_only"
+     ],
+     "description": "Type of base compensation for the amendment."
+    }
+   ],
    "api": "rest",
    "versions": [
     {
@@ -34025,8 +34547,414 @@
    "supportsMultipart": true,
    "bodyWrapper": "data",
    "params": [],
-   "bodyProps": [],
-   "fileFields": [],
+   "bodyProps": [
+    {
+     "name": "meta",
+     "in": "body",
+     "type": "object",
+     "required": true,
+     "description": "Additional custom info about a contract",
+     "properties": [
+      {
+       "name": "is_main_income",
+       "in": "body",
+       "type": "boolean",
+       "required": false,
+       "description": "Flag to indicate if the contract is the main income for the contractor."
+      },
+      {
+       "name": "documents_required",
+       "in": "body",
+       "type": "boolean",
+       "required": true,
+       "description": "Require the contractor to upload necessary compliance documents as per their country’s labor laws."
+      }
+     ]
+    },
+    {
+     "name": "title",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "The title of the contract."
+    },
+    {
+     "name": "client",
+     "in": "body",
+     "type": "object",
+     "required": true,
+     "description": "Client details for the contract, including the legal entity and team.",
+     "properties": [
+      {
+       "name": "team",
+       "in": "body",
+       "type": "object",
+       "required": true,
+       "description": "Choose the Deel team for this contract. Use teams endpoint to retrieve a list of teams in your organization.",
+       "properties": [
+        {
+         "name": "id",
+         "in": "body",
+         "type": "string",
+         "required": true,
+         "description": "Unique identifier of this resource."
+        }
+       ]
+      },
+      {
+       "name": "legal_entity",
+       "in": "body",
+       "type": "object",
+       "required": true,
+       "description": "Choose the Deel legal entity for this contract. Use legal entity endpoint to retrieve a list of legal entities in your organization.",
+       "properties": [
+        {
+         "name": "id",
+         "in": "body",
+         "type": "string",
+         "required": true,
+         "description": "Unique identifier of this resource."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "worker",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "nullable": true,
+     "description": "Worker properties",
+     "properties": [
+      {
+       "name": "last_name",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "nullable": true,
+       "description": "Worker's last name"
+      },
+      {
+       "name": "first_name",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "nullable": true,
+       "description": "Worker's first name"
+      },
+      {
+       "name": "work_email",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "nullable": true,
+       "description": "Worker's work email address."
+      },
+      {
+       "name": "expected_email",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "nullable": true,
+       "description": "Worker's email address."
+      }
+     ]
+    },
+    {
+     "name": "job_title",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "description": "Worker's job title. You can enter a custom job title or use a pre-defined job title using the Id retrieved in job-titles endpoint.",
+     "properties": [
+      {
+       "name": "id",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Unique identifier of this resource."
+      },
+      {
+       "name": "name",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "nullable": true,
+       "description": "Job title. Please leave it blank when entering an Id."
+      }
+     ]
+    },
+    {
+     "name": "seniority",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "nullable": true,
+     "description": "Job seniority level. Please use the seniority levels endpoint to retrieve the list of seniority levels.",
+     "properties": [
+      {
+       "name": "id",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Unique identifier of this resource."
+      }
+     ]
+    },
+    {
+     "name": "state_code",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "The state or province code. Use country lookup endpoint to retrieve state codes."
+    },
+    {
+     "name": "citizenship",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "ISO 3166-1 alpha-2 country code of the worker's citizenship."
+    },
+    {
+     "name": "external_id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "External Id."
+    },
+    {
+     "name": "who_reports",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "both",
+      "client",
+      "contractor"
+     ],
+     "description": "Flag to indicate who is supposed to provide regular reports"
+    },
+    {
+     "name": "country_code",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Country code."
+    },
+    {
+     "name": "notice_period",
+     "in": "body",
+     "type": "number",
+     "required": false,
+     "description": "Days before to notice the termination of contract for either party."
+    },
+    {
+     "name": "scope_of_work",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Describe the work to be performed."
+    },
+    {
+     "name": "special_clause",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Enter any special clause you may have."
+    },
+    {
+     "name": "scope_of_work_id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Existing scope of work public id"
+    },
+    {
+     "name": "termination_date",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Short date in format ISO-8601 (YYYY-MM-DD). For example: 2022-12-31."
+    },
+    {
+     "name": "contract_template_id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Contract Template Id."
+    },
+    {
+     "name": "platform_payment_type",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "STANDARD",
+      "OFF_PLATFORM"
+     ],
+     "description": "Whether the contract is paid through Deel (`STANDARD`) or outside Deel (`OFF_PLATFORM`). Applies to IC contracts only."
+    },
+    {
+     "name": "type",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "enum": [
+      "pay_as_you_go_time_based",
+      "payg_tasks",
+      "payg_milestones",
+      "ongoing_time_based"
+     ],
+     "description": "Type of contract"
+    },
+    {
+     "name": "start_date",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Short date in format ISO-8601 (YYYY-MM-DD). For example: 2022-12-31."
+    },
+    {
+     "name": "compensation_details",
+     "in": "body",
+     "type": "object",
+     "required": true,
+     "description": "Compensation and invoicing configuration for the contract.",
+     "properties": [
+      {
+       "name": "amount",
+       "in": "body",
+       "type": "number",
+       "required": true,
+       "description": "Amount to be paid. This field can be excluded when creating a Pay-as-you-go task-based or Milestone contracts."
+      },
+      {
+       "name": "cycle_end",
+       "in": "body",
+       "type": "number",
+       "required": false,
+       "description": "Date invoice cycle ends."
+      },
+      {
+       "name": "frequency",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "enum": [
+        "weekly",
+        "monthly",
+        "biweekly",
+        "semimonthly",
+        "calendar-month"
+       ],
+       "description": "Scale of the invoice cycle."
+      },
+      {
+       "name": "currency_code",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Currency code."
+      },
+      {
+       "name": "first_payment",
+       "in": "body",
+       "type": "number",
+       "required": false,
+       "description": "First payment amount."
+      },
+      {
+       "name": "notice_period",
+       "in": "body",
+       "type": "number",
+       "required": false,
+       "description": "Days before to notice the termination of contract for either party."
+      },
+      {
+       "name": "cycle_end_type",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "enum": [
+        "DAY_OF_WEEK",
+        "DAY_OF_LAST_WEEK",
+        "DAY_OF_MONTH"
+       ],
+       "description": "Cycle end can be weekly 1-7 (Monday = 1) or monthly 1-31."
+      },
+      {
+       "name": "payment_due_days",
+       "in": "body",
+       "type": "number",
+       "required": false,
+       "description": "Number of days to pay the invoice."
+      },
+      {
+       "name": "payment_due_type",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "enum": [
+        "REGULAR",
+        "WITHIN_MONTH",
+        "AFTER_MONTH",
+        "BEFORE_CYCLE_END"
+       ],
+       "description": "Type of payment due. If the payment is due on the last day of month, enter 'WITHIN_MONTH'. If the payment is due some days after the end of the month, enter 'AFTER_MONTH'. If the payment is due before the end of the invoice cycle, enter 'BEFORE_CYCLE_END'."
+      },
+      {
+       "name": "payment_policy_id",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "ID of a pre-configured payment policy. When provided, the payment schedule is derived from the policy and the individual payment fields (frequency, cycle_end, cycle_end_type, payment_due_type, payment_due_days, pay_before_weekends) must be omitted. Mutually exclusive with those individual fields."
+      },
+      {
+       "name": "first_payment_date",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "nullable": true,
+       "description": "Short date in format ISO-8601 (YYYY-MM-DD). For example: 2022-12-31."
+      },
+      {
+       "name": "pay_before_weekends",
+       "in": "body",
+       "type": "boolean",
+       "required": false,
+       "description": "If the payment due is on a weekend, pay on Friday."
+      },
+      {
+       "name": "scale",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "enum": [
+        "hourly",
+        "daily",
+        "weekly",
+        "monthly",
+        "biweekly",
+        "semimonthly",
+        "custom"
+       ],
+       "description": "Defines the scale at which the amount is paid. For example, enter 'hourly' to define the amount per hour. This field can be excluded when creating a Pay-as-you-go task-based or Milestone contracts."
+      }
+     ]
+    }
+   ],
+   "fileFields": [
+    "custom_contract_file"
+   ],
    "responseKind": "object",
    "responseFields": [
     {
@@ -37664,9 +38592,49 @@
     {
      "name": "type",
      "in": "body",
-     "type": "string",
+     "type": "object",
      "required": false,
-     "description": "Type definition of the custom field"
+     "description": "Type definition of the custom field",
+     "properties": [
+      {
+       "name": "name",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "enum": [
+        "text",
+        "number",
+        "date",
+        "percentage",
+        "hyperlink",
+        "currency",
+        "list",
+        "multiselect"
+       ],
+       "description": "Simple field type"
+      },
+      {
+       "name": "currency",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "ISO currency code"
+      },
+      {
+       "name": "is_fixed",
+       "in": "body",
+       "type": "boolean",
+       "required": false,
+       "description": "Whether the currency is fixed"
+      },
+      {
+       "name": "options",
+       "in": "body",
+       "type": "array",
+       "required": false,
+       "description": "Available options for the list field"
+      }
+     ]
     },
     {
      "name": "settings",
@@ -37813,9 +38781,49 @@
     {
      "name": "type",
      "in": "body",
-     "type": "string",
+     "type": "object",
      "required": true,
-     "description": "Type configuration of the custom field including its data type and type-specific properties"
+     "description": "Type configuration of the custom field including its data type and type-specific properties",
+     "properties": [
+      {
+       "name": "name",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "enum": [
+        "text",
+        "number",
+        "date",
+        "percentage",
+        "hyperlink",
+        "currency",
+        "list",
+        "multiselect"
+       ],
+       "description": "Simple types"
+      },
+      {
+       "name": "currency",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Currency code (null when is_fixed is false)"
+      },
+      {
+       "name": "is_fixed",
+       "in": "body",
+       "type": "boolean",
+       "required": false,
+       "description": "When currency is fixed, only the amount can be edited by the users"
+      },
+      {
+       "name": "options",
+       "in": "body",
+       "type": "array",
+       "required": false,
+       "description": "List of options for the custom field"
+      }
+     ]
     },
     {
      "name": "settings",
@@ -37965,8 +38973,47 @@
     {
      "name": "data",
      "in": "body",
-     "type": "string",
-     "required": true
+     "type": "object",
+     "required": true,
+     "properties": [
+      {
+       "name": "value",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "text",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "amount",
+       "in": "body",
+       "type": "number",
+       "required": false
+      },
+      {
+       "name": "currency",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The currency code in ISO 4217 format"
+      },
+      {
+       "name": "option",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "options",
+       "in": "body",
+       "type": "array",
+       "required": false
+      }
+     ]
     },
     {
      "name": "name",
@@ -38047,8 +39094,41 @@
     {
      "name": "data",
      "in": "body",
-     "type": "string",
-     "required": true
+     "type": "object",
+     "required": true,
+     "properties": [
+      {
+       "name": "value",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "amount",
+       "in": "body",
+       "type": "number",
+       "required": false
+      },
+      {
+       "name": "currency",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Important: When currency type is fixed, the currency field is ignored. "
+      },
+      {
+       "name": "option",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "options",
+       "in": "body",
+       "type": "array",
+       "required": false
+      }
+     ]
     }
    ],
    "fileFields": [],
@@ -39555,7 +40635,456 @@
            "in": "body",
            "type": "object",
            "required": false,
-           "description": "Country-specific metadata for the question. The shape depends on the question key: `employment.start_date` → payroll scheduling info; `employment.end_date` → definite-contract configuration; `compensation_details.salary` → salary bounds; `employment.holidays` → PTO bounds; `employment.probation_period` → probation rules; `employment.notice_period_type` → notice period rules matrix."
+           "description": "Country-specific metadata for the question. The shape depends on the question key: `employment.start_date` → payroll scheduling info; `employment.end_date` → definite-contract configuration; `compensation_details.salary` → salary bounds; `employment.holidays` → PTO bounds; `employment.probation_period` → probation rules; `employment.notice_period_type` → notice period rules matrix.",
+           "properties": [
+            {
+             "name": "payroll_lock",
+             "in": "body",
+             "type": "integer",
+             "required": false,
+             "description": "Day of the month after which the start date can no longer be set in the current month (payroll lock day)."
+            },
+            {
+             "name": "min_value_buffer_in_days",
+             "in": "body",
+             "type": "integer",
+             "required": false,
+             "description": "Minimum number of days from today before a start date can be selected. A value of 0 means the earliest available date is today (or the first upcoming payroll-eligible date). Null when no start date buffer is configured for the country."
+            },
+            {
+             "name": "is_same_month_payment_country",
+             "in": "body",
+             "type": "boolean",
+             "required": false,
+             "description": "Whether this country processes payroll in the same month as the employment start date (true) or the following month (false)."
+            },
+            {
+             "name": "type",
+             "in": "body",
+             "type": "string",
+             "required": false,
+             "enum": [
+              "NOT_ALLOWED",
+              "ALLOWED_WITHOUT_LIMITATION",
+              "ALLOWED_WITH_MAXIMUM_LIMITATION"
+             ],
+             "description": "Definite-contract policy for this country. Possible values: NOT_ALLOWED (no fixed-term contracts), ALLOWED_WITHOUT_LIMITATION (fixed-term allowed without duration limit), ALLOWED_WITH_MAXIMUM_LIMITATION (fixed-term allowed up to a maximum duration)."
+            },
+            {
+             "name": "maximum_limitation_in_months",
+             "in": "body",
+             "type": "integer",
+             "required": false,
+             "description": "Maximum fixed-term contract duration in months. Null when there is no maximum limitation."
+            },
+            {
+             "name": "max_salary",
+             "in": "body",
+             "type": "number",
+             "required": false,
+             "description": "Maximum allowable gross annual salary for this country. Null when no maximum salary is configured for the country."
+            },
+            {
+             "name": "min_salary",
+             "in": "body",
+             "type": "number",
+             "required": false,
+             "description": "Minimum allowable gross annual salary for this country. Null when no minimum salary is configured for the country."
+            },
+            {
+             "name": "additional_payments",
+             "in": "body",
+             "type": "array",
+             "required": false,
+             "description": "Country-mandated irregular payments (e.g. 13th salary, profit sharing) that are included in the total employment cost.",
+             "properties": [
+              {
+               "name": "amount",
+               "in": "body",
+               "type": "number",
+               "required": false,
+               "description": "Fixed amount of the payment (0 when it is percentage-based)."
+              },
+              {
+               "name": "payment_name",
+               "in": "body",
+               "type": "string",
+               "required": false,
+               "description": "Display name of the additional payment."
+              },
+              {
+               "name": "invoicing_type",
+               "in": "body",
+               "type": "string",
+               "required": false,
+               "description": "How the payment is invoiced (e.g. Single Month, Multiple Months)."
+              },
+              {
+               "name": "invoicing_months",
+               "in": "body",
+               "type": "array",
+               "required": false,
+               "description": "Months in which the payment is invoiced."
+              },
+              {
+               "name": "how_its_calculated",
+               "in": "body",
+               "type": "string",
+               "required": false,
+               "description": "Human-readable explanation of the calculation method."
+              },
+              {
+               "name": "payment_local_name",
+               "in": "body",
+               "type": "string",
+               "required": false,
+               "description": "Local-language name of the additional payment."
+              }
+             ]
+            },
+            {
+             "name": "part_time_holiday_type",
+             "in": "body",
+             "type": "string",
+             "required": false,
+             "description": "How holiday pay is calculated for part-time employees (e.g. PRORATED, STANDARD)."
+            },
+            {
+             "name": "standard_hours_per_week",
+             "in": "body",
+             "type": "number",
+             "required": false,
+             "description": "Standard working hours per week used as the full-time reference."
+            },
+            {
+             "name": "max_holidays",
+             "in": "body",
+             "type": "number",
+             "required": false,
+             "description": "Maximum paid vacation days allowed. Null when there is no upper limit."
+            },
+            {
+             "name": "min_holidays",
+             "in": "body",
+             "type": "number",
+             "required": false,
+             "description": "Minimum statutory paid vacation days for this country."
+            },
+            {
+             "name": "specific_calculation_rules",
+             "in": "body",
+             "type": "object",
+             "required": false,
+             "description": "Calculation rules when probation_type_for_definite is SPECIFIC_CALCULATION. Null for other types.",
+             "properties": [
+              {
+               "name": "time_unit",
+               "in": "body",
+               "type": "string",
+               "required": false,
+               "enum": [
+                "DAY",
+                "WEEK",
+                "MONTH"
+               ],
+               "description": "Time unit for all probation durations in this object (DAY, WEEK, or MONTH)."
+              },
+              {
+               "name": "max_probation_for_definite",
+               "in": "body",
+               "type": "number",
+               "required": false,
+               "description": "Maximum probation duration (in the unit specified by time_unit)."
+              },
+              {
+               "name": "min_probation_for_definite",
+               "in": "body",
+               "type": "number",
+               "required": false,
+               "description": "Minimum probation duration (in the unit specified by time_unit)."
+              },
+              {
+               "name": "max_probation_type_for_definite",
+               "in": "body",
+               "type": "string",
+               "required": false,
+               "description": "The formula used to derive the maximum probation period for a definite contract."
+              }
+             ]
+            },
+            {
+             "name": "probation_type_for_definite",
+             "in": "body",
+             "type": "string",
+             "required": false,
+             "enum": [
+              "STANDARD",
+              "SPECIFIC_CALCULATION",
+              "SPECIFIC_TO_DURATION_OF_CONTRACT"
+             ],
+             "description": "How the probation period is determined for definite (fixed-term) contracts. Possible values: STANDARD (fixed statutory period), SPECIFIC_CALCULATION (calculated from a rule), SPECIFIC_TO_DURATION_OF_CONTRACT (derived from contract length)."
+            },
+            {
+             "name": "specific_to_duration_of_contract_rules",
+             "in": "body",
+             "type": "array",
+             "required": false,
+             "description": "Rules mapping contract duration ranges to probation periods when probation_type_for_definite is SPECIFIC_TO_DURATION_OF_CONTRACT. Null for other types.",
+             "properties": [
+              {
+               "name": "time_unit",
+               "in": "body",
+               "type": "string",
+               "required": false,
+               "enum": [
+                "DAY",
+                "WEEK",
+                "MONTH"
+               ],
+               "description": "Time unit for probation_period and min_probation_period (DAY, WEEK, or MONTH)."
+              },
+              {
+               "name": "probation_period",
+               "in": "body",
+               "type": "number",
+               "required": false,
+               "description": "Probation duration for contracts in this range."
+              },
+              {
+               "name": "min_probation_period",
+               "in": "body",
+               "type": "number",
+               "required": false,
+               "description": "Minimum probation duration for contracts in this range."
+              },
+              {
+               "name": "max_employment_duration",
+               "in": "body",
+               "type": "number",
+               "required": false,
+               "description": "Upper bound of the contract duration range. Null when unbounded."
+              },
+              {
+               "name": "min_employment_duration",
+               "in": "body",
+               "type": "number",
+               "required": false,
+               "description": "Lower bound of the contract duration range."
+              },
+              {
+               "name": "employment_duration_type",
+               "in": "body",
+               "type": "string",
+               "required": false,
+               "enum": [
+                "DAY",
+                "WEEK",
+                "MONTH",
+                "YEAR"
+               ],
+               "description": "Time unit for the employment duration bounds (DAY, WEEK, MONTH, or YEAR)."
+              }
+             ]
+            },
+            {
+             "name": "notice_period_settings",
+             "in": "body",
+             "type": "array",
+             "required": false,
+             "description": "Notice-period configuration, one entry per employment type and term combination.",
+             "properties": [
+              {
+               "name": "tenure_rules",
+               "in": "body",
+               "type": "array",
+               "required": false,
+               "description": "Tenure-based notice period rules, used when the notice type is TENURE_BASED.",
+               "properties": [
+                {
+                 "name": "time_unit",
+                 "in": "body",
+                 "type": "string",
+                 "required": false,
+                 "enum": [
+                  "DAY",
+                  "WEEK",
+                  "MONTH"
+                 ],
+                 "description": "Time unit for notice_value."
+                },
+                {
+                 "name": "notice_value",
+                 "in": "body",
+                 "type": "integer",
+                 "required": false,
+                 "description": "Notice period value for contracts in this tenure range."
+                },
+                {
+                 "name": "max_employment_duration",
+                 "in": "body",
+                 "type": "integer",
+                 "required": false,
+                 "description": "Upper bound of the employment-duration range. Null when unbounded."
+                },
+                {
+                 "name": "min_employment_duration",
+                 "in": "body",
+                 "type": "integer",
+                 "required": false,
+                 "description": "Lower bound of the employment-duration range."
+                },
+                {
+                 "name": "employment_duration_type",
+                 "in": "body",
+                 "type": "string",
+                 "required": false,
+                 "enum": [
+                  "DAY",
+                  "WEEK",
+                  "MONTH",
+                  "YEAR"
+                 ],
+                 "description": "Time unit for the employment-duration bounds."
+                }
+               ]
+              },
+              {
+               "name": "employment_term",
+               "in": "body",
+               "type": "string",
+               "required": false,
+               "enum": [
+                "DEFINITE",
+                "INDEFINITE"
+               ],
+               "description": "Employment term this rule applies to."
+              },
+              {
+               "name": "employment_type",
+               "in": "body",
+               "type": "string",
+               "required": false,
+               "enum": [
+                "FULL_TIME",
+                "PART_TIME"
+               ],
+               "description": "Employment type this rule applies to."
+              },
+              {
+               "name": "type_for_after_probation",
+               "in": "body",
+               "type": "string",
+               "required": false,
+               "description": "How the notice period is determined after probation (e.g. NO_NOTICE_PERIOD, MIN_MAX_LIMITED, SPECIFIC, TENURE_BASED)."
+              },
+              {
+               "name": "type_for_during_probation",
+               "in": "body",
+               "type": "string",
+               "required": false,
+               "description": "How the notice period is determined during probation (e.g. NO_NOTICE_PERIOD, MIN_MAX_LIMITED, SPECIFIC, TENURE_BASED)."
+              },
+              {
+               "name": "notice_period_after_probation",
+               "in": "body",
+               "type": "object",
+               "required": false,
+               "description": "Notice period minimum/maximum bounds and default for this segment.",
+               "properties": [
+                {
+                 "name": "max_value",
+                 "in": "body",
+                 "type": "integer",
+                 "required": false,
+                 "description": "Maximum notice period value. Null when not applicable."
+                },
+                {
+                 "name": "min_value",
+                 "in": "body",
+                 "type": "integer",
+                 "required": false,
+                 "description": "Minimum notice period value. Null when not applicable."
+                },
+                {
+                 "name": "time_unit",
+                 "in": "body",
+                 "type": "string",
+                 "required": false,
+                 "enum": [
+                  "DAY",
+                  "WEEK",
+                  "MONTH"
+                 ],
+                 "description": "Time unit for the notice period values."
+                },
+                {
+                 "name": "default_value",
+                 "in": "body",
+                 "type": "integer",
+                 "required": false,
+                 "description": "Default notice period value. Null when there is no default."
+                }
+               ]
+              },
+              {
+               "name": "notice_period_during_probation",
+               "in": "body",
+               "type": "object",
+               "required": false,
+               "description": "Notice period minimum/maximum bounds and default for this segment.",
+               "properties": [
+                {
+                 "name": "max_value",
+                 "in": "body",
+                 "type": "integer",
+                 "required": false,
+                 "description": "Maximum notice period value. Null when not applicable."
+                },
+                {
+                 "name": "min_value",
+                 "in": "body",
+                 "type": "integer",
+                 "required": false,
+                 "description": "Minimum notice period value. Null when not applicable."
+                },
+                {
+                 "name": "time_unit",
+                 "in": "body",
+                 "type": "string",
+                 "required": false,
+                 "enum": [
+                  "DAY",
+                  "WEEK",
+                  "MONTH"
+                 ],
+                 "description": "Time unit for the notice period values."
+                },
+                {
+                 "name": "default_value",
+                 "in": "body",
+                 "type": "integer",
+                 "required": false,
+                 "description": "Default notice period value. Null when there is no default."
+                }
+               ]
+              }
+             ]
+            },
+            {
+             "name": "notice_period_rule_type",
+             "in": "body",
+             "type": "string",
+             "required": false,
+             "description": "Notice-period rule type for the country (e.g. LIMITED_AGREEMENT, FIXED_AGREEMENT)."
+            },
+            {
+             "name": "notice_period_time_unit",
+             "in": "body",
+             "type": "string",
+             "required": false,
+             "description": "Primary display time unit for the notice period (DAY, WEEK, or MONTH)."
+            }
+           ]
           },
           {
            "name": "date_limitation",
@@ -43557,7 +45086,9 @@
      "description": "A detailed description of the milestone."
     }
    ],
-   "fileFields": [],
+   "fileFields": [
+    "file"
+   ],
    "responseKind": "object",
    "responseFields": [
     {
@@ -51823,7 +53354,462 @@
    "supportsMultipart": false,
    "bodyWrapper": "data",
    "params": [],
-   "bodyProps": [],
+   "bodyProps": [
+    {
+     "name": "city",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "City name."
+    },
+    {
+     "name": "state",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "US state code."
+    },
+    {
+     "name": "address",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Street address. Maximum 40 characters for 1099 reporting compliance."
+    },
+    {
+     "name": "country",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "ISO 3166-1 alpha-2 country code."
+    },
+    {
+     "name": "zip_code",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "ZIP/postal code. Must be a valid US ZIP code for US addresses."
+    },
+    {
+     "name": "form_type",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "enum": [
+      "W9_INDIVIDUAL",
+      "W9_COMPANY",
+      "W8_BEN",
+      "W8_BEN_E"
+     ],
+     "description": "Tax form type for US individuals."
+    },
+    {
+     "name": "last_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Legal last name."
+    },
+    {
+     "name": "first_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Legal first name."
+    },
+    {
+     "name": "tax_number",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "description": "Taxpayer identification number.",
+     "properties": [
+      {
+       "name": "type",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "enum": [
+        "SSN",
+        "ITIN",
+        "EIN"
+       ],
+       "description": "Tax ID type. SSN/ITIN for individuals; EIN also allowed for disregarded entities."
+      },
+      {
+       "name": "value",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Tax ID value."
+      }
+     ]
+    },
+    {
+     "name": "middle_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Legal middle name."
+    },
+    {
+     "name": "business_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Business name. Only applicable when is_disregarded_entity is true."
+    },
+    {
+     "name": "contractor_signature",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Contractor's digital signature."
+    },
+    {
+     "name": "is_disregarded_entity",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Whether this is a disregarded entity."
+    },
+    {
+     "name": "client_legal_entity_id",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Public ID of the client's legal entity."
+    },
+    {
+     "name": "is_subject_backup_withholding",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Whether the contractor is subject to backup withholding."
+    },
+    {
+     "name": "doing_business_as",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "DBA name."
+    },
+    {
+     "name": "federal_tax_classification",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "description": "Federal tax classification.",
+     "properties": [
+      {
+       "name": "type",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "enum": [
+        "C_CORPORATION",
+        "S_CORPORATION",
+        "OTHER",
+        "PARTNERSHIP",
+        "LLC",
+        "TRUST_ESTATE"
+       ],
+       "description": "Federal tax classification type."
+      },
+      {
+       "name": "llc_classification",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "enum": [
+        "P",
+        "S",
+        "C"
+       ],
+       "description": "LLC sub-classification. Required when type is 'LLC'."
+      },
+      {
+       "name": "other_additional_information",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Additional information. Required when type is 'OTHER'."
+      }
+     ]
+    },
+    {
+     "name": "address_line2",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Street address line 2."
+    },
+    {
+     "name": "date_of_birth",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Date of birth. Must be at least 18 years ago and no more than 100 years ago."
+    },
+    {
+     "name": "us_tax_number",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "description": "US Taxpayer Identification Number.",
+     "properties": [
+      {
+       "name": "type",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "enum": [
+        "SSN",
+        "ITIN"
+       ],
+       "description": "US tax ID type."
+      },
+      {
+       "name": "value",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "US tax ID value."
+      }
+     ]
+    },
+    {
+     "name": "mailing_address",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "nullable": true,
+     "description": "Mailing address if different from permanent residence.",
+     "properties": [
+      {
+       "name": "city",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "nullable": true,
+       "description": "Mailing address city."
+      },
+      {
+       "name": "state",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "nullable": true,
+       "description": "Mailing address state."
+      },
+      {
+       "name": "address",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Mailing address."
+      },
+      {
+       "name": "country",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "ISO 3166-1 alpha-2 country code."
+      },
+      {
+       "name": "zip_code",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Mailing address ZIP/postal code."
+      },
+      {
+       "name": "address_line2",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "nullable": true,
+       "description": "Mailing address line 2."
+      }
+     ]
+    },
+    {
+     "name": "print_name_of_signer",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Printed name of the signer."
+    },
+    {
+     "name": "is_tax_treaty_enabled",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "nullable": true,
+     "description": "Whether the contractor claims tax treaty benefits."
+    },
+    {
+     "name": "country_of_citizenship",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "ISO 3166-1 alpha-2 country code of citizenship."
+    },
+    {
+     "name": "is_certified_and_agreed",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "nullable": true,
+     "description": "Certification that the signer has read and agrees with the certification information."
+    },
+    {
+     "name": "referencing_information",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Reference number for the form."
+    },
+    {
+     "name": "tax_treaty_benefits_form",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "nullable": true,
+     "description": "Tax treaty benefits details. Applicable when is_tax_treaty_enabled is true.",
+     "properties": [
+      {
+       "name": "details",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Additional details about the treaty claim."
+      },
+      {
+       "name": "type_of_income",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Type of income covered by the treaty."
+      },
+      {
+       "name": "withholding_rate",
+       "in": "body",
+       "type": "number",
+       "required": false,
+       "description": "Withholding rate under the treaty (percentage)."
+      },
+      {
+       "name": "article_and_paragraph",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Article and paragraph of the applicable tax treaty."
+      },
+      {
+       "name": "owner_resident_country",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Country of residence of the beneficial owner. Must be a US income tax treaty country."
+      }
+     ]
+    },
+    {
+     "name": "is_ftin_not_legally_required",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Check if FTIN is not legally required in your country of residence."
+    },
+    {
+     "name": "giin",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Global Intermediary Identification Number (19 characters)."
+    },
+    {
+     "name": "entity_type",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "CORPORATION",
+      "DISREGARDED_ENTITY",
+      "PARTNERSHIP",
+      "SIMPLE_TRUST",
+      "GRANTOR_TRUST",
+      "COMPLEX_TRUST",
+      "ESTATE",
+      "GOVERNMENT",
+      "CENTRAL_BANK_OF_ISSUE",
+      "TAX_EXEMPT",
+      "PRIVATE_FOUNDATION",
+      "INTERNATIONAL",
+      "FOREIGN_GOVERNMENT_CONTROLLED",
+      "FOREIGN_GOVERNMENT_INTEGRAL"
+     ],
+     "description": "Chapter 3 entity type."
+    },
+    {
+     "name": "fatca_status",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "ACTIVE_NFFE",
+      "PASSIVE_NFFE"
+     ],
+     "description": "FATCA (Foreign Account Tax Compliance Act) status."
+    },
+    {
+     "name": "entity_country",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "ISO 3166-1 alpha-2 country code of the entity."
+    },
+    {
+     "name": "name_of_organization",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Name of the organization."
+    },
+    {
+     "name": "has_substantial_us_owner",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Whether the entity has a substantial US owner. Required when fatca_status is 'PASSIVE_NFFE'."
+    },
+    {
+     "name": "name_of_disregarded_entity",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Name of the disregarded entity, if applicable."
+    },
+    {
+     "name": "is_entity_certification_confirmed",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "nullable": true,
+     "description": "Certification that the entity is the beneficial owner of all income."
+    }
+   ],
    "fileFields": [],
    "responseKind": "object",
    "responseFields": [
@@ -51894,7 +53880,472 @@
    "bodyProps": [],
    "fileFields": [],
    "responseKind": "array",
-   "responseFields": [],
+   "responseFields": [
+    {
+     "name": "id",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "The public ID (UUID) of the tax form."
+    },
+    {
+     "name": "city",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "City name."
+    },
+    {
+     "name": "state",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "State or province code."
+    },
+    {
+     "name": "address",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Street address of permanent residence."
+    },
+    {
+     "name": "country",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "ISO 3166-1 alpha-2 country code of permanent residence."
+    },
+    {
+     "name": "pdf_url",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Pre-signed download URL for the generated form PDF. The link expires about 15 minutes after the response is issued — download promptly or request the list again. Null while the PDF has not been generated yet."
+    },
+    {
+     "name": "zip_code",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "ZIP/postal code."
+    },
+    {
+     "name": "form_type",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "enum": [
+      "W9_INDIVIDUAL",
+      "W9_COMPANY",
+      "W8_BEN",
+      "W8_BEN_E"
+     ],
+     "description": "Tax form type for US individuals."
+    },
+    {
+     "name": "last_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Legal last name. Present on W9_INDIVIDUAL and W8_BEN forms."
+    },
+    {
+     "name": "created_at",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Timestamp of when the tax form was created."
+    },
+    {
+     "name": "first_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Legal first name. Present on W9_INDIVIDUAL and W8_BEN forms."
+    },
+    {
+     "name": "tax_number",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "description": "Taxpayer identification number. Returned unmasked.",
+     "properties": [
+      {
+       "name": "type",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "enum": [
+        "SSN",
+        "ITIN",
+        "EIN"
+       ],
+       "description": "Tax ID type."
+      },
+      {
+       "name": "value",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Tax ID value, unmasked."
+      }
+     ]
+    },
+    {
+     "name": "updated_at",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Timestamp of when the tax form was last updated."
+    },
+    {
+     "name": "middle_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Legal middle name. Present on W9_INDIVIDUAL and W8_BEN forms."
+    },
+    {
+     "name": "business_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Business name. Present on W9_COMPANY forms and disregarded-entity W9_INDIVIDUAL forms."
+    },
+    {
+     "name": "contractor_signature",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The signer's digital signature."
+    },
+    {
+     "name": "is_disregarded_entity",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Whether this is a disregarded entity. Present on W9_INDIVIDUAL and W8_BEN forms."
+    },
+    {
+     "name": "client_legal_entity_id",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Public ID of the client's legal entity the form was submitted against."
+    },
+    {
+     "name": "is_subject_backup_withholding",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Whether the contractor is subject to backup withholding. Present on W-9 forms."
+    },
+    {
+     "name": "doing_business_as",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "DBA name. Present on W9_COMPANY forms."
+    },
+    {
+     "name": "federal_tax_classification",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "description": "Federal tax classification. Present on W9_COMPANY forms.",
+     "properties": [
+      {
+       "name": "type",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "enum": [
+        "C_CORPORATION",
+        "S_CORPORATION",
+        "OTHER",
+        "PARTNERSHIP",
+        "LLC",
+        "TRUST_ESTATE"
+       ],
+       "description": "Federal tax classification type."
+      },
+      {
+       "name": "llc_classification",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "enum": [
+        "P",
+        "S",
+        "C"
+       ],
+       "description": "LLC sub-classification. Present when type is 'LLC'."
+      },
+      {
+       "name": "other_additional_information",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Additional information. Present when type is 'OTHER'."
+      }
+     ]
+    },
+    {
+     "name": "address_line2",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Street address line 2. Present on W8_BEN and W8_BEN_E forms."
+    },
+    {
+     "name": "date_of_birth",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Date of birth. Present on W8_BEN and W8_BEN_E forms."
+    },
+    {
+     "name": "us_tax_number",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "description": "US Taxpayer Identification Number. Present on W8_BEN and W8_BEN_E forms. Returned unmasked.",
+     "properties": [
+      {
+       "name": "type",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "enum": [
+        "SSN",
+        "ITIN"
+       ],
+       "description": "US tax ID type."
+      },
+      {
+       "name": "value",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "US tax ID value, unmasked."
+      }
+     ]
+    },
+    {
+     "name": "mailing_address",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "description": "Mailing address if different from permanent residence. Present on W8_BEN and W8_BEN_E forms.",
+     "properties": [
+      {
+       "name": "city",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Mailing address city."
+      },
+      {
+       "name": "state",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Mailing address state."
+      },
+      {
+       "name": "address",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Mailing address."
+      },
+      {
+       "name": "country",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "ISO 3166-1 alpha-2 country code."
+      },
+      {
+       "name": "zip_code",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Mailing address ZIP/postal code."
+      },
+      {
+       "name": "address_line2",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Mailing address line 2."
+      }
+     ]
+    },
+    {
+     "name": "print_name_of_signer",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Printed name of the signer. Present on W-8 forms."
+    },
+    {
+     "name": "is_tax_treaty_enabled",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Whether tax treaty benefits are claimed. Present on W-8 forms."
+    },
+    {
+     "name": "country_of_citizenship",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "ISO 3166-1 alpha-2 country code of citizenship (W8_BEN) or incorporation (W8_BEN_E)."
+    },
+    {
+     "name": "is_certified_and_agreed",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Certification that the signer has read and agrees with the certification information. Present on W8_BEN forms."
+    },
+    {
+     "name": "referencing_information",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Reference number for the form. Present on W-8 forms."
+    },
+    {
+     "name": "tax_treaty_benefits_form",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "description": "Tax treaty benefits details. Present when treaty benefits are claimed.",
+     "properties": [
+      {
+       "name": "details",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Additional details about the treaty claim."
+      },
+      {
+       "name": "type_of_income",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Type of income covered by the treaty."
+      },
+      {
+       "name": "withholding_rate",
+       "in": "body",
+       "type": "number",
+       "required": false,
+       "description": "Withholding rate under the treaty (percentage)."
+      },
+      {
+       "name": "article_and_paragraph",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Article and paragraph of the applicable tax treaty."
+      },
+      {
+       "name": "owner_resident_country",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Country of residence of the beneficial owner."
+      }
+     ]
+    },
+    {
+     "name": "is_ftin_not_legally_required",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Whether an FTIN is not legally required in the country of residence. Present on W-8 forms."
+    },
+    {
+     "name": "giin",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Global Intermediary Identification Number. Present on W8_BEN_E forms."
+    },
+    {
+     "name": "entity_type",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "CORPORATION",
+      "DISREGARDED_ENTITY",
+      "PARTNERSHIP",
+      "SIMPLE_TRUST",
+      "GRANTOR_TRUST",
+      "COMPLEX_TRUST",
+      "ESTATE",
+      "GOVERNMENT",
+      "CENTRAL_BANK_OF_ISSUE",
+      "TAX_EXEMPT",
+      "PRIVATE_FOUNDATION",
+      "INTERNATIONAL",
+      "FOREIGN_GOVERNMENT_CONTROLLED",
+      "FOREIGN_GOVERNMENT_INTEGRAL"
+     ],
+     "description": "Chapter 3 entity type. Present on W8_BEN_E forms."
+    },
+    {
+     "name": "fatca_status",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "ACTIVE_NFFE",
+      "PASSIVE_NFFE"
+     ],
+     "description": "FATCA (Foreign Account Tax Compliance Act) status. Present on W8_BEN_E forms."
+    },
+    {
+     "name": "entity_country",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "ISO 3166-1 alpha-2 country code of the entity. Present on W8_BEN_E forms."
+    },
+    {
+     "name": "name_of_organization",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Name of the organization. Present on W8_BEN_E forms."
+    },
+    {
+     "name": "has_substantial_us_owner",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Whether the entity has a substantial US owner. Present on W8_BEN_E forms."
+    },
+    {
+     "name": "name_of_disregarded_entity",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Name of the disregarded entity, if applicable. Present on W8_BEN_E forms."
+    },
+    {
+     "name": "is_entity_certification_confirmed",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Certification that the entity is the beneficial owner of all income. Present on W8_BEN_E forms."
+    }
+   ],
    "api": "rest",
    "versions": [
     {
@@ -51937,7 +54388,455 @@
      "description": "Public ID (UUID) of the tax form to replace, as returned by the create or list endpoints."
     }
    ],
-   "bodyProps": [],
+   "bodyProps": [
+    {
+     "name": "city",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "City name."
+    },
+    {
+     "name": "state",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "US state code."
+    },
+    {
+     "name": "address",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Street address. Maximum 40 characters for 1099 reporting compliance."
+    },
+    {
+     "name": "country",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "ISO 3166-1 alpha-2 country code."
+    },
+    {
+     "name": "zip_code",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "ZIP/postal code. Must be a valid US ZIP code for US addresses."
+    },
+    {
+     "name": "form_type",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "enum": [
+      "W9_INDIVIDUAL",
+      "W9_COMPANY",
+      "W8_BEN",
+      "W8_BEN_E"
+     ],
+     "description": "Tax form type for US individuals."
+    },
+    {
+     "name": "last_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Legal last name."
+    },
+    {
+     "name": "first_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Legal first name."
+    },
+    {
+     "name": "tax_number",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "description": "Taxpayer identification number.",
+     "properties": [
+      {
+       "name": "type",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "enum": [
+        "SSN",
+        "ITIN",
+        "EIN"
+       ],
+       "description": "Tax ID type. SSN/ITIN for individuals; EIN also allowed for disregarded entities."
+      },
+      {
+       "name": "value",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Tax ID value."
+      }
+     ]
+    },
+    {
+     "name": "middle_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Legal middle name."
+    },
+    {
+     "name": "business_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Business name. Only applicable when is_disregarded_entity is true."
+    },
+    {
+     "name": "contractor_signature",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Contractor's digital signature."
+    },
+    {
+     "name": "is_disregarded_entity",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Whether this is a disregarded entity."
+    },
+    {
+     "name": "is_subject_backup_withholding",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Whether the contractor is subject to backup withholding."
+    },
+    {
+     "name": "doing_business_as",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "DBA name."
+    },
+    {
+     "name": "federal_tax_classification",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "description": "Federal tax classification.",
+     "properties": [
+      {
+       "name": "type",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "enum": [
+        "C_CORPORATION",
+        "S_CORPORATION",
+        "OTHER",
+        "PARTNERSHIP",
+        "LLC",
+        "TRUST_ESTATE"
+       ],
+       "description": "Federal tax classification type."
+      },
+      {
+       "name": "llc_classification",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "enum": [
+        "P",
+        "S",
+        "C"
+       ],
+       "description": "LLC sub-classification. Required when type is 'LLC'."
+      },
+      {
+       "name": "other_additional_information",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Additional information. Required when type is 'OTHER'."
+      }
+     ]
+    },
+    {
+     "name": "address_line2",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Street address line 2."
+    },
+    {
+     "name": "date_of_birth",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Date of birth. Must be at least 18 years ago and no more than 100 years ago."
+    },
+    {
+     "name": "us_tax_number",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "description": "US Taxpayer Identification Number.",
+     "properties": [
+      {
+       "name": "type",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "enum": [
+        "SSN",
+        "ITIN"
+       ],
+       "description": "US tax ID type."
+      },
+      {
+       "name": "value",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "US tax ID value."
+      }
+     ]
+    },
+    {
+     "name": "mailing_address",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "nullable": true,
+     "description": "Mailing address if different from permanent residence.",
+     "properties": [
+      {
+       "name": "city",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "nullable": true,
+       "description": "Mailing address city."
+      },
+      {
+       "name": "state",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "nullable": true,
+       "description": "Mailing address state."
+      },
+      {
+       "name": "address",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Mailing address."
+      },
+      {
+       "name": "country",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "ISO 3166-1 alpha-2 country code."
+      },
+      {
+       "name": "zip_code",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Mailing address ZIP/postal code."
+      },
+      {
+       "name": "address_line2",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "nullable": true,
+       "description": "Mailing address line 2."
+      }
+     ]
+    },
+    {
+     "name": "print_name_of_signer",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Printed name of the signer."
+    },
+    {
+     "name": "is_tax_treaty_enabled",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "nullable": true,
+     "description": "Whether the contractor claims tax treaty benefits."
+    },
+    {
+     "name": "country_of_citizenship",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "ISO 3166-1 alpha-2 country code of citizenship."
+    },
+    {
+     "name": "is_certified_and_agreed",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "nullable": true,
+     "description": "Certification that the signer has read and agrees with the certification information."
+    },
+    {
+     "name": "referencing_information",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Reference number for the form."
+    },
+    {
+     "name": "tax_treaty_benefits_form",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "nullable": true,
+     "description": "Tax treaty benefits details. Applicable when is_tax_treaty_enabled is true.",
+     "properties": [
+      {
+       "name": "details",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Additional details about the treaty claim."
+      },
+      {
+       "name": "type_of_income",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Type of income covered by the treaty."
+      },
+      {
+       "name": "withholding_rate",
+       "in": "body",
+       "type": "number",
+       "required": false,
+       "description": "Withholding rate under the treaty (percentage)."
+      },
+      {
+       "name": "article_and_paragraph",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Article and paragraph of the applicable tax treaty."
+      },
+      {
+       "name": "owner_resident_country",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Country of residence of the beneficial owner. Must be a US income tax treaty country."
+      }
+     ]
+    },
+    {
+     "name": "is_ftin_not_legally_required",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Check if FTIN is not legally required in your country of residence."
+    },
+    {
+     "name": "giin",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Global Intermediary Identification Number (19 characters)."
+    },
+    {
+     "name": "entity_type",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "CORPORATION",
+      "DISREGARDED_ENTITY",
+      "PARTNERSHIP",
+      "SIMPLE_TRUST",
+      "GRANTOR_TRUST",
+      "COMPLEX_TRUST",
+      "ESTATE",
+      "GOVERNMENT",
+      "CENTRAL_BANK_OF_ISSUE",
+      "TAX_EXEMPT",
+      "PRIVATE_FOUNDATION",
+      "INTERNATIONAL",
+      "FOREIGN_GOVERNMENT_CONTROLLED",
+      "FOREIGN_GOVERNMENT_INTEGRAL"
+     ],
+     "description": "Chapter 3 entity type."
+    },
+    {
+     "name": "fatca_status",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "ACTIVE_NFFE",
+      "PASSIVE_NFFE"
+     ],
+     "description": "FATCA (Foreign Account Tax Compliance Act) status."
+    },
+    {
+     "name": "entity_country",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "ISO 3166-1 alpha-2 country code of the entity."
+    },
+    {
+     "name": "name_of_organization",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Name of the organization."
+    },
+    {
+     "name": "has_substantial_us_owner",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Whether the entity has a substantial US owner. Required when fatca_status is 'PASSIVE_NFFE'."
+    },
+    {
+     "name": "name_of_disregarded_entity",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Name of the disregarded entity, if applicable."
+    },
+    {
+     "name": "is_entity_certification_confirmed",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "nullable": true,
+     "description": "Certification that the entity is the beneficial owner of all income."
+    }
+   ],
    "fileFields": [],
    "responseKind": "object",
    "responseFields": [
@@ -56323,7 +59222,74 @@
    "supportsMultipart": false,
    "bodyWrapper": "data",
    "params": [],
-   "bodyProps": [],
+   "bodyProps": [
+    {
+     "name": "country",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "ISO 3166-1 alpha-2 code of the destination country."
+    },
+    {
+     "name": "work_type",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "enum": [
+      "ELIGIBILITY_CHECK",
+      "RIGHT_TO_WORK"
+     ],
+     "description": "The kind of case to open."
+    },
+    {
+     "name": "contract_id",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "The contract of the worker the case is for."
+    },
+    {
+     "name": "business_trip",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "description": "The trip to check. Required for BUSINESS_VISA, not allowed otherwise.",
+     "properties": [
+      {
+       "name": "reason",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Why the worker travels."
+      },
+      {
+       "name": "end_date",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Last day of the trip, not before start_date."
+      },
+      {
+       "name": "start_date",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "First day of the trip, today or later."
+      }
+     ]
+    },
+    {
+     "name": "visa_category",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "BUSINESS_VISA",
+      "WORK_PERMIT_VISA"
+     ],
+     "description": "The visa category to check eligibility for."
+    }
+   ],
    "fileFields": [],
    "responseKind": "object",
    "responseFields": [
@@ -56673,7 +59639,173 @@
    "supportsMultipart": false,
    "bodyWrapper": "data",
    "params": [],
-   "bodyProps": [],
+   "bodyProps": [
+    {
+     "name": "case_type",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "enum": [
+      "RIGHT_TO_WORK",
+      "EOR_VISA",
+      "SPONSORED_VISA",
+      "PRE_HIRE_EOR_VISA",
+      "PRE_HIRE_SPONSORSHIP_VISA",
+      "BUSINESS_VISA"
+     ],
+     "description": "The type of immigration case to be created. Determines the workflow and requirements"
+    },
+    {
+     "name": "contract_id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The contract object identifier. Required for document reviews and visa applications"
+    },
+    {
+     "name": "country_code",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "ISO 3166-1 alpha-2 country code where the immigration case needs to be processed"
+    },
+    {
+     "name": "visa_type_id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The id of visa type that is being applied for. Identifies the type of the visa."
+    },
+    {
+     "name": "entity_id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The unique identifier of the entity sponsoring the visa. Required for sponsored visa applications"
+    },
+    {
+     "name": "team_id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The unique identifier of the team for which the pre-hire visa case is being created"
+    },
+    {
+     "name": "employee_details",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "description": "Employee information. Citizenships and residence attributes are always required for business visa cases. The remaining fields are only required when no contract_id is present.",
+     "properties": [
+      {
+       "name": "email",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Employee's email address. Required if contract_id is not provided"
+      },
+      {
+       "name": "last_name",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Employee's last name. Required if contract_id is not provided"
+      },
+      {
+       "name": "residence",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "ISO 3166-1 alpha-2 country code of employee's current residence"
+      },
+      {
+       "name": "first_name",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Employee's first name. Required if contract_id is not provided"
+      },
+      {
+       "name": "citizenships",
+       "in": "body",
+       "type": "array",
+       "required": true,
+       "description": "List of ISO 3166-1 alpha-2 country codes representing employee's citizenships"
+      }
+     ]
+    },
+    {
+     "name": "travel_information",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "description": "Travel details for the business visa",
+     "properties": [
+      {
+       "name": "purpose",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "enum": [
+        "INTERNAL_BUSINESS_WITHOUT_WORK_FOR_CLIENT",
+        "INTERNAL_BUSINESS_WITH_WORK_FOR_CLIENT",
+        "MEETINGS_WITH_OR_FOR_A_CLIENT",
+        "EXT_BUS_MEET_NO_WORK",
+        "EXT_BUS_DELIVER_SERVICE",
+        "EXT_BUS_MEET_PROSPECT_INFO",
+        "EXT_BUS_MEET_PROSPECT_SALES",
+        "NEGOTIATING_CONTRACTS_OR_SIGNING_AGREEMENTS",
+        "CONFERENCE",
+        "TEAM_OFFSITE",
+        "SPEAKING_AT_CONFERENCE_UNPAID",
+        "SPEAKING_AT_CONFERENCE_PAID",
+        "CONF_WORKSHOP_PAID",
+        "CONF_ATTEND_FAIR_VISITOR",
+        "CONF_EXHIBIT_FAIR",
+        "ATTENDING_INTERNAL_TRAINING",
+        "ATTENDING_EXTERNAL_TRAINING",
+        "DELIVERING_TRAINING_TO_EXTERNAL_PARTICIPANTS_UNPAID",
+        "DELIVERING_TRAINING_TO_EXTERNAL_PARTICIPANTS_PAID",
+        "TRAIN_ACADEMIC_OBSERV",
+        "RESEARCH_DELIVER_EXT",
+        "ASSEMBLY_MAINTENANCE_REPAIR_INSTALLATION",
+        "TECH_SUPERVISION",
+        "TECH_SUPPORT_HANDS_ON",
+        "TECH_INTERNAL_TESTING",
+        "DRIVR_TEST_DEMO_IN_COUNTRY",
+        "DRIVR_TEST_DEMO_OUT_OF_COUNTRY",
+        "OFFSHORE_TERRITORIAL",
+        "OFFSHORE_INTL_WATERS",
+        "MARITIME_CREW",
+        "OTHER_SEASONAL_LABOUR",
+        "MARKET_RESEARCH_AND_EXPLORING_INVESTMENT_OPPORTUNITIES",
+        "MEETINGS_WITH_POTENTIAL_CLIENTS",
+        "OTHER_EXTERNAL_BUSINESS",
+        "DELIVERING_TRAINING_TO_INTERNAL_PARTICIPANTS",
+        "PARTICIPATION_IN_RESEARCH_PROJECTS_AND_STUDIES",
+        "TECHNICAL_SUPPORT_OR_SUPERVISION",
+        "OTHER_HANDS_ON_LABOUR",
+        "OTHER"
+       ],
+       "description": "The purpose of the business trip"
+      },
+      {
+       "name": "end_date",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Trip end date in YYYY-MM-DD format"
+      },
+      {
+       "name": "start_date",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Trip start date in YYYY-MM-DD format"
+      }
+     ]
+    }
+   ],
    "fileFields": [],
    "responseKind": "object",
    "responseFields": [
@@ -142799,8 +145931,47 @@
     {
      "name": "severance",
      "in": "body",
-     "type": "string",
-     "required": true
+     "type": "object",
+     "required": true,
+     "properties": [
+      {
+       "name": "type",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "enum": [
+        "TIME",
+        "CASH"
+       ],
+       "description": "The type of severance, either in time off."
+      },
+      {
+       "name": "amount",
+       "in": "body",
+       "type": "number",
+       "required": true,
+       "description": "The amount of severance, specified in the designated currency or time unit."
+      },
+      {
+       "name": "currency",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Currency code for severance."
+      },
+      {
+       "name": "time_unit",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "enum": [
+        "DAYS",
+        "WEEKS",
+        "MONTHS"
+       ],
+       "description": "The unit of time for severance (e.g., DAYS, WEEKS, MONTHS)."
+      }
+     ]
     },
     {
      "name": "is_voluntary",
@@ -150611,8 +153782,76 @@
    "params": [],
    "bodyProps": [],
    "fileFields": [],
-   "responseKind": "none",
-   "responseFields": [],
+   "responseKind": "object",
+   "responseFields": [
+    {
+     "name": "status",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "`ACCEPTED` once every legal agreement and the platform terms of service are accepted."
+    },
+    {
+     "name": "agreements",
+     "in": "body",
+     "type": "array",
+     "required": true,
+     "description": "The legal agreements (master service agreement pages) accepted for the organization.",
+     "properties": [
+      {
+       "name": "title",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Title of the legal agreement page, as published in the Deel Legal Hub."
+      },
+      {
+       "name": "version",
+       "in": "body",
+       "type": "number",
+       "required": true,
+       "description": "Current version of the agreement page."
+      },
+      {
+       "name": "accepted_at",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "When this version of the agreement was accepted."
+      }
+     ]
+    },
+    {
+     "name": "accepted_at",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Latest acceptance across the legal agreements and the terms of service; null when none."
+    },
+    {
+     "name": "terms_of_service",
+     "in": "body",
+     "type": "object",
+     "required": true,
+     "description": "The platform terms of service acceptance; null when not accepted.",
+     "properties": [
+      {
+       "name": "version",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Version of the Deel platform terms of service."
+      },
+      {
+       "name": "accepted_at",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "When the platform terms of service were accepted."
+      }
+     ]
+    }
+   ],
    "api": "rest",
    "beta": true,
    "versions": [
@@ -150645,8 +153884,76 @@
    "params": [],
    "bodyProps": [],
    "fileFields": [],
-   "responseKind": "none",
-   "responseFields": [],
+   "responseKind": "object",
+   "responseFields": [
+    {
+     "name": "status",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "`ACCEPTED` once every legal agreement and the platform terms of service are accepted."
+    },
+    {
+     "name": "agreements",
+     "in": "body",
+     "type": "array",
+     "required": true,
+     "description": "The legal agreements (master service agreement pages) the organization must accept, at their current version.",
+     "properties": [
+      {
+       "name": "title",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Title of the legal agreement page, as published in the Deel Legal Hub."
+      },
+      {
+       "name": "version",
+       "in": "body",
+       "type": "number",
+       "required": true,
+       "description": "Current version of the agreement page."
+      },
+      {
+       "name": "accepted_at",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "When this version of the agreement was accepted; null until it is accepted."
+      }
+     ]
+    },
+    {
+     "name": "accepted_at",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Latest acceptance across the legal agreements and the terms of service; null when none."
+    },
+    {
+     "name": "terms_of_service",
+     "in": "body",
+     "type": "object",
+     "required": true,
+     "description": "The platform terms of service acceptance; null when not accepted.",
+     "properties": [
+      {
+       "name": "version",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Version of the Deel platform terms of service."
+      },
+      {
+       "name": "accepted_at",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "When the platform terms of service were accepted."
+      }
+     ]
+    }
+   ],
    "api": "rest",
    "beta": true,
    "versions": [
@@ -151575,7 +154882,204 @@
    "bodyProps": [],
    "fileFields": [],
    "responseKind": "array",
-   "responseFields": [],
+   "responseFields": [
+    {
+     "name": "city",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The city of the user's address."
+    },
+    {
+     "name": "iban",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The International Bank Account Number (IBAN)."
+    },
+    {
+     "name": "email",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The user's email address."
+    },
+    {
+     "name": "phone",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The user's phone number."
+    },
+    {
+     "name": "postal",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The user's postal or ZIP code."
+    },
+    {
+     "name": "tax_id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The user's tax identification number."
+    },
+    {
+     "name": "bank_code",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The bank code."
+    },
+    {
+     "name": "bank_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Name of the user's bank."
+    },
+    {
+     "name": "full_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Full name of the user."
+    },
+    {
+     "name": "sort_code",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "UK sort code."
+    },
+    {
+     "name": "swift_bic",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "SWIFT/BIC code for the bank."
+    },
+    {
+     "name": "rib_number",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The RIB(Relevé d'Identité Bancaire)."
+    },
+    {
+     "name": "branch_code",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The branch code of the user's bank."
+    },
+    {
+     "name": "account_type",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Bank account type."
+    },
+    {
+     "name": "country_code",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The country code of the user."
+    },
+    {
+     "name": "address_line1",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The primary address line."
+    },
+    {
+     "name": "address_line2",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The secondary address line."
+    },
+    {
+     "name": "currency_code",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The currency code for transactions."
+    },
+    {
+     "name": "original_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The original name of the user."
+    },
+    {
+     "name": "account_number",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The user's bank account number."
+    },
+    {
+     "name": "province_state",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The state or province of the user's address."
+    },
+    {
+     "name": "bank_branch_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The name of the user's bank branch."
+    },
+    {
+     "name": "bank_country_code",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The country code where the bank is located."
+    },
+    {
+     "name": "ach_routing_number",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The ACH (Automated Clearing House) Routing Number."
+    },
+    {
+     "name": "id",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Unique identifier of this resource."
+    },
+    {
+     "name": "status",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Current status of bank account."
+    },
+    {
+     "name": "created_at",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Long date-time format following ISO-8601."
+    },
+    {
+     "name": "updated_at",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Long date-time format following ISO-8601."
+    }
+   ],
    "api": "rest",
    "versions": [
     {
@@ -151627,7 +155131,211 @@
    "bodyProps": [],
    "fileFields": [],
    "responseKind": "array",
-   "responseFields": [],
+   "responseFields": [
+    {
+     "name": "city",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The city of the user's address."
+    },
+    {
+     "name": "iban",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The International Bank Account Number (IBAN)."
+    },
+    {
+     "name": "email",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The user's email address."
+    },
+    {
+     "name": "phone",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The user's phone number."
+    },
+    {
+     "name": "postal",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The user's postal or ZIP code."
+    },
+    {
+     "name": "tax_id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The user's tax identification number."
+    },
+    {
+     "name": "bank_code",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The bank code."
+    },
+    {
+     "name": "bank_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Name of the user's bank."
+    },
+    {
+     "name": "full_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Full name of the user."
+    },
+    {
+     "name": "sort_code",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "UK sort code."
+    },
+    {
+     "name": "swift_bic",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "SWIFT/BIC code for the bank."
+    },
+    {
+     "name": "rib_number",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The RIB(Relevé d'Identité Bancaire)."
+    },
+    {
+     "name": "branch_code",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The branch code of the user's bank."
+    },
+    {
+     "name": "account_type",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Bank account type."
+    },
+    {
+     "name": "country_code",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The country code of the user."
+    },
+    {
+     "name": "address_line1",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The primary address line."
+    },
+    {
+     "name": "address_line2",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The secondary address line."
+    },
+    {
+     "name": "currency_code",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The currency code for transactions."
+    },
+    {
+     "name": "original_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The original name of the user."
+    },
+    {
+     "name": "account_number",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The user's bank account number."
+    },
+    {
+     "name": "province_state",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The state or province of the user's address."
+    },
+    {
+     "name": "bank_branch_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The name of the user's bank branch."
+    },
+    {
+     "name": "bank_country_code",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The country code where the bank is located."
+    },
+    {
+     "name": "ach_routing_number",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The ACH (Automated Clearing House) Routing Number."
+    },
+    {
+     "name": "id",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Unique identifier of this resource."
+    },
+    {
+     "name": "status",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Current status of bank account."
+    },
+    {
+     "name": "created_at",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Long date-time format following ISO-8601."
+    },
+    {
+     "name": "updated_at",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Long date-time format following ISO-8601."
+    },
+    {
+     "name": "funds_distribution",
+     "in": "body",
+     "type": "number",
+     "required": false,
+     "description": "Percentage (0–100) of the salary paid to this account. All of a contract’s accounts sum to 100."
+    }
+   ],
    "api": "rest",
    "versions": [
     {
@@ -159097,9 +162805,64 @@
     {
      "name": "employment",
      "in": "body",
-     "type": "string",
+     "type": "object",
      "required": true,
-     "description": "The employment details of the employee"
+     "description": "The employment details of the employee",
+     "properties": [
+      {
+       "name": "type",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "enum": [
+        "PART_TIME",
+        "FULL_TIME"
+       ],
+       "description": "The type of employment"
+      },
+      {
+       "name": "end_date",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The end date of the employment"
+      },
+      {
+       "name": "job_title",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "The job title of the employment"
+      },
+      {
+       "name": "seniority",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "The seniority of the employment"
+      },
+      {
+       "name": "start_date",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "The start date of the employment"
+      },
+      {
+       "name": "document_template_id",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The document template ID for the employment contract"
+      },
+      {
+       "name": "part_time_percentage",
+       "in": "body",
+       "type": "number",
+       "required": false,
+       "description": "The percentage of PART_TIME employment"
+      }
+     ]
     },
     {
      "name": "invitation",
@@ -160726,8 +164489,47 @@
     {
      "name": "type",
      "in": "body",
-     "type": "string",
-     "required": false
+     "type": "object",
+     "required": false,
+     "properties": [
+      {
+       "name": "name",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "enum": [
+        "text",
+        "number",
+        "date",
+        "percentage",
+        "currency",
+        "list",
+        "multiselect"
+       ],
+       "description": "Simple types"
+      },
+      {
+       "name": "currency",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Currency code"
+      },
+      {
+       "name": "is_fixed",
+       "in": "body",
+       "type": "boolean",
+       "required": false,
+       "description": "When currency is fixed, only the amount can be edited by the users"
+      },
+      {
+       "name": "options",
+       "in": "body",
+       "type": "array",
+       "required": false,
+       "description": "List of options for the custom field"
+      }
+     ]
     },
     {
      "name": "settings",
@@ -160869,9 +164671,49 @@
     {
      "name": "type",
      "in": "body",
-     "type": "string",
+     "type": "object",
      "required": false,
-     "description": "Type of the custom field"
+     "description": "Type of the custom field",
+     "properties": [
+      {
+       "name": "name",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "enum": [
+        "text",
+        "number",
+        "date",
+        "percentage",
+        "hyperlink",
+        "currency",
+        "list",
+        "multiselect"
+       ],
+       "description": "Simple types"
+      },
+      {
+       "name": "currency",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Currency code"
+      },
+      {
+       "name": "is_fixed",
+       "in": "body",
+       "type": "boolean",
+       "required": false,
+       "description": "When currency is fixed, only the amount can be edited by the users"
+      },
+      {
+       "name": "options",
+       "in": "body",
+       "type": "array",
+       "required": false,
+       "description": "List of options for the custom field"
+      }
+     ]
     },
     {
      "name": "settings",
@@ -161021,8 +164863,47 @@
     {
      "name": "data",
      "in": "body",
-     "type": "string",
-     "required": true
+     "type": "object",
+     "required": true,
+     "properties": [
+      {
+       "name": "value",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "text",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "amount",
+       "in": "body",
+       "type": "number",
+       "required": false
+      },
+      {
+       "name": "currency",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The currency code in ISO 4217 format"
+      },
+      {
+       "name": "option",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "options",
+       "in": "body",
+       "type": "array",
+       "required": false
+      }
+     ]
     },
     {
      "name": "name",
@@ -161103,8 +164984,43 @@
     {
      "name": "data",
      "in": "body",
-     "type": "string",
-     "required": true
+     "type": "object",
+     "required": true,
+     "properties": [
+      {
+       "name": "value",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Text type"
+      },
+      {
+       "name": "amount",
+       "in": "body",
+       "type": "number",
+       "required": false
+      },
+      {
+       "name": "currency",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Important: When currency type is fixed, the currency field is ignored. "
+      },
+      {
+       "name": "option",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Option type"
+      },
+      {
+       "name": "options",
+       "in": "body",
+       "type": "array",
+       "required": false
+      }
+     ]
     }
    ],
    "fileFields": [],
@@ -161587,8 +165503,846 @@
    ],
    "bodyProps": [],
    "fileFields": [],
-   "responseKind": "none",
-   "responseFields": [],
+   "responseKind": "object",
+   "responseFields": [
+    {
+     "name": "id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Unique identifier for the employee."
+    },
+    {
+     "name": "state",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The state of the employee."
+    },
+    {
+     "name": "emails",
+     "in": "body",
+     "type": "array",
+     "required": false,
+     "description": "An array of the employee's email addresses.",
+     "properties": [
+      {
+       "name": "type",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The type of email."
+      },
+      {
+       "name": "value",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The email address."
+      }
+     ]
+    },
+    {
+     "name": "country",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The country of the employee."
+    },
+    {
+     "name": "timezone",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The timezone of the employee."
+    },
+    {
+     "name": "addresses",
+     "in": "body",
+     "type": "array",
+     "required": false,
+     "description": "An array of address objects containing the employee's physical addresses.",
+     "properties": [
+      {
+       "name": "region",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Region code."
+      },
+      {
+       "name": "country",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Country code."
+      },
+      {
+       "name": "locality",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Locality name."
+      },
+      {
+       "name": "postalCode",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Postal code."
+      },
+      {
+       "name": "streetAddress",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Street and number."
+      }
+     ]
+    },
+    {
+     "name": "full_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The full name of the employee."
+    },
+    {
+     "name": "job_title",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The job title of the employee."
+    },
+    {
+     "name": "last_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The last name of the employee."
+    },
+    {
+     "name": "seniority",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The seniority level of the employee."
+    },
+    {
+     "name": "worker_id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The worker ID of the employee."
+    },
+    {
+     "name": "birth_date",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The birth date of the employee."
+    },
+    {
+     "name": "created_at",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The creation timestamp of the employee record."
+    },
+    {
+     "name": "department",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "description": "The department of the employee.",
+     "properties": [
+      {
+       "name": "id",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Unique identifier of this resource."
+      },
+      {
+       "name": "name",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The name of the department."
+      },
+      {
+       "name": "parent",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The parent department."
+      }
+     ]
+    },
+    {
+     "name": "first_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The first name of the employee."
+    },
+    {
+     "name": "start_date",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The date the employee started working."
+    },
+    {
+     "name": "updated_at",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Long date-time format following ISO-8601"
+    },
+    {
+     "name": "employments",
+     "in": "body",
+     "type": "array",
+     "required": false,
+     "description": "An array of employment records associated with the employee, including contract details, team information, payment details, and employment status.",
+     "properties": [
+      {
+       "name": "id",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Unique identifier for the employment."
+      },
+      {
+       "name": "name",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Name of the employee."
+      },
+      {
+       "name": "team",
+       "in": "body",
+       "type": "object",
+       "required": false,
+       "description": "The team to which the employee belongs.",
+       "properties": [
+        {
+         "name": "id",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "Refers to Groups in the platform. Working groups that reflect the organization's structure."
+        },
+        {
+         "name": "name",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "The team name."
+        }
+       ]
+      },
+      {
+       "name": "email",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The work email of the employee."
+      },
+      {
+       "name": "state",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The state of employment."
+      },
+      {
+       "name": "country",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The country of employment."
+      },
+      {
+       "name": "payment",
+       "in": "body",
+       "type": "object",
+       "required": false,
+       "description": "Payment information for the employment, including rate, scale, currency, and associated contract name.",
+       "properties": [
+        {
+         "name": "rate",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "The payment rate. Value is a string if contract type is PEO."
+        },
+        {
+         "name": "scale",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "The payment scale (e.g., hourly, weekly, monthly, etc.)"
+        },
+        {
+         "name": "currency",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "The currency code (ISO 4217) for the payment"
+        },
+        {
+         "name": "contract_name",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "The name of the contract associated with the payment"
+        }
+       ]
+      },
+      {
+       "name": "is_ended",
+       "in": "body",
+       "type": "boolean",
+       "required": false,
+       "description": "Whether the employment has ended."
+      },
+      {
+       "name": "timezone",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The timezone of the employment."
+      },
+      {
+       "name": "job_title",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The job title of the employment."
+      },
+      {
+       "name": "seniority",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The seniority level of the employment."
+      },
+      {
+       "name": "start_date",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The start date of the employment."
+      },
+      {
+       "name": "work_email",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The work email of the employment."
+      },
+      {
+       "name": "hiring_type",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The type of hiring of the employment."
+      },
+      {
+       "name": "hiring_status",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The current hiring status of the employment."
+      },
+      {
+       "name": "completion_date",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The completion date of the employment contract."
+      },
+      {
+       "name": "contract_status",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The status of the employment contract."
+      },
+      {
+       "name": "voluntarily_left",
+       "in": "body",
+       "type": "boolean",
+       "required": false,
+       "description": "Whether the employee voluntarily left the employment."
+      },
+      {
+       "name": "contract_coverage",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "enum": [
+        "is_shielded",
+        "is_premium"
+       ],
+       "description": "The coverage type of the employment contract. 'is_shielded' = Contractor of Record, 'is_premium' = Premium, null = Standard (no coverage)."
+      },
+      {
+       "name": "new_hiring_status",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The new hiring status of the employment."
+      },
+      {
+       "name": "client_legal_entity",
+       "in": "body",
+       "type": "object",
+       "required": false,
+       "description": "The client legal entity associated with this employment contract.",
+       "properties": [
+        {
+         "name": "id",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "Unique identifier of this resource."
+        },
+        {
+         "name": "name",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "The name of the client legal entity."
+        }
+       ]
+      },
+      {
+       "name": "has_eor_termination",
+       "in": "body",
+       "type": "boolean",
+       "required": false,
+       "description": "Whether the employment has an EOR termination."
+      },
+      {
+       "name": "contract_is_archived",
+       "in": "body",
+       "type": "boolean",
+       "required": false,
+       "description": "Whether the employment contract is archived."
+      },
+      {
+       "name": "termination_last_day",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The last day of work mentioned on the contract termination."
+      },
+      {
+       "name": "contract_has_contractor",
+       "in": "body",
+       "type": "boolean",
+       "required": false,
+       "description": "Whether the contract has a contractor."
+      },
+      {
+       "name": "is_user_contract_deleted",
+       "in": "body",
+       "type": "boolean",
+       "required": false,
+       "description": "Whether the user contract is deleted."
+      },
+      {
+       "name": "hris_direct_employee_invitation",
+       "in": "body",
+       "type": "object",
+       "required": false,
+       "description": "The HRIS direct employee invitation status.",
+       "properties": [
+        {
+         "name": "oid",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "Unique identifier of this resource."
+        },
+        {
+         "name": "status",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "The HRIS direct employee invitation status."
+        },
+        {
+         "name": "send_at",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "The HRIS direct employee invitation send date."
+        },
+        {
+         "name": "timezone",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "The HRIS direct employee invitation timezone."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "external_id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The external ID of the employee."
+    },
+    {
+     "name": "hiring_type",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The type of hiring of the employee."
+    },
+    {
+     "name": "hiring_status",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The current hiring status of the employee."
+    },
+    {
+     "name": "nationalities",
+     "in": "body",
+     "type": "array",
+     "required": false,
+     "description": "The nationality of the employee."
+    },
+    {
+     "name": "work_location",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The work location of the employee."
+    },
+    {
+     "name": "direct_manager",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "description": "The direct manager of the employee.",
+     "properties": [
+      {
+       "name": "id",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Unique identifier for the manager."
+      },
+      {
+       "name": "last_name",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The last name of the manager."
+      },
+      {
+       "name": "worker_id",
+       "in": "body",
+       "type": "number",
+       "required": false,
+       "description": "The worker ID of the manager."
+      },
+      {
+       "name": "first_name",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The first name of the manager."
+      },
+      {
+       "name": "work_email",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The work email of the manager."
+      }
+     ]
+    },
+    {
+     "name": "direct_reports",
+     "in": "body",
+     "type": "array",
+     "required": false,
+     "description": "The direct reports to the employee.",
+     "properties": [
+      {
+       "name": "id",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Unique identifier for the direct report."
+      },
+      {
+       "name": "last_name",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The last name of the direct report."
+      },
+      {
+       "name": "first_name",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The first name of the direct report."
+      },
+      {
+       "name": "work_email",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The work email of the direct report."
+      }
+     ]
+    },
+    {
+     "name": "completion_date",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The completion date of the task or project."
+    },
+    {
+     "name": "new_hiring_status",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The new hiring status of the employee."
+    },
+    {
+     "name": "additional_details",
+     "in": "body",
+     "type": "array",
+     "required": false,
+     "description": "Country-scoped additional employment data points (national IDs, tax IDs, etc.) sourced from hris_employment_eligibility.eligibility_data. Returned only when the caller's organization has the feature flag enabled and the request is not redacting PII.",
+     "properties": [
+      {
+       "name": "type",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Field name (the JSONB key from hris_employment_eligibility.eligibility_data, e.g. socialSecurity, idNumber, taxIdentificationNumber)."
+      },
+      {
+       "name": "value",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Raw value associated with the field. May be a string, number, boolean, or null."
+      },
+      {
+       "name": "country",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "ISO-2 country code that scopes this entry."
+      }
+     ]
+    },
+    {
+     "name": "client_legal_entity",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "description": "The primary client legal entity associated with the employee.",
+     "properties": [
+      {
+       "name": "id",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Unique identifier of this resource."
+      },
+      {
+       "name": "name",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The name of the client legal entity."
+      }
+     ]
+    },
+    {
+     "name": "preferred_last_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The preferred last name of the employee."
+    },
+    {
+     "name": "direct_reports_count",
+     "in": "body",
+     "type": "integer",
+     "required": false,
+     "description": "The count of direct reports to the employee."
+    },
+    {
+     "name": "preferred_first_name",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The preferred first name of the employee."
+    },
+    {
+     "name": "active_worker_termination_status",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "PENDING",
+      "CONTRACT_TERMINATION_DATA_COLLECTED",
+      "IN_PROGRESS",
+      "COMPLETED",
+      "FAILED",
+      "CANCELED"
+     ],
+     "description": "The status of the active worker termination."
+    },
+    {
+     "name": "profile_organizational_structures",
+     "in": "body",
+     "type": "array",
+     "required": false,
+     "description": "An array of organizational structures associated with the employee profile.",
+     "properties": [
+      {
+       "name": "id",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Id of the Organizational structure."
+      },
+      {
+       "name": "name",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Name of the Organizational structure."
+      },
+      {
+       "name": "teams",
+       "in": "body",
+       "type": "array",
+       "required": false,
+       "description": "List of teams in the organizational structure.",
+       "properties": [
+        {
+         "name": "id",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "Id of the team."
+        },
+        {
+         "name": "name",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "Name of the team."
+        },
+        {
+         "name": "positions",
+         "in": "body",
+         "type": "array",
+         "required": false,
+         "description": "An array of positions held by the employee within this team.",
+         "properties": [
+          {
+           "name": "id",
+           "in": "body",
+           "type": "string",
+           "required": false,
+           "description": "Id of the position."
+          },
+          {
+           "name": "role",
+           "in": "body",
+           "type": "object",
+           "required": false,
+           "description": "The role associated with this position, including role ID and name.",
+           "properties": [
+            {
+             "name": "id",
+             "in": "body",
+             "type": "string",
+             "required": false,
+             "description": "Id of the role."
+            },
+            {
+             "name": "name",
+             "in": "body",
+             "type": "string",
+             "required": false,
+             "description": "Name of the role."
+            }
+           ]
+          },
+          {
+           "name": "is_supportive",
+           "in": "body",
+           "type": "boolean",
+           "required": false,
+           "description": "Whether the position is supportive or not."
+          }
+         ]
+        },
+        {
+         "name": "name_hierarchy",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "Hierarchy of the team."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "name": "direct_employee_termination_last_day",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "The last day of work mentioned on the primary contract termination."
+    },
+    {
+     "name": "custom_fields",
+     "in": "body",
+     "type": "array",
+     "required": false,
+     "description": "An array of custom field objects containing additional attributes associated with the employee (e.g., Job title, Project code, etc.).",
+     "properties": [
+      {
+       "name": "name",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Custom field property name."
+      },
+      {
+       "name": "value",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Custom field property value."
+      }
+     ]
+    }
+   ],
    "api": "rest",
    "versions": [
     {
@@ -165459,8 +170213,546 @@
    ],
    "bodyProps": [],
    "fileFields": [],
-   "responseKind": "none",
-   "responseFields": [],
+   "responseKind": "object",
+   "responseFields": [
+    {
+     "name": "id",
+     "in": "body",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "meta",
+     "in": "body",
+     "type": "object",
+     "required": true,
+     "properties": [
+      {
+       "name": "created",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "location",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "lastModified",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "resourceType",
+       "in": "body",
+       "type": "string",
+       "required": false
+      }
+     ]
+    },
+    {
+     "name": "name",
+     "in": "body",
+     "type": "object",
+     "required": true,
+     "properties": [
+      {
+       "name": "givenName",
+       "in": "body",
+       "type": "string",
+       "required": true
+      },
+      {
+       "name": "familyName",
+       "in": "body",
+       "type": "string",
+       "required": true
+      }
+     ]
+    },
+    {
+     "name": "title",
+     "in": "body",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "active",
+     "in": "body",
+     "type": "boolean",
+     "required": false
+    },
+    {
+     "name": "emails",
+     "in": "body",
+     "type": "array",
+     "required": true,
+     "properties": [
+      {
+       "name": "type",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "enum": [
+        "home",
+        "work",
+        "other"
+       ]
+      },
+      {
+       "name": "value",
+       "in": "body",
+       "type": "string",
+       "required": true
+      },
+      {
+       "name": "primary",
+       "in": "body",
+       "type": "boolean",
+       "required": false
+      }
+     ]
+    },
+    {
+     "name": "schemas",
+     "in": "body",
+     "type": "array",
+     "required": true
+    },
+    {
+     "name": "userName",
+     "in": "body",
+     "type": "string",
+     "required": true
+    },
+    {
+     "name": "userType",
+     "in": "body",
+     "type": "string",
+     "required": false
+    },
+    {
+     "name": "addresses",
+     "in": "body",
+     "type": "array",
+     "required": false,
+     "properties": [
+      {
+       "name": "type",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "region",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "country",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "locality",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "postalCode",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "streetAddress",
+       "in": "body",
+       "type": "string",
+       "required": false
+      }
+     ]
+    },
+    {
+     "name": "phoneNumbers",
+     "in": "body",
+     "type": "array",
+     "required": true,
+     "properties": [
+      {
+       "name": "type",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "enum": [
+        "home",
+        "work",
+        "other"
+       ]
+      },
+      {
+       "name": "value",
+       "in": "body",
+       "type": "string",
+       "required": true
+      },
+      {
+       "name": "primary",
+       "in": "body",
+       "type": "boolean",
+       "required": true
+      }
+     ]
+    },
+    {
+     "name": "urn:ietf:params:scim:schemas:extension:2.0:User",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "properties": [
+      {
+       "name": "state",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "country",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "endDate",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "isManager",
+       "in": "body",
+       "type": "boolean",
+       "required": false
+      },
+      {
+       "name": "startDate",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "jobProfile",
+       "in": "body",
+       "type": "object",
+       "required": false,
+       "description": "Active job profile of the worker from job architecture. Present only when job profiles are enabled for the organization and job architecture is set up; null when the worker has no active job profile or the token lacks the job_profile.view permission.",
+       "properties": [
+        {
+         "name": "id",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "Job profile id."
+        },
+        {
+         "name": "name",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "Job profile name."
+        },
+        {
+         "name": "level",
+         "in": "body",
+         "type": "integer",
+         "required": false,
+         "description": "Job profile level."
+        },
+        {
+         "name": "track",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "Job profile track, as configured in job architecture (free text)."
+        },
+        {
+         "name": "jobFamily",
+         "in": "body",
+         "type": "object",
+         "required": false,
+         "description": "Job family of the job profile.",
+         "properties": [
+          {
+           "name": "id",
+           "in": "body",
+           "type": "string",
+           "required": false,
+           "description": "Job family id."
+          },
+          {
+           "name": "name",
+           "in": "body",
+           "type": "string",
+           "required": false,
+           "description": "Job family name."
+          }
+         ]
+        },
+        {
+         "name": "jobFamilyGroup",
+         "in": "body",
+         "type": "object",
+         "required": false,
+         "description": "Job family group of the job family.",
+         "properties": [
+          {
+           "name": "id",
+           "in": "body",
+           "type": "string",
+           "required": false,
+           "description": "Job family group id."
+          },
+          {
+           "name": "name",
+           "in": "body",
+           "type": "string",
+           "required": false,
+           "description": "Job family group name."
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "name": "employments",
+       "in": "body",
+       "type": "array",
+       "required": false,
+       "properties": [
+        {
+         "name": "team",
+         "in": "body",
+         "type": "object",
+         "required": false,
+         "properties": [
+          {
+           "name": "name",
+           "in": "body",
+           "type": "string",
+           "required": false
+          }
+         ]
+        },
+        {
+         "name": "state",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "title",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "active",
+         "in": "body",
+         "type": "boolean",
+         "required": false
+        },
+        {
+         "name": "country",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "startDate",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "contractId",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "contractType",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "customFields",
+         "in": "body",
+         "type": "array",
+         "required": false,
+         "description": "Contract-level custom fields associated with the employment",
+         "properties": [
+          {
+           "name": "id",
+           "in": "body",
+           "type": "string",
+           "required": false
+          },
+          {
+           "name": "data",
+           "in": "body",
+           "type": "object",
+           "required": false,
+           "description": "The custom field value payload, structure varies by field type"
+          },
+          {
+           "name": "name",
+           "in": "body",
+           "type": "string",
+           "required": false
+          },
+          {
+           "name": "type",
+           "in": "body",
+           "type": "string",
+           "required": false
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "name": "customFields",
+       "in": "body",
+       "type": "array",
+       "required": false,
+       "properties": [
+        {
+         "name": "id",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "name",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "value",
+         "in": "body",
+         "type": "string",
+         "required": false
+        }
+       ]
+      },
+      {
+       "name": "hiringStatus",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "workLocation",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "The work location label assigned to the worker's HRIS profile"
+      },
+      {
+       "name": "departmentHierarchy",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "departmentExternalId",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "customFieldsFlattened",
+       "in": "body",
+       "type": "object",
+       "required": false,
+       "description": "Custom fields keyed by field UUID. Only present when the scimFlattenedFields feature flag is enabled."
+      },
+      {
+       "name": "departmentCustomFields",
+       "in": "body",
+       "type": "object",
+       "required": false,
+       "description": "Org-structure custom fields resolved for the department node, keyed by normalized field name. Only present when the department custom fields feature flag is enabled for the organization."
+      },
+      {
+       "name": "departmentExternalIdHierarchy",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "organizationalStructuresFlattened",
+       "in": "body",
+       "type": "object",
+       "required": false,
+       "description": "Org structures keyed by structure UUID. Only present when the scimFlattenedFields feature flag is enabled."
+      }
+     ]
+    },
+    {
+     "name": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "properties": [
+      {
+       "name": "manager",
+       "in": "body",
+       "type": "object",
+       "required": false,
+       "properties": [
+        {
+         "name": "value",
+         "in": "body",
+         "type": "string",
+         "required": true
+        },
+        {
+         "name": "displayName",
+         "in": "body",
+         "type": "string",
+         "required": false
+        }
+       ]
+      },
+      {
+       "name": "costCenter",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "department",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "organization",
+       "in": "body",
+       "type": "string",
+       "required": false
+      }
+     ]
+    }
+   ],
    "api": "scim",
    "versions": [
     {
@@ -165531,7 +170823,617 @@
      "name": "Resources",
      "in": "body",
      "type": "array",
-     "required": false
+     "required": false,
+     "properties": [
+      {
+       "name": "id",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "meta",
+       "in": "body",
+       "type": "object",
+       "required": true,
+       "properties": [
+        {
+         "name": "created",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "location",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "lastModified",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "resourceType",
+         "in": "body",
+         "type": "string",
+         "required": false
+        }
+       ]
+      },
+      {
+       "name": "name",
+       "in": "body",
+       "type": "object",
+       "required": true,
+       "properties": [
+        {
+         "name": "givenName",
+         "in": "body",
+         "type": "string",
+         "required": true
+        },
+        {
+         "name": "familyName",
+         "in": "body",
+         "type": "string",
+         "required": true
+        }
+       ]
+      },
+      {
+       "name": "title",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "active",
+       "in": "body",
+       "type": "boolean",
+       "required": false
+      },
+      {
+       "name": "emails",
+       "in": "body",
+       "type": "array",
+       "required": true,
+       "properties": [
+        {
+         "name": "type",
+         "in": "body",
+         "type": "string",
+         "required": true,
+         "enum": [
+          "home",
+          "work",
+          "other"
+         ]
+        },
+        {
+         "name": "value",
+         "in": "body",
+         "type": "string",
+         "required": true
+        },
+        {
+         "name": "primary",
+         "in": "body",
+         "type": "boolean",
+         "required": false
+        }
+       ]
+      },
+      {
+       "name": "schemas",
+       "in": "body",
+       "type": "array",
+       "required": true
+      },
+      {
+       "name": "userName",
+       "in": "body",
+       "type": "string",
+       "required": true
+      },
+      {
+       "name": "userType",
+       "in": "body",
+       "type": "string",
+       "required": false
+      },
+      {
+       "name": "addresses",
+       "in": "body",
+       "type": "array",
+       "required": false,
+       "properties": [
+        {
+         "name": "type",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "region",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "country",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "lineTwo",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "locality",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "postalCode",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "streetAddress",
+         "in": "body",
+         "type": "string",
+         "required": false
+        }
+       ]
+      },
+      {
+       "name": "urn:ietf:params:scim:schemas:extension:2.0:User",
+       "in": "body",
+       "type": "object",
+       "required": false,
+       "properties": [
+        {
+         "name": "state",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "country",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "endDate",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "birthday",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "workerId",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "isManager",
+         "in": "body",
+         "type": "boolean",
+         "required": false
+        },
+        {
+         "name": "startDate",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "jobProfile",
+         "in": "body",
+         "type": "object",
+         "required": false,
+         "description": "Active job profile of the worker from job architecture. Present only when job profiles are enabled for the organization and job architecture is set up; null when the worker has no active job profile or the token lacks the job_profile.view permission.",
+         "properties": [
+          {
+           "name": "id",
+           "in": "body",
+           "type": "string",
+           "required": false,
+           "description": "Job profile id."
+          },
+          {
+           "name": "name",
+           "in": "body",
+           "type": "string",
+           "required": false,
+           "description": "Job profile name."
+          },
+          {
+           "name": "level",
+           "in": "body",
+           "type": "integer",
+           "required": false,
+           "description": "Job profile level."
+          },
+          {
+           "name": "track",
+           "in": "body",
+           "type": "string",
+           "required": false,
+           "description": "Job profile track, as configured in job architecture (free text)."
+          },
+          {
+           "name": "jobFamily",
+           "in": "body",
+           "type": "object",
+           "required": false,
+           "description": "Job family of the job profile.",
+           "properties": [
+            {
+             "name": "id",
+             "in": "body",
+             "type": "string",
+             "required": false,
+             "description": "Job family id."
+            },
+            {
+             "name": "name",
+             "in": "body",
+             "type": "string",
+             "required": false,
+             "description": "Job family name."
+            }
+           ]
+          },
+          {
+           "name": "jobFamilyGroup",
+           "in": "body",
+           "type": "object",
+           "required": false,
+           "description": "Job family group of the job family.",
+           "properties": [
+            {
+             "name": "id",
+             "in": "body",
+             "type": "string",
+             "required": false,
+             "description": "Job family group id."
+            },
+            {
+             "name": "name",
+             "in": "body",
+             "type": "string",
+             "required": false,
+             "description": "Job family group name."
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "name": "employments",
+         "in": "body",
+         "type": "array",
+         "required": false,
+         "properties": [
+          {
+           "name": "team",
+           "in": "body",
+           "type": "object",
+           "required": false,
+           "properties": [
+            {
+             "name": "name",
+             "in": "body",
+             "type": "string",
+             "required": false
+            }
+           ]
+          },
+          {
+           "name": "state",
+           "in": "body",
+           "type": "string",
+           "required": false
+          },
+          {
+           "name": "title",
+           "in": "body",
+           "type": "string",
+           "required": false
+          },
+          {
+           "name": "active",
+           "in": "body",
+           "type": "boolean",
+           "required": false
+          },
+          {
+           "name": "country",
+           "in": "body",
+           "type": "string",
+           "required": false
+          },
+          {
+           "name": "startDate",
+           "in": "body",
+           "type": "string",
+           "required": false
+          },
+          {
+           "name": "contractId",
+           "in": "body",
+           "type": "string",
+           "required": false
+          },
+          {
+           "name": "contractType",
+           "in": "body",
+           "type": "string",
+           "required": false
+          },
+          {
+           "name": "customFields",
+           "in": "body",
+           "type": "array",
+           "required": false,
+           "description": "Contract-level custom fields associated with the employment",
+           "properties": [
+            {
+             "name": "id",
+             "in": "body",
+             "type": "string",
+             "required": false
+            },
+            {
+             "name": "data",
+             "in": "body",
+             "type": "object",
+             "required": false,
+             "description": "The custom field value payload. Structure varies by field type: Text/Number/Date have {value}, Percentage has {value, text}, Currency has {amount, currency}, List has {option}, Multiselect has {options}."
+            },
+            {
+             "name": "name",
+             "in": "body",
+             "type": "string",
+             "required": false
+            },
+            {
+             "name": "type",
+             "in": "body",
+             "type": "string",
+             "required": false
+            }
+           ]
+          },
+          {
+           "name": "employeeNumber",
+           "in": "body",
+           "type": "string",
+           "required": false
+          }
+         ]
+        },
+        {
+         "name": "customFields",
+         "in": "body",
+         "type": "array",
+         "required": false,
+         "properties": [
+          {
+           "name": "id",
+           "in": "body",
+           "type": "string",
+           "required": false
+          },
+          {
+           "name": "name",
+           "in": "body",
+           "type": "string",
+           "required": false
+          },
+          {
+           "name": "value",
+           "in": "body",
+           "type": "string",
+           "required": false
+          }
+         ]
+        },
+        {
+         "name": "hiringStatus",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "workLocation",
+         "in": "body",
+         "type": "string",
+         "required": false,
+         "description": "The work location label assigned to the worker's HRIS profile"
+        },
+        {
+         "name": "preferredName",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "preferredLastName",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "preferredFirstName",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "departmentHierarchy",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "departmentExternalId",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "departmentCustomFields",
+         "in": "body",
+         "type": "object",
+         "required": false,
+         "description": "Org-structure custom fields resolved for the department node, keyed by normalized field name. Only present when the department custom fields feature flag is enabled for the organization."
+        },
+        {
+         "name": "organizationalStructures",
+         "in": "body",
+         "type": "array",
+         "required": false,
+         "properties": [
+          {
+           "name": "name",
+           "in": "body",
+           "type": "string",
+           "required": false
+          },
+          {
+           "name": "externalId",
+           "in": "body",
+           "type": "string",
+           "required": false
+          },
+          {
+           "name": "structureId",
+           "in": "body",
+           "type": "string",
+           "required": false
+          },
+          {
+           "name": "nameHierarchy",
+           "in": "body",
+           "type": "string",
+           "required": false
+          },
+          {
+           "name": "structureName",
+           "in": "body",
+           "type": "string",
+           "required": false
+          },
+          {
+           "name": "externalIdHierarchy",
+           "in": "body",
+           "type": "string",
+           "required": false
+          }
+         ]
+        },
+        {
+         "name": "departmentExternalIdHierarchy",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "workerTerminationLastDateOfWork",
+         "in": "body",
+         "type": "string",
+         "required": false
+        }
+       ]
+      },
+      {
+       "name": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User",
+       "in": "body",
+       "type": "object",
+       "required": false,
+       "properties": [
+        {
+         "name": "manager",
+         "in": "body",
+         "type": "object",
+         "required": false,
+         "properties": [
+          {
+           "name": "email",
+           "in": "body",
+           "type": "string",
+           "required": false
+          },
+          {
+           "name": "value",
+           "in": "body",
+           "type": "string",
+           "required": true
+          },
+          {
+           "name": "displayName",
+           "in": "body",
+           "type": "string",
+           "required": false
+          }
+         ]
+        },
+        {
+         "name": "costCenter",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "department",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "customFields",
+         "in": "body",
+         "type": "object",
+         "required": false
+        },
+        {
+         "name": "organization",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "preferredLastName",
+         "in": "body",
+         "type": "string",
+         "required": false
+        },
+        {
+         "name": "preferredFirstName",
+         "in": "body",
+         "type": "string",
+         "required": false
+        }
+       ]
+      }
+     ]
     },
     {
      "name": "startIndex",
@@ -179061,7 +184963,9 @@
      "description": "Identifier of an existing timesheet preset used to link a standardized hourly rate and label to this entry."
     }
    ],
-   "fileFields": [],
+   "fileFields": [
+    "file"
+   ],
    "responseKind": "object",
    "responseFields": [
     {
@@ -179199,8 +185103,350 @@
    ],
    "bodyProps": [],
    "fileFields": [],
-   "responseKind": "none",
-   "responseFields": [],
+   "responseKind": "object",
+   "responseFields": [
+    {
+     "name": "id",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Unique identifier of this resource."
+    },
+    {
+     "name": "type",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Deprecated - it is always \"work\""
+    },
+    {
+     "name": "scale",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Predefined scale used to calculate the timesheet amount (e.g. hourly, daily, custom)."
+    },
+    {
+     "name": "status",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "enum": [
+      "approved",
+      "declined",
+      "not_payable",
+      "paid",
+      "pending",
+      "processing"
+     ],
+     "description": "Status of this entry."
+    },
+    {
+     "name": "contract",
+     "in": "body",
+     "type": "object",
+     "required": true,
+     "description": "Contract associated with this timesheet.",
+     "properties": [
+      {
+       "name": "id",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Unique identifier of the contract."
+      },
+      {
+       "name": "type",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "enum": [
+        "ongoing_time_based",
+        "milestones",
+        "time_based",
+        "pay_as_you_go_time_based",
+        "commission",
+        "payg_milestones",
+        "payg_tasks",
+        "eor",
+        "unknown",
+        "employee",
+        "global_payroll",
+        "shield_msa",
+        "hris_direct_employee",
+        "peo"
+       ],
+       "description": "Type of a contract"
+      },
+      {
+       "name": "title",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Human-readable title of the contract."
+      }
+     ]
+    },
+    {
+     "name": "quantity",
+     "in": "body",
+     "type": "number",
+     "required": true,
+     "description": "Quantity of work units (hours, days, etc.) used to calculate the total amount."
+    },
+    {
+     "name": "worksheet",
+     "in": "body",
+     "type": "object",
+     "required": true,
+     "description": "Breakdown of time worked across different units.",
+     "properties": [
+      {
+       "name": "days",
+       "in": "body",
+       "type": "number",
+       "required": true,
+       "description": "Number of days reported."
+      },
+      {
+       "name": "hours",
+       "in": "body",
+       "type": "number",
+       "required": true,
+       "description": "Number of hours reported."
+      },
+      {
+       "name": "weeks",
+       "in": "body",
+       "type": "number",
+       "required": true,
+       "description": "Number of weeks reported."
+      },
+      {
+       "name": "minutes",
+       "in": "body",
+       "type": "number",
+       "required": true,
+       "description": "Number of minutes reported."
+      }
+     ]
+    },
+    {
+     "name": "attachment",
+     "in": "body",
+     "type": "object",
+     "required": true,
+     "description": "This object is used for linking file attachments to your records.",
+     "properties": [
+      {
+       "name": "key",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "You can call attachments end-point, get key and URL to upload your file."
+      },
+      {
+       "name": "filename",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Original filename you used to upload using attachments end-point."
+      }
+     ]
+    },
+    {
+     "name": "created_at",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Timestamp when the timesheet was created (ISO-8601)."
+    },
+    {
+     "name": "description",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Human-readable description of the work performed."
+    },
+    {
+     "name": "reported_by",
+     "in": "body",
+     "type": "object",
+     "required": true,
+     "description": "User who submitted the timesheet.",
+     "properties": [
+      {
+       "name": "id",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Unique identifier of the reporting user."
+      },
+      {
+       "name": "full_name",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Full name of the user who submitted the timesheet."
+      }
+     ]
+    },
+    {
+     "name": "reviewed_by",
+     "in": "body",
+     "type": "object",
+     "required": true,
+     "description": "Reviewer information if the timesheet has been reviewed.",
+     "properties": [
+      {
+       "name": "id",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Unique identifier of the reviewer."
+      },
+      {
+       "name": "remarks",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Reviewer remarks or decision notes."
+      },
+      {
+       "name": "full_name",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Full name of the reviewer."
+      },
+      {
+       "name": "reviewed_at",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Timestamp when the review occurred (ISO-8601)."
+      }
+     ]
+    },
+    {
+     "name": "custom_scale",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Custom scale label defined by the client for non-standard billing rates."
+    },
+    {
+     "name": "total_amount",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "is equal to quantity times rate of active work statement + bonus in this record"
+    },
+    {
+     "name": "currency_code",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "ISO 4217 currency code used for the amount."
+    },
+    {
+     "name": "payment_cycle",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "description": "Payment cycle associated with this timesheet.",
+     "properties": [
+      {
+       "name": "end_date",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Long date-time format following ISO-8601"
+      },
+      {
+       "name": "start_date",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Long date-time format following ISO-8601"
+      }
+     ]
+    },
+    {
+     "name": "date_submitted",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Long date-time format following ISO-8601"
+    },
+    {
+     "name": "hourly_report_preset",
+     "in": "body",
+     "type": "object",
+     "required": false,
+     "description": "Timesheet preset linked to this entry, if any.",
+     "properties": [
+      {
+       "name": "id",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "unique identifier of the related timesheet preset"
+      },
+      {
+       "name": "rate",
+       "in": "body",
+       "type": "number",
+       "required": false,
+       "description": "the hourly rate of the related timesheet preset"
+      },
+      {
+       "name": "title",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "the title of the related timesheet preset"
+      },
+      {
+       "name": "description",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "the description of the related timesheet preset"
+      }
+     ]
+    },
+    {
+     "name": "approvers",
+     "in": "body",
+     "type": "array",
+     "required": true,
+     "description": "List of approvers and their decisions recorded against this timesheet.",
+     "properties": [
+      {
+       "name": "email",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Email address of the approver."
+      },
+      {
+       "name": "approved",
+       "in": "body",
+       "type": "boolean",
+       "required": true,
+       "description": "Whether the approver has approved the timesheet."
+      },
+      {
+       "name": "full_name",
+       "in": "body",
+       "type": "string",
+       "required": false,
+       "description": "Full name of the approver."
+      }
+     ]
+    }
+   ],
    "api": "rest",
    "versions": [
     {

@@ -365,16 +365,13 @@ test("the wrong number of arguments, an empty one or an unknown flag sends nothi
   }
 });
 
-test("--help on shared words is one page with every endpoint's full help; a selector narrows it to one", async () => {
+test("--help on shared words lists every endpoint, and its flags or its arguments narrow it to one", async () => {
   const all = await capture(["ships", "get", "--help"], fleet.manifest.descriptors);
   assert.equal(all.code, EXIT.OK);
-  assert.match(all.out, /^ships get — 3 endpoints; the flags pick one$/m);
   for (const line of ["deel ships get <ship>\n", "deel ships get <ship> --worker-type eor\n", "deel ships get <ship> --file-format pdf --as worker\n"]) assert.ok(all.out.includes(line), all.out);
-  // Each endpoint's own section: its usage, arguments and response, with no value typed.
-  assert.equal(all.out.match(/^── \d of 3: /gm)?.length, 3);
-  for (const usage of ["USAGE  deel ships get <ship> [GLOBAL OPTIONS]", "USAGE  deel ships get <ship> --worker-type eor [GLOBAL OPTIONS]"]) assert.ok(all.out.includes(usage), all.out);
-  assert.match(all.out, /^GET \/eor\/fleet\/\{ship_id\}$/m);
-  assert.match(all.out, /^One endpoint only: add its flags before --help \(deel ships get --file-format pdf --as worker --help\)\.$/m);
+  assert.match(all.out, /^ {6}GET \/eor\/fleet\/\{ship_id\}/m);
+  assert.match(all.out, /add its flags before --help \(deel ships get --file-format pdf --as worker --help\); for the line without flags, put its ID before --help\.$/m);
+  assert.ok(!all.out.includes("RESPONSE"), "the list stays one line per endpoint");
   const one = await capture(["ships", "get", "--worker-type", "eor", "--help"], fleet.manifest.descriptors);
   assert.match(one.out, /USAGE  deel ships get <ship> --worker-type eor \[GLOBAL OPTIONS\]/);
   const json = JSON.parse((await capture(["ships", "benefits", "list", "--help", "--json"], fleet.manifest.descriptors)).out);
