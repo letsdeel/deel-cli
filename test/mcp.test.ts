@@ -45,6 +45,15 @@ test("an SSE response is read from its data lines", async () => {
   assert.deepEqual((await call(transport)).texts, ["ok"]);
 });
 
+test("an SSE message split over several data lines is joined, and a reply to another call is skipped", () => {
+  const body = JSON.stringify({ jsonrpc: "2.0", id: 1, result: { content: [{ type: "text", text: "a" }] } }, null, 1);
+  const multiline = body.split("\n").map((line) => `data: ${line}`).join("\n");
+  assert.deepEqual(parseRpcBody(`event: message\n${multiline}\n\n`, "text/event-stream", 1)?.result, { content: [{ type: "text", text: "a" }] });
+  assert.equal(parseRpcBody(JSON.stringify({ jsonrpc: "2.0", id: 2, result: {} }), "application/json", 1), null);
+  assert.deepEqual(parseRpcBody(JSON.stringify({ jsonrpc: "2.0", id: 1, result: { a: 1 } }), "application/json", 1)?.result, { a: 1 });
+  assert.deepEqual(parseRpcBody(JSON.stringify({ result: { a: 2 } }), "application/json", 1)?.result, { a: 2 });
+});
+
 test("parseRpcBody picks the SSE message with the call's id and skips bad lines", () => {
   const text = ["data: not json", `data: ${JSON.stringify({ jsonrpc: "2.0", id: 9, result: {} })}`, `data: ${JSON.stringify({ jsonrpc: "2.0", id: 1, result: { x: 1 } })}`].join("\n");
   assert.deepEqual(parseRpcBody(text, "text/event-stream", 1)?.result, { x: 1 });

@@ -32,14 +32,14 @@ import { commonArgs, configFrom, outputOpts } from "./shared.ts";
 import type { Args } from "./shared.ts";
 
 // Test seams: a fake transport, keychain or IO; the real ones otherwise.
-export type AppDeps = { baseTransport?: Transport; store?: CredentialStore; io?: IOStreams; sleep?: (ms: number) => Promise<void> };
+export type AppDeps = { baseTransport?: Transport; store?: CredentialStore; io?: IOStreams; sleep?: (ms: number) => Promise<void>; now?: () => number };
 
 type Session = { ctx: Ctx; client: AppClient };
 
 function prepare(args: Args, rawArgs: string[], deps: AppDeps = {}): Session {
   setLoggingEnabled(args.log !== false);
   const config = configFrom(args, rawArgs);
-  const resolved: ResolvedToken = resolveToken({ tokenStdin: Boolean(args["token-stdin"]), config, store: deps.store, transport: deps.baseTransport });
+  const resolved: ResolvedToken = resolveToken({ tokenStdin: Boolean(args["token-stdin"]), config, store: deps.store, transport: deps.baseTransport, now: deps.now });
   assertEligible(resolved);
   const url = resolveMcpUrl(config, { oauth: resolved.source === "oauth" });
   // A failed login refresh must not read as "the action may have run": it fails before the request is sent.
@@ -79,12 +79,14 @@ function refuseUnsupported(rawArgs: string[], extra: string[]): void {
   }
 }
 
-// citty ignores a flag it doesn't know, so a mistyped `--dryrun` would run the write. Every `--flag` must be one this
-// command declares, a `--no-` form of one, or the hidden `--base-url`.
+// citty ignores a flag it doesn't know, so a mistyped `--dryrun` would run the write, and it reads `-dry-run` as a
+// group of short options and sets nothing. Every `--flag` must be one this command declares, a `--no-` form of one, or
+// the hidden `--base-url`; the only short option is `-h`, and a bare `-` or a negative number is a value.
 function refuseUnknownFlags(rawArgs: string[], own: string[]): void {
   const known = new Set<string>([...HONOURED_FLAGS, ...own, ...HIDDEN_VALUE_FLAGS, "help"]);
   for (const token of rawArgs) {
     if (token === "--") return;
+    if (/^-[A-Za-z]/.test(token) && token !== "-h") throw new CliError("usage.app", `Unknown option ${token}.`, "Flags are written --like-this. Nothing was run.");
     if (!token.startsWith("--")) continue;
     const name = token.slice(2).split("=")[0];
     if (!known.has(name) && !known.has(name.replace(/^no-/, ""))) {
@@ -153,7 +155,7 @@ export async function runRun(args: Args, rawArgs: string[], deps?: AppDeps): Pro
   const { action, requestId } = await getAction(client, name);
   if (args["dry-run"]) {
     const call = runCall(action, input);
-    await render(ctx.io, envelope({ method: "tools/call", params: { name: call.tool, arguments: call.arguments } }, { request_id: requestId, dry_run: true }), outputOpts(args));
+    await render(ctx.io, envelope({ method: "tools/call", params: { name: call.tool, arguments: call.arguments } }, { request_id: requestId, dry_run: true }), { ...outputOpts(args), quiet: false });
     return;
   }
   const outcome = await runAction(client, action, input);

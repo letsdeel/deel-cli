@@ -182,6 +182,10 @@ test("run --dry-run prints the call and runs nothing", async (t) => {
   const printed = io.json();
   assert.deepEqual(printed.data, { method: "tools/call", params: { name: "run_write_action", arguments: { name: "approve_widget", path_params: { widget_id: "w1" } } } });
   assert.equal(printed.meta.dry_run, true);
+
+  const quiet = captureIO();
+  await runRun({ ...ARGS, _: ["approve_widget"], input: '{"path_params":{"widget_id":"w1"}}', "dry-run": true, quiet: true }, [], deps(transport, loggedIn(), quiet.io));
+  assert.equal(quiet.json().meta.dry_run, true); // --quiet doesn't blank the preview
 });
 
 test("run checks its arguments and --input before any call", async (t) => {
@@ -232,6 +236,25 @@ test("a login refresh that fails during a write is its own error, not an unknown
     (error: CliError) => error.code === "network.timeout",
   );
   assert.deepEqual(tools().map((call) => call.name), ["get_action", "run_write_action"]);
+});
+
+test("a login that expires between the lookup and the write fails to refresh as its own error, with no write sent", async (t) => {
+  isolated(t);
+  let clock = Date.now();
+  const { transport, tools } = server((tool) => {
+    if (tool !== "get_action") return assert.fail("the write must not be sent");
+    clock += 2 * 3600_000; // the stored token is now past its life, so the next send refreshes first
+    return { texts: [JSON.stringify(APPROVE)] };
+  });
+  const refusing: Transport = async (request) => {
+    if (request.url === `${ISSUER}/oauth/tokens`) throw new CliError("network.timeout", "The token endpoint timed out.");
+    return transport(request);
+  };
+  await assert.rejects(
+    () => runRun({ ...ARGS, _: ["approve_widget"], input: "path_params={widget_id=w1}" }, [], { ...deps(refusing, loggedIn(), captureIO().io), now: () => clock }),
+    (error: CliError) => error.code === "network.timeout",
+  );
+  assert.deepEqual(tools().map((call) => call.name), ["get_action"]);
 });
 
 test("DEEL_MCP_URL points a DEEL_TOKEN at another /mcp", async (t) => {
@@ -292,16 +315,16 @@ test("a flag the command doesn't have is refused before any call, so a mistyped 
   isolated(t);
   const { transport, requests } = server(() => assert.fail("no call expected"));
   const d = deps(transport, loggedIn(), captureIO().io);
-  const unknown = (error: CliError) => error.code === "usage.app" && /Unknown flag/.test(error.message);
-  for (const flag of ["--dryrun", "--dry_run", "--dry", "--limit=3"]) {
+  const unknown = (error: CliError) => error.code === "usage.app" && /Unknown (flag|option)/.test(error.message);
+  for (const flag of ["--dryrun", "--dry_run", "--dry", "--limit=3", "-dry-run", "-n"]) {
     await assert.rejects(() => runRun({ ...ARGS, _: ["approve_widget"] }, ["run", "approve_widget", "--input", "path_params={id=1}", flag], d), unknown, flag);
   }
   await assert.rejects(() => runSearch({ ...ARGS, _: ["x"] }, ["search", "--limt", "3", "x"], d), unknown);
   await assert.rejects(() => runDescribe({ ...ARGS, _: ["x"] }, ["describe", "x", "--generate_input"], d), unknown);
   assert.equal(requests.length, 0);
-  // Declared flags, their --no- forms, --base-url and everything after `--` pass.
+  // Declared flags, their --no- forms, --base-url, -h, a bare `-`, a negative number and everything after `--` pass.
   const { transport: ok } = server(() => ({ texts: ['{"actions":[]}'] }));
-  await runSearch({ ...ARGS, _: ["x", "--weird"] }, ["search", "x", "--limit", "2", "--no-log", "--base-url", "https://api.letsdeel.com/rest", "--", "--weird"], deps(ok, loggedIn(), captureIO().io));
+  await runSearch({ ...ARGS, _: ["x", "--weird"] }, ["search", "x", "--limit", "2", "--no-log", "--base-url", "https://api.letsdeel.com/rest", "-h", "-", "-5", "--", "--weird", "-x"], deps(ok, loggedIn(), captureIO().io));
 });
 
 test("run keeps shorthand numbers exact, typed by the action's schema", async (t) => {

@@ -37,22 +37,31 @@ type RpcMessage = { jsonrpc?: string; id?: unknown; result?: unknown; error?: { 
 // A Streamable HTTP response is either one JSON body or an SSE stream whose `data:` lines carry the messages.
 export function parseRpcBody(text: string, contentType: string | undefined, id: number): RpcMessage | null {
   if (contentType?.includes("text/event-stream")) {
-    const messages = text
-      .split(/\r?\n/)
-      .filter((line) => line.startsWith("data:"))
-      .map((line) => {
-        try {
-          return JSON.parse(line.slice("data:".length).trim()) as RpcMessage;
-        } catch {
-          return null;
-        }
-      })
-      .filter((message): message is RpcMessage => message !== null);
+    // An event is the `data:` lines up to a blank line, joined by newlines (a long message may span several). A
+    // server that skips the blank lines is read line by line.
+    const parse = (data: string) => {
+      try {
+        return [JSON.parse(data) as RpcMessage];
+      } catch {
+        return [];
+      }
+    };
+    const messages = text.split(/\r?\n\r?\n/).flatMap((event) => {
+      const lines = event
+        .split(/\r?\n/)
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice("data:".length).replace(/^ /, ""));
+      const joined = parse(lines.join("\n"));
+      return joined.length > 0 ? joined : lines.flatMap(parse);
+    });
     return messages.find((message) => message.id === id) ?? null;
   }
   try {
     const message: unknown = JSON.parse(text);
-    return message && typeof message === "object" && !Array.isArray(message) ? (message as RpcMessage) : null;
+    if (!message || typeof message !== "object" || Array.isArray(message)) return null;
+    // A reply to another request is not ours; one without an id is taken as ours.
+    const replyId = (message as RpcMessage).id;
+    return replyId === undefined || replyId === id ? (message as RpcMessage) : null;
   } catch {
     return null;
   }
