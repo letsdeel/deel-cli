@@ -26,14 +26,14 @@ const definitions = parseDefinitions(endpoints.map(([method, path, , summary]) =
 const map: MapEntry[] = endpoints.map(([method, path, command]) => ({ method, path, command, ...(path === "/Users" ? { api: "scim" as const } : {}) }));
 const generated = generate(definitions, { reserved: { commands: handPicked.descriptors, topLevel: RESERVED_COMMANDS }, map, now: new Date("2026-10-30T00:00:00Z") });
 
-async function capture(argv: string[]): Promise<{ code: number; out: string; err: string }> {
+async function capture(argv: string[], descriptors = generated.manifest.descriptors): Promise<{ code: number; out: string; err: string }> {
   const out: string[] = [];
   const err: string[] = [];
   const origOut = process.stdout.write;
   const origErr = process.stderr.write;
   process.stdout.write = ((chunk: any) => (out.push(String(chunk)), true)) as typeof process.stdout.write;
   process.stderr.write = ((chunk: any) => (err.push(String(chunk)), true)) as typeof process.stderr.write;
-  setGeneratedDescriptorsForTests(generated.manifest.descriptors);
+  setGeneratedDescriptorsForTests(descriptors);
   try {
     const code = await run(argv);
     return { code, out: out.join(""), err: err.join("") };
@@ -169,4 +169,123 @@ test("every domain has a stage and a description, and a group title uses them", 
   assert.equal(domainOf("nope"), undefined);
   assert.match(groupTitle(["contracts"]), /^deel contracts — Every working arrangement/);
   assert.equal(groupTitle(["contracts", "amendments"]), "deel contracts amendments");
+});
+
+// ---- a group whose lines use every kind of picking flag ----
+
+// A group whose lines use every kind of picking flag: a worker type, `--as`, `--file-format`, `--bulk`, a scope, and
+// two lines that differ only in the name of their path ID (R7b).
+const fleetEndpoints: Array<[string, string, string]> = [
+  ["GET", "/fleet/{ship_id}", "deel ships get <ship>"],
+  ["GET", "/eor/fleet/{ship_id}", "deel ships get <ship> --worker-type eor"],
+  ["GET", "/gp/fleet/{sailor_id}", "deel ships get <sailor> --worker-type gp"],
+  ["GET", "/workers/fleet/{ship_id}/pdf", "deel ships get <ship> --file-format pdf --as worker"],
+  ["POST", "/fleet/reviews/many", "deel ships reviews create --bulk"],
+  ["POST", "/fleet/{ship_id}/reviews", "deel ships reviews create <ship>"],
+  ["GET", "/gp/crews/{crew_id}/ships", "deel ships list --crew <crew> [--worker-type gp]"],
+  ["POST", "/fleet/notes", "deel ships notes create [--bulk]"],
+  ["GET", "/ats/jobs", "deel ats jobs list"],
+];
+const fleetDefinitions = parseDefinitions(
+  fleetEndpoints.map(([method, path]) => ({
+    api: "rest", method, path, version: "2026-01-01", beta_until: null, sunset_at: null,
+    operation: { summary: `${method} ${path}`, responses: { "200": { description: "ok" } }, ...(method === "POST" ? { requestBody: { content: { "application/json": { schema: { type: "object", properties: { note: { type: "string" } } } } } } } : {}) },
+  })),
+);
+const fleet = generate(fleetDefinitions, {
+  reserved: { commands: [], topLevel: new Set() },
+  now: new Date("2026-10-30T00:00:00Z"),
+  map: fleetEndpoints.map(([method, path, command]) => ({ method, path, command })),
+});
+
+test("the picking-flag fixture generates cleanly", () => {
+  assert.deepEqual(fleet.errors, []);
+});
+
+test("group help lists a line per endpoint and names each path ID when the worker types differ (R7b)", async () => {
+  const { code, out } = await capture(["ships", "--help"], fleet.manifest.descriptors);
+  assert.equal(code, EXIT.OK);
+  assert.match(out, /^ {2}get <ship> {2,}/m);
+  assert.match(out, /^ {2}get <ship> --worker-type eor {2,}/m);
+  assert.match(out, /^ {2}get <sailor> --worker-type gp {2,}/m);
+  assert.match(out, /^ {2}get <ship> --file-format pdf --as worker {2,}/m);
+  assert.match(out, /^ {2}list \[--worker-type gp\] --crew <crew> {2,}GET \/gp\/crews\/\{crew_id\}\/ships$/m);
+});
+
+test("group help explains each flag its lines use, and only those", async () => {
+  const { out } = await capture(["ships", "--help"], fleet.manifest.descriptors);
+  const legend = out.slice(out.indexOf("Flags that pick the endpoint:"), out.indexOf("Add --help"));
+  assert.match(legend, /^ {2}--worker-type <type> /m);
+  assert.match(legend, /^ {2}--as <side> /m);
+  assert.match(legend, /^ {2}--file-format <format> /m);
+  assert.doesNotMatch(legend, /--status/);
+  // `--bulk` is on the `reviews` line, not on the group's own.
+  const reviews = await capture(["ships", "reviews", "--help"], fleet.manifest.descriptors);
+  assert.match(reviews.out, /^ {2}--bulk {2,}many at once$/m);
+  assert.match(reviews.out, /^ {2}create --bulk {2,}/m);
+  assert.doesNotMatch(reviews.out, /--as <side>/);
+});
+
+test("a value of a flag that picks an endpoint is not a command word, whichever kind of flag it is", async () => {
+  const cases = [
+    ["ships", "--worker-type", "gp", "--help"], // a selector with a value
+    ["ships", "--file-format", "pdf", "--help"],
+    ["ships", "--crew", "c1", "--help"], // a scope
+    ["ships", "--bulk", "--help"], // a switch takes no value
+  ];
+  for (const argv of cases) {
+    const { code, out, err } = await capture(argv, fleet.manifest.descriptors);
+    assert.equal(code, EXIT.OK, `${argv.join(" ")}: ${err}`);
+    assert.match(out, /^deel ships/m, argv.join(" "));
+  }
+});
+
+test("a switch such as --bulk does not swallow the word after it", async () => {
+  // If --bulk were read as taking a value, `reviews` would be that value and the group's own help would print.
+  const { code, out } = await capture(["ships", "--bulk", "reviews", "--help"], fleet.manifest.descriptors);
+  assert.equal(code, EXIT.OK);
+  assert.match(out, /^ {2}create --bulk {2,}/m);
+  assert.doesNotMatch(out, /^ {2}get <ship>/m);
+});
+
+test("a word that is not a command is named in the error even after a picking flag's value", async () => {
+  await assert.rejects(capture(["--as", "worker", "shps"], fleet.manifest.descriptors), (error: Error) => /Unknown command 'shps'\./.test(error.message) && /Did you mean: ships\?/.test(error.message));
+});
+
+test("a flag written as an optional switch, [--bulk], is explained too", async () => {
+  const { out } = await capture(["ships", "notes", "--help"], fleet.manifest.descriptors);
+  assert.match(out, /^ {2}create \[--bulk\] {2,}/m);
+  assert.match(out, /^ {2}--bulk {2,}many at once$/m);
+});
+
+test("group help orders the rows: verbs in their usual order, then leaves, chains and groups by name", async () => {
+  const { out } = await capture(["contracts", "--help"]);
+  const rows = out.slice(out.indexOf("Commands:\n") + "Commands:\n".length, out.indexOf("\nFlags that pick")).trimEnd().split("\n").map((line) => line.trim().split(/ {3,}/)[0]);
+  assert.deepEqual(rows, ["list", "get <contract>", "get <contract> --worker-type eor", "invite send <contract>", "amendments"]);
+});
+
+test("root help sorts the words of a stage by name, and puts a word domains.json does not know last, under Other", async () => {
+  const { out } = await capture([], [...generated.manifest.descriptors, ...fleet.manifest.descriptors]);
+  const at = (pattern: RegExp) => out.search(pattern);
+  // `ats` was added after `contracts`, so only the sort puts it first.
+  assert.ok(at(/ats jobs list/) !== -1 && at(/ats jobs list/) < at(/contracts {3,}/), "ats before contracts within Hiring");
+  assert.match(out, /^ {2}Other {3,}ships {3,}/m);
+  assert.ok(at(/^ {2}Other {3,}/m) > at(/^ {2}Platform {3,}/m), "Other comes after every stage");
+});
+
+test("--help on a static leaf prints its usage and runs nothing", async () => {
+  const realFetch = globalThis.fetch;
+  let requests = 0;
+  globalThis.fetch = (async () => (requests++, new Response("{}"))) as typeof fetch;
+  try {
+    for (const [argv, flag] of [[["auth", "login", "--help"], "--input"], [["commands", "--help"], "--filter"], [["job", "status", "--help"], "--input"]] as const) {
+      const { code, out, err } = await capture([...argv]);
+      assert.equal(code, EXIT.OK, `${argv.join(" ")}: ${err}`);
+      assert.match(out, /USAGE/, argv.join(" "));
+      assert.ok(out.includes(flag), `${argv.join(" ")} lists ${flag}`);
+    }
+    assert.equal(requests, 0);
+  } finally {
+    globalThis.fetch = realFetch;
+  }
 });

@@ -8,7 +8,8 @@ import { defineCommand, parseArgs, runCommand, showUsage } from "citty";
 import type { ArgsDef, CommandDef } from "citty";
 import type { Descriptor } from "./types.ts";
 import { allDescriptors, loadGeneratedDescriptors, matchForm, pickingFlags, selectForm, usageOf } from "./public-api/commands.ts";
-import { acceptsFlag, argvEnables, argvMentionsFlag, flagMissingValue, flagOf, joinSwitchValues } from "./core/flags.ts";
+import { acceptsFlag, argvEnables, argvMentionsFlag, flagMissingValue, flagOf, joinSwitchValues, unknownFlag } from "./core/flags.ts";
+export { unknownFlag };
 import { parseInput } from "./core/input.ts";
 import { createContext } from "./core/context.ts";
 import { execute } from "./core/executor.ts";
@@ -156,19 +157,6 @@ function switchesOf(descriptors: Descriptor[]): string[] {
   const globals = Object.entries(commonArgs).filter(([, def]) => (def as { type?: string }).type === "boolean").map(([name]) => name);
   const own = descriptors.flatMap((d) => d.params.filter((param) => param.type === "boolean").map(flagOf));
   return [...globals, ...own, ...descriptors.flatMap((d) => (d.form?.selectors ?? []).filter((s) => s.value === undefined).map((s) => s.flag))];
-}
-
-// The first flag in argv, as typed, that none of `known` accepts in any spelling the parser reads (--a-b, --aB, --no-a).
-export function unknownFlag(argv: string[], known: string[]): string | undefined {
-  for (const token of argv) {
-    if (token === "--") break;
-    if (/^-[A-Za-z]/.test(token)) return token.split("=")[0]; // no short flags beyond -h and -v, read earlier
-    if (!token.startsWith("--")) continue;
-    const key = token.slice(2).split("=")[0];
-    const accepted = (name: string) => known.some((flag) => acceptsFlag(flag, name));
-    if (!accepted(key) && !(key.startsWith("no-") && accepted(key.slice(3)))) return `--${key}`;
-  }
-  return undefined;
 }
 
 // The endpoints that share a generated command's words: the selector and scope flags given pick one. That

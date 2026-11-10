@@ -74,6 +74,18 @@ test("deel commands --filter with no value fails as a value flag does, and sends
   }
 });
 
+test("deel commands refuses a stray word or an unknown flag instead of listing more than was asked", async () => {
+  await assert.rejects(run(["commands", "--filter", "amendments", "list"]), (error: { code?: string; message: string }) => error.code === "usage.command" && /takes no arguments, got: list/.test(error.message));
+  await assert.rejects(run(["commands", "--fliter", "invoice"]), (error: { code?: string; message: string }) => error.code === "usage.flag" && /no flag --fliter/.test(error.message));
+  assert.equal((await capture(["commands", "--filter=contracts", "--no-json"])).code, EXIT.OK);
+});
+
+test("deel commands --json prints an empty list, and exits 0, when nothing matches", async () => {
+  const { code, out } = await capture(["commands", "--filter=nothing-matches-this", "--json"]);
+  assert.equal(code, EXIT.OK);
+  assert.deepEqual(JSON.parse(out), []);
+});
+
 test("commandRows sorts by command, then path, whatever order the rows come in; renderCommandRows aligns the columns", () => {
   const plain = manifest.descriptors.find((d) => d.path === "/contracts/{contract_id}")!;
   const eor = manifest.descriptors.find((d) => d.path === "/eor/contracts/{contract_id}/details")!;
