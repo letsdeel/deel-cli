@@ -246,6 +246,8 @@ deel dev logs list --limit 100 --cursor <page.cursor> --beta # next page, until 
 
 `--jq` and `--quiet` see only `data`, so to page read `page.cursor` from the full JSON envelope (or with `--fields`, which keeps `page`).
 
+A flag that takes a value (`--fields`, `--jq`, `--input`, `--env`, `--limit`...) and gets none, or gets the next flag in its place, fails before anything is sent. A value that starts with `-` is written attached: `--jq=-.a`.
+
 | Flag              | Effect                                                                 |
 | ----------------- | ---------------------------------------------------------------------- |
 | `--no-json`       | Human-readable view on a TTY (default is always JSON)                  |
@@ -262,16 +264,16 @@ deel jobs list --quiet
 
 ## API tokens
 
-`deel dev tokens` lists and inspects the API tokens of your organization, and your own personal tokens, and invalidates one. The calling token needs the `tokens:read` scope, plus `tokens:write` to invalidate. The API never returns a token's secret value.
+`deel dev tokens` lists and inspects the API tokens of your organization, and your own personal tokens, and invalidates one. The calling token needs the `tokens:read` scope, plus `tokens:write` to invalidate. The API never returns a token's secret value. These endpoints are in beta, so each command takes `--beta`.
 
 ```bash
-deel dev tokens list                                   # newest first; --limit/--cursor to page
-deel dev tokens get <token_id>
-deel dev tokens revocations create <token_id> --input reason=rotated   # invalidates the token; there is no undo
-deel dev logs tokens list                              # what each token has been used for
+deel dev tokens list --beta                            # newest first; --limit/--cursor to page
+deel dev tokens get <token_id> --beta
+deel dev tokens revocations create <token_id> --input reason=rotated --beta   # invalidates the token; there is no undo
+deel dev logs tokens list --beta                       # what each token has been used for
 ```
 
-There is no confirmation prompt and no `--yes`: `revocations create` invalidates the token as soon as it is typed. Check the ID with `deel dev tokens get <token_id>` first.
+There is no confirmation prompt and no `--yes`: `revocations create` invalidates the token as soon as it is typed. Check the ID with `deel dev tokens get <token_id> --beta` first.
 
 ## Idempotency
 

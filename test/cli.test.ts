@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { run, unknownFlag } from "../src/cli.ts";
 import { CliError, EXIT } from "../src/core/errors.ts";
+import { commonArgs, valuedFlags } from "../src/commands/shared.ts";
 import { printContract, printContractJson } from "../src/help.ts";
 import type { Descriptor } from "../src/types.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
@@ -304,4 +305,42 @@ test("a --base-url with no value fails before any request, on a generated comman
   for (const argv of [["contracts", "list", "--base-url"], ["contracts", "list", "--base-url="], ["contracts", "list", "--base-url", "--json"], ["job", "status", "j1", "--base-url="]]) {
     await assert.rejects(() => run(argv), (error: unknown) => error instanceof CliError && error.code === "usage.flag_value" && /--base-url needs a value/.test(error.message), argv.join(" "));
   }
+});
+
+test("a flag that takes a value, typed with none, stops every command before any request, on a generated and a static command alike", async (t) => {
+  let sent = 0;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async () => {
+    sent++;
+    return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+  const saved = { token: process.env.DEEL_TOKEN, log: process.env.DEEL_LOG };
+  process.env.DEEL_TOKEN = "a-token";
+  process.env.DEEL_LOG = "off";
+  t.after(() => {
+    globalThis.fetch = realFetch;
+    for (const [key, value] of [["DEEL_TOKEN", saved.token], ["DEEL_LOG", saved.log]] as const) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+  // Every global string flag, taken from commonArgs, so one added later is covered without touching this test.
+  const flags = Object.entries(commonArgs).filter(([, def]) => def.type === "string").map(([name]) => name);
+  assert.deepEqual(valuedFlags().sort(), [...flags, "base-url"].sort());
+  assert.ok(["fields", "jq", "input", "env", "file", "ca-cert", "idempotency-key"].every((flag) => flags.includes(flag)));
+  const commands = [["legal-entities", "list"], ["webhooks", "list"], ["dev", "tokens", "list"], ["job", "status", "j1"], ["job", "list"], ["auth", "status"], ["auth", "logout"]];
+  for (const command of commands) {
+    for (const flag of [...flags, "base-url"]) {
+      // The bare flag last, empty with =, and followed by another flag (--raw, which a filter would otherwise swallow).
+      for (const typed of [[`--${flag}`], [`--${flag}=`], [`--${flag}`, "--raw"]]) {
+        const argv = [...command, ...typed];
+        await assert.rejects(() => run(argv), (error: unknown) => error instanceof CliError && error.code === "usage.flag_value" && error.message === `--${flag} needs a value.`, argv.join(" "));
+      }
+    }
+  }
+  // The parameters of the endpoint itself, and `auth login --scopes`.
+  for (const argv of [["legal-entities", "list", "--limit"], ["legal-entities", "list", "--cursor="], ["webhooks", "list", "--limit", "--json"], ["auth", "login", "--scopes"], ["auth", "login", "--scopes="]]) {
+    await assert.rejects(() => run(argv), (error: unknown) => error instanceof CliError && error.code === "usage.flag_value", argv.join(" "));
+  }
+  assert.equal(sent, 0);
 });

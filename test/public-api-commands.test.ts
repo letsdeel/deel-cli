@@ -755,3 +755,29 @@ test("a command of a single endpoint refuses a flag it doesn't have instead of r
   assert.match(typo.err, /'deel gizmos list' has no flag --limt/);
   assert.equal(typo.sent.length, 0);
 });
+
+test("every README example of a command the manifest marks beta carries --beta", () => {
+  const byCommand = new Map<string, Descriptor[]>();
+  for (const descriptor of (JSON.parse(readFileSync(new URL("../src/public-api/manifest.json", import.meta.url), "utf8")) as { descriptors: Descriptor[] }).descriptors) {
+    const key = descriptor.command.join(" ");
+    byCommand.set(key, [...(byCommand.get(key) ?? []), descriptor]);
+  }
+  const missing: string[] = [];
+  let checked = 0;
+  for (const [index, line] of readFileSync(new URL("../README.md", import.meta.url), "utf8").split("\n").entries()) {
+    const example = line.trim();
+    if (!example.startsWith("deel ")) continue;
+    const words = example.split(/\s+/).slice(1).filter((word) => !/^[-<#]/.test(word));
+    for (let count = Math.min(words.length, 5); count >= 1; count--) {
+      const descriptors = byCommand.get(words.slice(0, count).join(" "));
+      if (!descriptors) continue;
+      if (descriptors.some((descriptor) => descriptor.beta)) {
+        checked++;
+        if (!/--beta\b/.test(example)) missing.push(`README.md:${index + 1} ${example.slice(0, 80)}`);
+      }
+      break;
+    }
+  }
+  assert.ok(checked >= 5, `only ${checked} beta examples found; the README check has stopped matching`);
+  assert.deepEqual(missing, []);
+});

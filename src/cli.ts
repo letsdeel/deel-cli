@@ -17,7 +17,7 @@ import { setLoggingEnabled, setLogBodiesEnabled } from "./core/logging.ts";
 import { EXIT } from "./core/errors.ts";
 import { CliError } from "./core/errors.ts";
 import { CLI_VERSION } from "./version.ts";
-import { commandToken, commonArgs, configFrom, gatherFiles, gatherFlagValues, outputOpts } from "./commands/shared.ts";
+import { commandToken, commonArgs, configFrom, gatherFiles, gatherFlagValues, outputOpts, refuseMissingGlobalValues } from "./commands/shared.ts";
 import type { Args } from "./commands/shared.ts";
 import { staticCommands } from "./commands/index.ts";
 import { printActionHelp, printFormsHelp, printFormsJson, printContractJson, printGlobalOptions, printSkeleton, printVariantGroupHelp, printVersion } from "./help.ts";
@@ -50,6 +50,7 @@ function argsForDescriptor(descriptor: Descriptor): ArgsDef {
 // params a form fills itself: its positional IDs and its scope flags, whether the param sits in the path or the query.
 async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<string, unknown>; rawArgs: string[] }, formValues: Record<string, string> = {}): Promise<void> {
   const args = cittyCtx.args as Args;
+  refuseMissingGlobalValues(cittyCtx.rawArgs); // before --input, --file or anything else reads its value, and before any request
   setLoggingEnabled(args.log !== false);
   setLogBodiesEnabled(args["log-bodies"] === true);
 

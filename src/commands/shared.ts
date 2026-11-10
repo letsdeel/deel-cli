@@ -36,11 +36,19 @@ export const commonArgs: ArgsDef = {
   "generate-input": { type: "boolean", description: "Print a JSON body skeleton and exit" },
 };
 
+// --fields and --jq are text. A bare one reaches here as `true`; it is refused before the request (refuseMissingGlobalValues),
+// and again here so that nothing renders a response with a filter that isn't one.
+function textFlag(args: Args, name: "fields" | "jq"): string | undefined {
+  const value = args[name];
+  if (value === undefined || typeof value === "string") return value;
+  throw new CliError("usage.flag_value", `--${name} needs a value.`, `Write --${name}=<value>.`);
+}
+
 export function outputOpts(args: Args): OutputOpts {
   return {
     json: Boolean(args.json),
-    fields: args.fields as string | undefined,
-    jq: args.jq as string | undefined,
+    fields: textFlag(args, "fields"),
+    jq: textFlag(args, "jq"),
     raw: Boolean(args.raw),
     quiet: Boolean(args.quiet),
   };
@@ -83,13 +91,18 @@ export function gatherFiles(rawArgs: string[]): Record<string, string[]> {
   return files;
 }
 
-// Global flags whose value picks where a call goes or how it is sent. One typed with no value (`--base-url=`, as the
-// last word, or followed by another flag) must stop the command: citty reads it as `true` or as nothing, and the call
-// would go to prod, or carry a made-up key, though the user pointed it elsewhere.
-const VALUED_GLOBAL_FLAGS = ["base-url", "env", "ca-cert", "idempotency-key"];
+// The flags of `defs` that take a value (declared string or enum), plus the hidden --base-url. Derived from the
+// declarations, so a flag added later is covered without a second list to keep.
+export function valuedFlags(defs: ArgsDef = commonArgs): string[] {
+  const declared = Object.entries(defs).filter(([, def]) => def.type === "string" || def.type === "enum").map(([name]) => name);
+  return [...declared, "base-url"];
+}
 
-export function refuseMissingGlobalValues(rawArgs: string[]): void {
-  const missing = flagMissingValue(rawArgs, VALUED_GLOBAL_FLAGS);
+// A flag that takes a value, typed with none (`--base-url=`, as the last word, or followed by another flag), must stop
+// the command before anything is sent: citty reads it as `true` or as nothing, so the call would go to prod, carry a
+// made-up key, or fail on `--fields`/`--jq` only after the request has been made (and a write has happened).
+export function refuseMissingGlobalValues(rawArgs: string[], defs: ArgsDef = commonArgs): void {
+  const missing = flagMissingValue(rawArgs, valuedFlags(defs));
   if (missing) throw new CliError("usage.flag_value", `--${missing} needs a value.`, `Write --${missing}=<value>. Nothing was sent.`);
 }
 

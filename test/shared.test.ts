@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { configFrom, gatherFlagValues, gatherFiles, readHidden, refuseMissingGlobalValues } from "../src/commands/shared.ts";
+import { configFrom, gatherFlagValues, gatherFiles, outputOpts, readHidden, refuseMissingGlobalValues } from "../src/commands/shared.ts";
 
 test("gatherFlagValues reads a repeatable flag in every spelling the parser accepts, in the order typed", () => {
   assert.deepEqual(gatherFlagValues(["--job-ids", "a", "--job-ids=b"], "job_ids"), ["a", "b"]);
@@ -62,4 +62,23 @@ test("a global flag typed without its value stops the command before anything is
     assert.doesNotThrow(() => refuseMissingGlobalValues(argv), argv.join(" "));
   }
   assert.equal(configFrom({ json: true }, ["--base-url", "https://a.test/rest"]).baseUrl, "https://a.test/rest");
+});
+
+test("every string flag of the command set is refused with no value, not only the ones that pick the environment", () => {
+  for (const flag of ["fields", "jq", "input", "file"]) {
+    for (const argv of [[`--${flag}`], [`--${flag}=`], [`--${flag}`, "--json"], ["list", `--${flag}`]]) {
+      assert.throws(() => refuseMissingGlobalValues(argv), (err: any) => err.code === "usage.flag_value" && err.message === `--${flag} needs a value.`, argv.join(" "));
+    }
+  }
+  // A value that starts with - is attached; a lone - (stdin) and a negative number are values; a boolean flag takes none.
+  for (const argv of [["--jq=-.a"], ["--input", "-"], ["--fields", "id,name"], ["--jq", ".data[]"], ["--jq", "-1"], ["--json"], ["--raw", "--quiet"], ["--fields=a", "--jq=.a", "--input=a=1"]]) {
+    assert.doesNotThrow(() => refuseMissingGlobalValues(argv), argv.join(" "));
+  }
+});
+
+test("outputOpts refuses a --fields or --jq that arrived as `true`, instead of rendering with a filter that isn't one", () => {
+  assert.throws(() => outputOpts({ json: true, fields: true }), (err: any) => err.code === "usage.flag_value" && /--fields needs a value/.test(err.message));
+  assert.throws(() => outputOpts({ json: true, jq: true }), (err: any) => err.code === "usage.flag_value" && /--jq needs a value/.test(err.message));
+  assert.deepEqual(outputOpts({ json: true, fields: "id", jq: ".id", raw: true }), { json: true, fields: "id", jq: ".id", raw: true, quiet: false });
+  assert.deepEqual(outputOpts({ json: true }), { json: true, fields: undefined, jq: undefined, raw: false, quiet: false });
 });

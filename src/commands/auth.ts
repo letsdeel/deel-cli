@@ -4,6 +4,7 @@
 //   logout  revoke the login (best effort) and remove it from the OS keychain
 
 import { defineCommand } from "citty";
+import type { ArgsDef } from "citty";
 import { resolveToken, authFor, accessTokenScope, maskToken, extractIdentity, baseUrlRefused } from "../core/auth.ts";
 import { credentialStore } from "../core/keychain.ts";
 import type { CredentialStore } from "../core/keychain.ts";
@@ -15,7 +16,7 @@ import { envelope, render } from "../core/output.ts";
 import { setLoggingEnabled, setLogBodiesEnabled } from "../core/logging.ts";
 import { CliError } from "../core/errors.ts";
 import { HEADER } from "../core/constants.ts";
-import { commonArgs, configFrom, outputOpts } from "./shared.ts";
+import { commonArgs, configFrom, outputOpts, refuseMissingGlobalValues } from "./shared.ts";
 import type { Args } from "./shared.ts";
 import { assertIssuerOverride } from "../core/config.ts";
 import type { Config } from "../core/config.ts";
@@ -113,6 +114,13 @@ export async function authLogout(args: Args, config: Config, deps: AuthDeps): Pr
   await render(ctx.io, envelope({ removed, env: config.env, revoked, ...(hadLogin && revoked === false ? { revoke_error: reason ?? "unknown error" } : {}) }), outputOpts(args));
 }
 
+const loginArgs: ArgsDef = {
+  ...commonArgs,
+  browser: { type: "boolean", default: true, description: "Open the browser (--no-browser to only print the sign-in URL)" },
+  scopes: { type: "string", description: "Comma-separated scopes to request (default: the server's default set)" },
+  "read-only": { type: "boolean", description: "Request read-only (*:read) scopes only" },
+};
+
 export const authCommand = defineCommand({
   meta: { name: "auth", description: "Authentication" },
   subCommands: {
@@ -128,14 +136,10 @@ export const authCommand = defineCommand({
     }),
     login: defineCommand({
       meta: { name: "login", description: "Sign in through your browser and store the login in the OS keychain" },
-      args: {
-        ...commonArgs,
-        browser: { type: "boolean", default: true, description: "Open the browser (--no-browser to only print the sign-in URL)" },
-        scopes: { type: "string", description: "Comma-separated scopes to request (default: the server's default set)" },
-        "read-only": { type: "boolean", description: "Request read-only (*:read) scopes only" },
-      },
+      args: loginArgs,
       async run(cittyCtx) {
         const args = cittyCtx.args as Args;
+        refuseMissingGlobalValues(cittyCtx.rawArgs, loginArgs); // a bare --scopes would otherwise be read as `true`
         setLoggingEnabled(args.log !== false);
         await authLogin(args, configFrom(args, cittyCtx.rawArgs), realDeps());
       },
