@@ -123,31 +123,34 @@ test("keyWords and isLinkKey read snake, kebab and camel case; maskLink only cut
 });
 
 // ---- the masking policy against the generated manifest ----
-// Every field name an endpoint takes or returns that reads like a credential, a link, a financial or government
-// identifier or a person's data must be masked in the log, or be listed here as reviewed and safe, with the reason. A new
-// endpoint with a new such name fails this test, instead of surfacing in a review of the log.
-const LOOKS_SENSITIVE = new Set([
-  "key", "keys", "secret", "secrets", "token", "tokens", "password", "passwd", "credential", "credentials", "link", "url", "uri", "href",
-  "signature", "signatures", "iban", "bic", "swift", "rib", "account", "routing", "ssn", "tax", "vat", "passport", "identity", "national",
-  "nationality", "birth", "dob", "email", "phone", "mobile", "address", "card", "cvv", "cvc", "pin", "otp", "hash", "salary", "gender",
-  "number", "code", "private", "auth", "session", "cookie", "jwt", "certificate", "cert", "license", "social", "security",
-]);
+// Every field name an endpoint takes or returns is masked in the log, or made only of words reviewed as safe
+// (test/fixtures/log-safe-words.txt), or reviewed by name below. Nothing passes by default: a new endpoint with a
+// new word, or a new name that carries a word of an identifier (code, number, key...), fails this test, instead of
+// surfacing in a review of the log. The policy itself is in src/core/constants.ts.
+const SAFE_WORDS = new Set(
+  readFileSync(new URL("./fixtures/log-safe-words.txt", import.meta.url), "utf8")
+    .split("\n")
+    .filter((line) => line && !line.startsWith("#")),
+);
 
+// Names that carry a word which names an identifier or a credential in other fields (account, code, number, key,
+// hash), reviewed one by one: none holds a credential or a person's identifier.
 const REVIEWED_SAFE: Record<string, string[]> = {
-  "a date, a kind or a label of an account, not its number": ["account_activation_date", "account_type", "general_ledger_account"],
-  "an internal id or reference of a company's own record": [
+  "a date, a kind or a label of an account, or the id of a company's own account record": ["account_activation_date", "account_type", "general_ledger_account", "expense_account_id"],
+  "an internal number of a company's own record (employee, grant, position, cost center) or a part number": [
     "alternate_employee_number", "employeeNumber", "employee_number", "employee_grant_number", "split_employee_grant_number", "position_number",
-    "cost_center_number", "number", "expense_account_id", "import_session_id", "serial_number",
+    "cost_center_number", "number", "serial_number",
   ],
-  "company registry data, public by nature": ["registration_number", "registrationNumber", "sic_number", "certificate_of_good_standing"],
-  "a code of a type, currency, country, state or response": [
-    "benefit_type_code", "calling_code", "country_code", "currency_code", "currency_iso_code", "compensation_currency_iso_code", "fmv_currency_code",
-    "dial_code", "job_code", "state_code", "vat_code", "response_status_code", "code", "number_type",
+  "company registry data, public by nature": ["registration_number", "registrationNumber", "sic_number"],
+  "the unit or representation of a number field": ["number_type"],
+  "a code of a type, currency, country, state, job or response, or a machine-readable error code": [
+    "benefit_type_code", "calling_code", "country_code", "currency_code", "currency_iso_code", "fmv_currency_code", "dial_code", "job_code",
+    "state_code", "vat_code", "response_status_code", "code",
   ],
-  "a postal code: part of an address, which is masked whole": ["post_code", "postalCode", "zip_code"],
-  "a field or storage key of the product, not a credential": ["category_key", "compare_key", "display_key", "group_key", "key", "left_field_key", "right_field_key", "question_key", "missing_keys"],
+  "a field, question, category or storage key of the product, not a credential": [
+    "category_key", "compare_key", "display_key", "group_key", "key", "left_field_key", "right_field_key", "question_key", "missing_keys",
+  ],
   "a hash that fingerprints a record's version": ["row_hash", "version_hash"],
-  "a VAT amount or rate, not an identifier": ["vat", "vat_amount", "vat_percentage", "vat_rate", "vat_total"],
 };
 
 function fieldNamesOf(fields: CliParam[] | undefined, into: Set<string>): void {
@@ -157,7 +160,7 @@ function fieldNamesOf(fields: CliParam[] | undefined, into: Set<string>): void {
   }
 }
 
-test("every field name of the generated manifest that reads as sensitive is masked in the log or reviewed as safe", async () => {
+test("every field name of the generated manifest is masked in the log, made of reviewed words, or reviewed by name", async () => {
   const names = new Set<string>();
   for (const descriptor of await loadGeneratedDescriptors()) {
     fieldNamesOf(descriptor.params, names);
@@ -165,17 +168,50 @@ test("every field name of the generated manifest that reads as sensitive is mask
     fieldNamesOf(descriptor.responseFields, names);
   }
   const safe = new Map(Object.entries(REVIEWED_SAFE).flatMap(([reason, keys]) => keys.map((key) => [key, reason] as const)));
-  const unreviewed = [...names].filter((name) => keyWords(name).some((word) => LOOKS_SENSITIVE.has(word)) && !isSensitiveKey(name) && !isLinkKey(name) && !safe.has(name));
-  assert.deepEqual(unreviewed.sort(), [], "mask these in SENSITIVE_LOG_KEYS (src/core/constants.ts), or list them as safe with a reason");
-  // The list stays honest: no entry is stale, masked anyway, or a name the heuristic would never ask about.
+  const masked = (name: string) => isSensitiveKey(name) || isLinkKey(name);
+  const unreviewed = [...names].filter((name) => !masked(name) && !keyWords(name).every((word) => SAFE_WORDS.has(word)) && !safe.has(name));
+  assert.deepEqual(
+    unreviewed.sort(),
+    [],
+    "mask these in src/core/constants.ts (SENSITIVE_LOG_KEYS or SENSITIVE_LOG_WORDS), add their new words to test/fixtures/log-safe-words.txt if they are safe, or list them in REVIEWED_SAFE with a reason",
+  );
+  // The reviewed lists stay honest: no stale name, none masked anyway, none that the safe words already cover.
   for (const [name, reason] of safe) {
     assert.ok(names.has(name), `${name} (${reason}) is no longer a field of the manifest`);
-    assert.equal(isSensitiveKey(name) || isLinkKey(name), false, `${name} is masked already; drop it from the reviewed list`);
+    assert.equal(masked(name), false, `${name} is masked already; drop it from REVIEWED_SAFE`);
+    assert.equal(keyWords(name).every((word) => SAFE_WORDS.has(word)), false, `${name} is made of safe words already; drop it from REVIEWED_SAFE`);
   }
-  assert.ok(safe.size < 80, "the reviewed list is meant to stay small");
-  // And the names that matter most are masked.
-  for (const name of ["magic_link", "rib_number", "id_number", "ifsc_code", "bsb_code", "vat_number", "client_signature", "account_holder", "annual_salary", "nationality"]) {
-    assert.ok(names.has(name) || name === "client_signature", `${name} no longer exists; update this list`);
-    assert.equal(isSensitiveKey(name), true, name);
-  }
+  assert.ok(safe.size < 60, "the reviewed-by-name list is meant to stay small");
+  // The words list is sorted and unique so a change reads as a diff, and no word in it is one the log masks.
+  const words = [...SAFE_WORDS];
+  assert.deepEqual(words, [...new Set(words)].sort(), "keep test/fixtures/log-safe-words.txt sorted, one word per line, without duplicates");
+  for (const word of words) assert.equal(masked(word), false, `${word} is a safe word but the log masks it`);
+});
+
+test("the log masks credentials, identifiers and personal data by name, in every spelling, and keeps ordinary fields", () => {
+  const sensitive = [
+    // identifiers of a person
+    "personal_id", "personalId", "PersonalID", "national_id", "nationalId", "passport_number", "driver_license", "driving_licence", "identity_number",
+    "tax_id", "tin", "ssn", "nric", "cpf", "curp", "dni", "nif", "social_security_number", "document_number", "id_number",
+    // the special categories of the GDPR, article 9
+    "ethnicity", "ethnic_origin", "race", "racial_origin", "religion", "religious_belief", "political_opinion", "union_membership", "health_status",
+    "medical_condition", "disability", "disability_status", "sick_leave_reason", "sexual_orientation", "sex", "biometric_data", "genetic_data",
+    // family, birth, contact and address
+    "marital_status", "spouse_name", "dependents", "children", "family_members", "date_of_birth", "dob", "place_of_birth", "phone_number", "mobile",
+    "work_email", "fax", "home_address", "street", "street_name", "postal_code", "post_code", "zip", "zip_code", "line1", "line2", "residence_country", "resident_id",
+    // bank, card, pay
+    "iban", "bic", "swift_code", "routing_number", "account_number", "account_holder_name", "sort_code", "card_number", "cvv", "pan", "last4_digits",
+    "salary", "base_wage", "annual_income", "bonus_amount", "compensation", "commission_rate",
+    // credentials, sessions and links
+    "access_token", "refresh_token", "client_secret", "password", "passcode", "otp", "api_key", "private_key", "username", "session_id", "ip", "magic_link",
+    "emergency_contact", "immigration_status", "visa_type", "beneficiary", "demographics", "pii", "pep", "sensitive_fields",
+  ];
+  for (const key of sensitive) assert.equal(isSensitiveKey(key), true, key);
+  const ordinary = [
+    "id", "name", "first_name", "company_name", "status", "type", "title", "description", "created_at", "start_date", "is_active", "country", "city",
+    "currency", "amount", "rate", "unit", "count", "contract_id", "organization_id", "payment_cycle_id", "page", "limit", "cursor",
+  ];
+  for (const key of ordinary) assert.equal(isSensitiveKey(key), false, key);
+  // Short names match as whole words, so they don't hide ordinary words that contain them.
+  for (const key of ["company", "panel", "planning", "setting", "single", "tiny", "ipsum"]) assert.equal(isSensitiveKey(key), false, key);
 });

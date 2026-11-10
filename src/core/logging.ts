@@ -4,7 +4,7 @@
 import { appendFileSync, mkdirSync, statSync, renameSync, existsSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
-import { LOG_DIR_MODE, LOG_FILE_MODE, LOG_MAX_BYTES_DEFAULT, LOG_MAX_FILES_DEFAULT, LINK_KEY_WORDS, SENSITIVE_LOG_KEYS } from "./constants.ts";
+import { LOG_DIR_MODE, LOG_FILE_MODE, LOG_MAX_BYTES_DEFAULT, LOG_MAX_FILES_DEFAULT, LINK_KEY_WORDS, SENSITIVE_LOG_KEYS, SENSITIVE_LOG_WORDS } from "./constants.ts";
 
 // A logger is any sink for structured entries; the default writes bounded NDJSON.
 export type Logger = (entry: Record<string, unknown>) => void;
@@ -34,11 +34,12 @@ function logDir(): string {
   return join(process.env.XDG_STATE_HOME ?? join(home, ".local", "state"), "deel", "logs");
 }
 
-// Match by substring so variants (access_token, tax_id, …) are caught, not just exact keys.
+// Match by substring so variants (access_token, tax_id, …) are caught, not just exact keys; the short names that
+// would match inside other words are matched as whole words of the key.
 export function isSensitiveKey(key: string): boolean {
   const lower = key.toLowerCase();
   for (const needle of SENSITIVE_LOG_KEYS) if (lower.includes(needle)) return true;
-  return false;
+  return keyWords(key).some((word) => SENSITIVE_LOG_WORDS.has(word));
 }
 
 // A key's words: `download_url`, `downloadUrl` and `download-url` are all download + url.

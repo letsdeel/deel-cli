@@ -76,11 +76,25 @@ async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<st
   await execute(descriptor, call, ctx, { output: outputOpts(args), debug: Boolean(args.debug), form: Boolean(args.form) });
 }
 
+// The command declares the parameters of the endpoint it runs and nothing else, so a flag it doesn't know would be
+// ignored and the call would run without it: it is refused instead. `extra` are the flags the command accepts beyond
+// those of `descriptor`, such as the selectors of its variants; --base-url is hidden from help but always accepted.
+function refuseUnknownFlag(rawArgs: string[], descriptor: Descriptor, extra: string[] = []): void {
+  const unknown = unknownFlag(rawArgs, [...Object.keys(argsForDescriptor(descriptor)), ...extra, "base-url"]);
+  if (unknown) {
+    const named = descriptor.variant ? ` --${descriptor.variant}` : "";
+    throw new CliError("usage.flag", `'deel ${descriptor.command.join(" ")}${named}' has no flag ${unknown}.`, "Run it with --help to see its flags.");
+  }
+}
+
 function actionCommand(descriptor: Descriptor): CommandDef {
   return defineCommand({
     meta: { name: descriptor.command[descriptor.command.length - 1], description: `${descriptor.summary ?? ""}${descriptor.async ? " (async)" : ""}` },
     args: argsForDescriptor(descriptor),
-    async run(cittyCtx) { await runDescriptor(descriptor, cittyCtx); },
+    async run(cittyCtx) {
+      refuseUnknownFlag(cittyCtx.rawArgs, descriptor);
+      await runDescriptor(descriptor, cittyCtx);
+    },
   });
 }
 
@@ -116,6 +130,9 @@ function variantCommand(descriptors: Descriptor[]): CommandDef {
       if (selected.length === 0) throw new CliError("usage.variant", `Specify one of: ${variants.map((v) => `--${v}`).join(", ")}`);
       if (selected.length > 1) throw new CliError("usage.variant", `Specify exactly one of: ${variants.map((v) => `--${v}`).join(", ")}`);
       const descriptor = descriptors.find((d) => d.variant === selected[0])!;
+      // The command declares the parameters of every variant, so one that only another variant takes would be
+      // accepted here and then dropped from the request.
+      refuseUnknownFlag(cittyCtx.rawArgs, descriptor, variants);
       await runDescriptor(descriptor, cittyCtx);
     },
   });
@@ -156,10 +173,19 @@ function formCommand(descriptors: Descriptor[]): CommandDef {
       const form = descriptor.form!;
       // --base-url is hidden from help but still takes a value, so it is declared for the parse.
       const defs: ArgsDef = { ...argsForDescriptor(descriptor), "base-url": { type: "string" } };
-      // An unknown flag would be read as a switch and its value as one more argument, so it is refused instead.
-      // A sibling's switch typed off (--no-bulk) is known too: it is how the form without it is picked.
-      const unknown = unknownFlag(rawArgs, [...Object.keys(defs), ...switchesOf(descriptors)]);
-      if (unknown) throw new CliError("usage.flag", `'${usageOf(descriptor)}' has no flag ${unknown}.`, "Run it with --help to see its flags.");
+      // An unknown flag would be read as a switch and its value as one more argument, so it is refused instead. A
+      // sibling's switch selector typed off (--no-bulk) is known too: it is how the form without it is picked. A
+      // flag only a sibling endpoint takes is not: it would be accepted and then dropped, and the call would run without it.
+      const siblingSwitches = descriptors.flatMap((d) => (d.form?.selectors ?? []).filter((s) => s.value === undefined).map((s) => s.flag));
+      const unknown = unknownFlag(rawArgs, [...Object.keys(defs), ...siblingSwitches]);
+      if (unknown) {
+        const owner = descriptors.find((d) => d !== descriptor && unknownFlag([unknown], Object.keys(argsForDescriptor(d))) === undefined);
+        throw new CliError(
+          "usage.flag",
+          `'${usageOf(descriptor)}' has no flag ${unknown}${owner ? `; only '${usageOf(owner)}' takes it` : ""}.`,
+          owner ? "Pick that endpoint's flags, or drop the flag. Nothing was sent." : "Run it with --help to see its flags.",
+        );
+      }
       // A flag that takes a value and has none would swallow the next flag as its value (or send it empty).
       const missing = flagMissingValue(rawArgs, [...descriptor.params.filter((param) => param.type !== "boolean").map(flagOf), ...form.scopes.map((scope) => scope.flag), ...form.selectors.filter((s) => s.value !== undefined).map((s) => s.flag)]);
       if (missing) throw new CliError("usage.flag_value", `--${missing} needs a value.`, `Write --${missing}=<value>; run it with --help to see the values.`);

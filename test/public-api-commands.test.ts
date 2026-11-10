@@ -689,3 +689,71 @@ test("a flag that takes a value must be given one: bare, empty or followed by an
   assert.notEqual(wrong.code, EXIT.OK);
   assert.equal(wrong.sent.length, 0);
 });
+
+test("a boolean flag only a sibling endpoint takes is refused, naming that endpoint, never accepted and dropped", async () => {
+  const committed = await loadGeneratedDescriptors();
+  // `payouts methods list` has one endpoint per worker type; only the contractor one takes --is-default.
+  const refused = await callApi(["payouts", "methods", "list", "--worker-type", "employee", "--is-default"], committed);
+  assert.notEqual(refused.code, EXIT.OK);
+  assert.match(refused.err, /'deel payouts methods list --worker-type employee' has no flag --is-default; only 'deel payouts methods list --worker-type contractor' takes it/);
+  assert.equal(refused.sent.length, 0);
+  // Every spelling of the flag, on and off, with a value or attached.
+  for (const flag of [["--is-default", "false"], ["--is_default=true"], ["--no-is-default"], ["--isDefault"]]) {
+    const called = await callApi(["payouts", "methods", "list", "--worker-type", "employee", ...flag], committed);
+    assert.notEqual(called.code, EXIT.OK, flag.join(" "));
+    assert.match(called.err, /only 'deel payouts methods list --worker-type contractor' takes it/, flag.join(" "));
+    assert.equal(called.sent.length, 0, flag.join(" "));
+  }
+  // The endpoint that has the flag still takes it, in the same spellings.
+  for (const [flag, query] of [[["--is-default"], "is_default=true"], [["--is-default", "false"], "is_default=false"], [["--no-is-default"], "is_default=false"]] as Array<[string[], string]>) {
+    const called = await callApi(["payouts", "methods", "list", "--worker-type", "contractor", ...flag], committed);
+    assert.equal(called.code, EXIT.OK, `${flag.join(" ")}: ${called.err}`);
+    assert.equal(called.sent[0].url.pathname, "/rest/payouts/contractors/methods");
+    assert.equal(called.sent[0].url.search.slice(1), query, flag.join(" "));
+  }
+  // The same on the scoped and the bare endpoint of one command.
+  const scoped = await callApi(["time-off", "list", "--person", "p1", "--include-deleted-time-offs"], committed);
+  assert.notEqual(scoped.code, EXIT.OK);
+  assert.match(scoped.err, /only 'deel time-off list' takes it/);
+  assert.equal(scoped.sent.length, 0);
+  const bare = await callApi(["time-off", "list", "--include-deleted-time-offs"], committed);
+  assert.equal(bare.code, EXIT.OK, bare.err);
+  assert.equal(bare.sent[0].url.search.slice(1), "include_deleted_time_offs=true");
+});
+
+test("a flag of another endpoint of the same words is refused for a selector switch too, but its off form picks the endpoint without it", async () => {
+  const { sent, code, err } = await callApi(["ships", "reviews", "create", "s1", "--no-bulk", "--input", "note=x"], fleet.manifest.descriptors);
+  assert.equal(code, EXIT.OK, err);
+  assert.equal(sent[0].url.pathname, "/rest/fleet/s1/reviews");
+  // A flag that no endpoint of these words takes is still refused, without naming an owner.
+  const unknown = await callApi(["ships", "reviews", "create", "s1", "--nope"], fleet.manifest.descriptors);
+  assert.notEqual(unknown.code, EXIT.OK);
+  assert.match(unknown.err, /has no flag --nope\.$/);
+  assert.equal(unknown.sent.length, 0);
+});
+
+test("a variant command refuses a flag only another variant takes, instead of dropping it from the request", async () => {
+  const base = { command: ["gadgets", "create"], async: false, bodyKind: "none", supportsMultipart: false, bodyWrapper: "none", bodyProps: [], fileFields: [], responseKind: "none", responseFields: [] } as const;
+  const gadgets = [
+    { ...base, variant: "red", method: "POST", path: "/gadgets/red", params: [{ name: "shade", in: "query", type: "string", required: false }] },
+    { ...base, variant: "blue", method: "POST", path: "/gadgets/blue", params: [{ name: "tint", in: "query", type: "string", required: false }] },
+  ] as unknown as Descriptor[];
+  const ok = await callApi(["gadgets", "create", "--red", "--shade", "dark"], gadgets);
+  assert.equal(ok.code, EXIT.OK, ok.err);
+  assert.equal(ok.sent[0].url.search.slice(1), "shade=dark");
+  const crossed = await callApi(["gadgets", "create", "--red", "--tint", "pale"], gadgets);
+  assert.notEqual(crossed.code, EXIT.OK);
+  assert.match(crossed.err, /'deel gadgets create --red' has no flag --tint/);
+  assert.equal(crossed.sent.length, 0);
+});
+
+test("a command of a single endpoint refuses a flag it doesn't have instead of running without it", async () => {
+  const gizmo = { command: ["gizmos", "list"], method: "GET", path: "/gizmos", async: false, bodyKind: "none", supportsMultipart: false, bodyWrapper: "none", params: [{ name: "limit", in: "query", type: "string", required: false }], bodyProps: [], fileFields: [], responseKind: "none", responseFields: [] } as unknown as Descriptor;
+  const ok = await callApi(["gizmos", "list", "--limit", "5"], [gizmo]);
+  assert.equal(ok.code, EXIT.OK, ok.err);
+  assert.equal(ok.sent[0].url.search.slice(1), "limit=5");
+  const typo = await callApi(["gizmos", "list", "--limt", "5"], [gizmo]);
+  assert.notEqual(typo.code, EXIT.OK);
+  assert.match(typo.err, /'deel gizmos list' has no flag --limt/);
+  assert.equal(typo.sent.length, 0);
+});
