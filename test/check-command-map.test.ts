@@ -30,6 +30,22 @@ test("the check exits 1 and names each failure when the map file it is given has
   assert.match(run.stderr, /^command map: [1-9]\d* failure\(s\)/m);
 });
 
+
+
+
+
+test("a map file that isn't an array of entries fails with a clear message instead of a stack trace", () => {
+  const dir = mkdtempSync(join(tmpdir(), "check-command-map-"));
+  for (const [name, content] of [["object.json", '{"method":"GET"}'], ["missing.json", '[{"method":"GET","path":"/a"}]']]) {
+    const file = join(dir, name);
+    writeFileSync(file, content);
+    const run = spawnSync(process.execPath, ["scripts/check-command-map.ts", file], { cwd: ROOT, encoding: "utf8" });
+    assert.equal(run.status, 1, run.stderr);
+    assert.match(run.stderr, /^FAIL {2}.*check-command-map-.*: (the command map must be a JSON array|entry 0 needs a non-empty string command)/m);
+    assert.doesNotMatch(run.stderr, /at .*\.ts:\d+/);
+  }
+});
+
 test("a command line must parse, with lowercase kebab-case words", () => {
   assert.match(failures([entry("GET", "/x", "deel Things list")]).join(), /'Things' is not lowercase kebab-case/);
   assert.match(failures([entry("GET", "/x", "things list")]).join(), /does not start with deel/);

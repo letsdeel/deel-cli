@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { writeFileSync, mkdtempSync } from "node:fs";
+import { writeFileSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { errorFromResponse, execute, withholdSecrets } from "../src/core/executor.ts";
@@ -10,6 +10,7 @@ import type { Descriptor } from "../src/types.ts";
 import type { HttpRequest, HttpResponse } from "../src/core/http.ts";
 import type { Config } from "../src/core/config.ts";
 import { HEADER } from "../src/core/constants.ts";
+import { log, setLoggingEnabled, setLogBodiesEnabled } from "../src/core/logging.ts";
 
 const CONFIG: Config = { env: "demo", baseUrl: "https://example.test/rest", issuer: null, clientId: "test-client", oauthBaseUrlOk: false };
 
@@ -46,6 +47,14 @@ const createDescriptor: Descriptor = {
   responseFields: [],
 };
 
+test("--debug prints the request line with its sensitive query values masked", async () => {
+  const { ctx, io } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: [] } }));
+  const lookup: Descriptor = { ...createDescriptor, method: "GET", bodyKind: "none", bodyProps: [], params: [{ name: "email", in: "query", type: "string", required: false }, { name: "page", in: "query", type: "string", required: false }] };
+  await execute(lookup, { flags: { email: "a@b.co", page: "2" }, files: {} }, ctx, { output: { json: true, quiet: false, raw: false }, debug: true, form: false });
+  const line = io.stderr.join("").split("\n").find((text) => text.startsWith("[debug] GET"));
+  assert.match(line ?? "", /^\[debug\] GET https:\/\/example\.test\/rest\/adjustments\?email=\*\*\*&page=2 -> 200/);
+});
+
 test("execute() drives the injected transport + IOStreams (DI)", async () => {
   const { ctx, io, seen } = ctxWith(() => ({ status: 201, headers: {}, text: "", json: { data: { id: "adj_1", amount: 5000 } } }));
 
@@ -67,7 +76,7 @@ test("execute() drives the injected transport + IOStreams (DI)", async () => {
   assert.equal(req.headers["x-version"], createDescriptor.version);
 
   // Output went through IOStreams, not process.stdout.
-  const parsed = JSON.parse((io as any).stdout.join(""));
+  const parsed = JSON.parse(io.stdout.join(""));
   assert.equal(parsed.data.id, "adj_1");
   assert.ok(!("kind" in parsed));
 });
@@ -146,7 +155,7 @@ test("execute() renders a 202 response body directly (no polling)", async () => 
     { output: { json: true, quiet: false, raw: false }, debug: false, form: false },
   );
 
-  const parsed = JSON.parse((io as any).stdout.join(""));
+  const parsed = JSON.parse(io.stdout.join(""));
   assert.equal(parsed.data.batch_id, "batch_1");
   assert.equal(parsed.data.items[0].status, "PENDING");
 });
@@ -485,7 +494,7 @@ test("a SCIM command calls the /scim base path and renders the unwrapped SCIM bo
   await execute(scimDescriptor, { flags: {}, body: undefined, files: {} }, ctx, { output: { json: true, quiet: false, raw: false }, debug: false, form: false });
 
   assert.equal(seen[0].url, "https://example.test/scim/Users");
-  const parsed = JSON.parse((io as any).stdout.join(""));
+  const parsed = JSON.parse(io.stdout.join(""));
   assert.equal(parsed.data.Resources[0].id, "u1");
 });
 
@@ -493,10 +502,28 @@ test("a webhook's signing key is never printed, from one webhook or a list, and 
   for (const json of [{ data: { id: "w1", signing_key: "sk_secret" } }, { data: [{ id: "w1", signing_key: "sk_secret" }, { id: "w2" }] }]) {
     const { ctx, io } = ctxWith(() => ({ status: 200, headers: {}, text: "", json }));
     await execute(logsGetDescriptor, { flags: { request_id: "w1" }, files: {} }, ctx, JSON_OUT);
-    const out = (io as any).stdout.join("");
+    const out = io.stdout.join("");
     assert.ok(!out.includes("sk_secret"), out);
     assert.match(out, /"w1"/);
-    assert.match((io as any).stderr.join(""), /signing_key is not printed: reveal the signing key in Developer Center/);
+    assert.match(io.stderr.join(""), /signing_key is not printed: reveal the signing key in Developer Center/);
+  }
+});
+
+test("with --log-bodies the local log masks a webhook's signing_key too", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "deel-log-"));
+  process.env.DEEL_LOG_DIR = dir;
+  setLoggingEnabled(true);
+  setLogBodiesEnabled(true);
+  try {
+    const json = { data: { id: "w1", signing_key: "sk_secret" } };
+    const ctx = createContext({ config: CONFIG, token: "tok_SECRET", io: captureIO({}), clock: () => 1000, rng: () => "req-fixed-id", logger: log, baseTransport: async () => ({ status: 200, headers: {}, text: "", json }) });
+    await execute(logsGetDescriptor, { flags: { request_id: "w1" }, files: {} }, ctx, JSON_OUT);
+    const content = readFileSync(join(dir, "deel.log"), "utf8");
+    assert.ok(!content.includes("sk_secret"), content);
+    assert.equal(JSON.parse(content.trim().split("\n").pop()!).response.data.signing_key, "***");
+  } finally {
+    setLogBodiesEnabled(false);
+    delete process.env.DEEL_LOG_DIR;
   }
 });
 
@@ -504,6 +531,13 @@ test("withholdSecrets reads only its own keys, so a field named like an Object m
   const data = JSON.parse('{"id":"a","constructor":"c","toString":"t","signing_key":"k"}');
   const { kept, withheld } = withholdSecrets(data);
   assert.deepEqual(kept, { id: "a", constructor: "c", toString: "t" });
+  assert.deepEqual(withheld, ["signing_key"]);
+});
+
+test("a withheld field is withheld in every spelling of its name, and reported under the name the constant gives", () => {
+  const data = [{ id: "a", signingKey: "1" }, { id: "b", Signing_Key: "2" }, { id: "c", "signing-key": "3", SIGNING_KEY: "4" }, { id: "d", signing_key: "5", signingkeys: "keep" }];
+  const { kept, withheld } = withholdSecrets(data);
+  assert.deepEqual(kept, [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d", signingkeys: "keep" }]);
   assert.deepEqual(withheld, ["signing_key"]);
 });
 
@@ -532,7 +566,7 @@ test("a send-once call goes out once, with no derived Idempotency-Key, so a repe
 test("a 2xx whose response reports is_success: false prints the response, then fails", async () => {
   const { ctx, io } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { is_success: false, delivery: { response_status_code: 500 } } } }));
   await assert.rejects(execute(simulateDescriptor, simulateCall, ctx, quiet), (err: any) => err.code === "api.unsuccessful" && /is_success: false/.test(err.message) && err.requestId === "req-fixed-id");
-  assert.equal(JSON.parse((io as any).stdout.join("")).data.delivery.response_status_code, 500);
+  assert.equal(JSON.parse(io.stdout.join("")).data.delivery.response_status_code, 500);
   const ok = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { is_success: true } } }));
   await execute(simulateDescriptor, simulateCall, ok.ctx, quiet);
   const list = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: [{ is_success: false }] } }));

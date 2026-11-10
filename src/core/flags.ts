@@ -33,6 +33,14 @@ export function argvFlagValue(argv: string[], flag: string): string | undefined 
   return value === undefined || value === true ? undefined : String(value);
 }
 
+// Whether argv writes the flag's value attached (--flag=value), the one form a value that starts with - can take.
+export function argvAttachesValue(argv: string[], flag: string, value: string): boolean {
+  return argv.some((token) => {
+    const at = token.indexOf("=");
+    return token.startsWith("--") && at > 2 && acceptsFlag(flag, token.slice(2, at)) && token.slice(at + 1) === value;
+  });
+}
+
 // `--bulk true` reads as the switch plus an argument "true"; join such a value onto its switch (--bulk=true).
 export function joinSwitchValues(argv: string[], switches: string[]): string[] {
   const out: string[] = [];
@@ -47,4 +55,22 @@ export function joinSwitchValues(argv: string[], switches: string[]): string[] {
     } else out.push(token);
   }
   return out;
+}
+
+// The first of `flags` (which take a value) that argv types without one, as it was typed: as the last token, followed by another
+// flag, or as an empty `--flag=`. A lone `-` (stdin) and a negative number are values; any other value starting
+// with - has to be attached (--flag=-x), since a separate one reads as the next flag. Tokens after `--` are arguments.
+export function flagMissingValue(argv: string[], flags: string[]): string | undefined {
+  for (let index = 0; index < argv.length; index++) {
+    const token = argv[index];
+    if (token === "--") return undefined;
+    if (!token.startsWith("--")) continue;
+    const at = token.indexOf("=");
+    const typed = at === -1 ? token.slice(2) : token.slice(2, at);
+    if (!flags.some((candidate) => acceptsFlag(candidate, typed))) continue;
+    const value = at === -1 ? argv[index + 1] : token.slice(at + 1);
+    const isValue = value !== undefined && value !== "" && (at !== -1 || !value.startsWith("-") || value === "-" || /^-\d+(\.\d+)?$/.test(value));
+    if (!isValue) return typed;
+  }
+  return undefined;
 }

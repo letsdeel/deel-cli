@@ -47,6 +47,13 @@ test("redactHeaders masks Authorization case-insensitively", () => {
   });
 });
 
+test("redactHeaders masks any other header that names a credential, whatever its spelling, and keeps the rest", () => {
+  assert.deepEqual(
+    redactHeaders({ "X-Api-Key": "k", Cookie: "sid=1", "x-session-token": "t", "Proxy-Authorization": "Basic abc", "Idempotency-Key": "u-1", "x-request-id": "r-1", accept: "application/json" }),
+    { "X-Api-Key": "***", Cookie: "***", "x-session-token": "***", "Proxy-Authorization": "***", "Idempotency-Key": "u-1", "x-request-id": "r-1", accept: "application/json" },
+  );
+});
+
 test("resolveToken reads DEEL_TOKEN from the environment", () => {
   withEnv({ DEEL_TOKEN: "tok_env" }, () => {
     assert.deepEqual(resolveToken({ config: PROD }), { token: "tok_env", source: "env" });

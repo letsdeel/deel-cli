@@ -1,6 +1,7 @@
 // Generator input: the public definitions route's shape, read from a file or an https URL.
 
 import { readFileSync } from "node:fs";
+import { isApi } from "./command-map.ts";
 import type { Api } from "./command-map.ts";
 
 type AnyObj = Record<string, any>;
@@ -61,7 +62,7 @@ function isValidTimestamp(value: unknown): boolean {
 
 // The path and version end up in request URLs and headers.
 function assertValidDefinition(entry: AnyObj, label: string): void {
-  if (entry.api !== "rest" && entry.api !== "scim") throw new Error(`${label} has unknown api "${entry.api}"`);
+  if (!isApi(entry.api)) throw new Error(`${label} has unknown api "${entry.api}"`);
   if (typeof entry.path !== "string" || !isValidPath(entry.path)) throw new Error(`${label} has an invalid path ${JSON.stringify(entry.path)}`);
   if (typeof entry.version !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(entry.version)) {
     throw new Error(`${label} has an invalid version ${JSON.stringify(entry.version)} (expected YYYY-MM-DD)`);

@@ -8,6 +8,7 @@ import { CLI_VERSION } from "./version.ts";
 import { commonArgs } from "./commands/shared.ts";
 import { flagOf } from "./core/flags.ts";
 import type { CommandDef } from "citty";
+import { withheldFieldFor } from "./core/constants.ts";
 import { domainOf, STAGE_ORDER, usageOf } from "./public-api/commands.ts";
 
 // Flattens nested object fields into dotted paths (request.amount, ...) so every
@@ -19,6 +20,9 @@ function flattenFields(fields: CliParam[], prefix = ""): CliParam[] {
     return field.properties?.length ? [flat, ...flattenFields(field.properties, name)] : [flat];
   });
 }
+
+// The response fields a caller can read: the secrets the CLI withholds (see execute) are never printed, so they aren't listed.
+const shownResponseFields = (descriptor: Descriptor): CliParam[] => descriptor.responseFields.filter((field) => withheldFieldFor(field.name) === undefined);
 
 export function printVersion(): void {
   process.stdout.write(`deel ${CLI_VERSION}\n`);
@@ -56,7 +60,7 @@ export function printContract(descriptor: Descriptor): void {
     out(`\nRESPONSE\n  ${descriptor.async ? "{ job_id }  — poll with 'deel job status <id>'" : "(no documented fields)"}\n`);
   } else {
     out(`\nRESPONSE — data${descriptor.responseKind === "array" ? "[]" : ""}\n`);
-    for (const field of flattenFields(descriptor.responseFields)) out(line(field.name, field.type, false, undefined, field.description));
+    for (const field of flattenFields(shownResponseFields(descriptor))) out(line(field.name, field.type, false, undefined, field.description));
   }
   out(`\n`);
 }
@@ -157,7 +161,7 @@ function contractOf(descriptor: Descriptor) {
     },
     response: {
       kind: descriptor.responseKind,
-      fields: fieldsToJson(descriptor.responseFields),
+      fields: fieldsToJson(shownResponseFields(descriptor)),
     },
   };
 }
@@ -191,10 +195,11 @@ function printFormSection(descriptor: Descriptor): void {
   if (options.length) {
     out(`\nOPTIONS\n`);
     for (const param of options) {
-      const options = param.enum ? `  [${param.enum.join(" | ")}]` : "";
+      const choices = param.enum ? `  [${param.enum.join(" | ")}]` : "";
       const requiredTag = param.required ? "  (required)" : "";
-      out(`  --${flagOf(param)}=<${param.type}>${requiredTag}${options}${param.description ? `   ${param.description}` : ""}\n`);
+      out(`  --${flagOf(param)}=<${param.type}>${requiredTag}${choices}${param.description ? `   ${param.description}` : ""}\n`);
     }
+    if (options.some((param) => param.type === "boolean")) out(`  A boolean is on with --<flag>, --<flag>=true or --<flag> true, and off with --no-<flag>, --<flag>=false or --<flag> false.\n`);
   }
 
   printContract(descriptor);
@@ -428,10 +433,8 @@ export function suggestions(word: string, candidates: string[], limit = 5): stri
     .map((entry) => entry.candidate);
 }
 
-export function printUnknownCommand(word: string, path: string[], node: CommandDef): void {
-  const where = path.length ? ` under 'deel ${path.join(" ")}'` : "";
+// " Did you mean: a, b?" for a mistyped word among the node's commands, or "" when none is close.
+export function didYouMean(word: string, node: CommandDef): string {
   const similar = suggestions(word, Object.keys(subCommandsOf(node)));
-  const hint = similar.length ? ` Did you mean: ${similar.join(", ")}?` : "";
-  process.stderr.write(`Unknown command '${word}'${where}.${hint}\n`);
-  process.stderr.write(`Run 'deel ${path.length ? `${path.join(" ")} ` : ""}--help' to see available commands.\n`);
+  return similar.length ? ` Did you mean: ${similar.join(", ")}?` : "";
 }

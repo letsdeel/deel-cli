@@ -5,12 +5,12 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { bindForm, parseCommand } from "./public-api/command-map.ts";
+import { bindForm, parseCommand, readCommandMap } from "./public-api/command-map.ts";
 import type { MapEntry, ParsedCommand } from "./public-api/command-map.ts";
-import { GLOBAL_FLAGS, reservedClashes } from "./public-api/generate.ts";
+import { GLOBAL_FLAGS, readGeneratedManifest, reservedClashes } from "./public-api/generate.ts";
 import type { Reserved } from "./public-api/generate.ts";
 import { formUsage } from "../src/public-api/commands.ts";
-import type { Descriptor, GeneratedManifest } from "../src/types.ts";
+import type { Descriptor } from "../src/types.ts";
 import { manifest as handPicked } from "../src/manifest.generated.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
 
@@ -121,11 +121,19 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const file = resolve(process.cwd(), process.argv[2] ?? resolve(REPO_ROOT, "src/public-api/commands.json"));
-  const released = (JSON.parse(readFileSync(resolve(REPO_ROOT, "src/public-api/manifest.json"), "utf8")) as GeneratedManifest).descriptors;
+  let map: MapEntry[];
+  let released: Descriptor[];
+  try {
+    map = readCommandMap(file);
+    released = readGeneratedManifest(resolve(REPO_ROOT, "src/public-api/manifest.json")).descriptors;
+  } catch (error) {
+    process.stderr.write(`FAIL  ${(error as Error).message}\n`);
+    process.exit(1);
+  }
   const reserved = { commands: handPicked.descriptors, topLevel: RESERVED_COMMANDS };
   const stages = JSON.parse(readFileSync(resolve(REPO_ROOT, "src/public-api/domains.json"), "utf8")) as { domains: { name: string }[] }[];
   const domains = stages.flatMap((stage) => stage.domains.map((d) => d.name));
-  const { failures, warnings } = checkMap(JSON.parse(readFileSync(file, "utf8")) as MapEntry[], { reserved, released, domains });
+  const { failures, warnings } = checkMap(map, { reserved, released, domains });
   for (const f of failures) process.stderr.write(`FAIL  ${f.message}\n      ${f.entry}\n`);
   for (const w of warnings) process.stderr.write(`warn  ${w.message}\n      ${w.entry}\n`);
   process.stderr.write(`command map: ${failures.length} failure(s), ${warnings.length} warning(s)\n`);

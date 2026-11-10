@@ -1,11 +1,13 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { parseDefinitions } from "../scripts/public-api/definitions.ts";
 import type { Definition } from "../scripts/public-api/definitions.ts";
 import { pathParams } from "../scripts/public-api/command-map.ts";
 import type { MapEntry } from "../scripts/public-api/command-map.ts";
-import { generate as generateWith, mergeVariants, reservedClashes, summarize } from "../scripts/public-api/generate.ts";
+import { generate as generateWith, mergeVariants, readGeneratedManifest, reservedClashes, summarize } from "../scripts/public-api/generate.ts";
 import type { GenerateOptions } from "../scripts/public-api/generate.ts";
 import type { Descriptor } from "../src/types.ts";
 
@@ -405,4 +407,20 @@ test("reservedClashes finds a name that shadows, replaces, groups or is grouped 
   assert.match(reservedClashes(["gizmos list all"], reserved)[0], /turn the hand-picked "deel gizmos list" into a group/);
   assert.match(reservedClashes(["gadgets show"], reserved)[0], /is a group of the hand-picked "deel gadgets show all"/);
   assert.deepEqual(reservedClashes(["gizmos get", "widgets list"], reserved), []);
+});
+
+test("readGeneratedManifest refuses a damaged manifest by name, not with a TypeError", () => {
+  const dir = mkdtempSync(join(tmpdir(), "check-command-map-"));
+  const manifest = join(dir, "manifest.json");
+  for (const content of ['{"descriptors": [{"method": "GET"}]}', "{}"]) {
+    writeFileSync(manifest, content);
+    assert.throws(() => readGeneratedManifest(manifest), /manifest\.json is not a generated manifest/);
+  }
+  writeFileSync(manifest, JSON.stringify({ generator: "x", descriptors: [{ method: "GET", path: "/a", command: ["a", "list"], params: [], form: { positionals: [], scopes: [], selectors: [] } }] }));
+  assert.equal(readGeneratedManifest(manifest).descriptors.length, 1);
+  writeFileSync(manifest, JSON.stringify({ descriptors: [{ method: "GET", path: "/a", command: ["a"], params: [], form: { positionals: [] } }] }));
+  assert.throws(() => readGeneratedManifest(manifest), /descriptor 0 has a form without positionals, scopes and selectors/);
+  assert.throws(() => readGeneratedManifest(join(dir, "nope.json")), /nope\.json/);
+  writeFileSync(manifest, "not json");
+  assert.throws(() => readGeneratedManifest(manifest), /manifest\.json: /);
 });
