@@ -508,6 +508,20 @@ test("people custom-fields delete takes the field first and the worker as --pers
   assert.deepEqual([sent[0].method, sent[0].url.pathname], ["DELETE", "/rest/people/worker-1/custom_fields/field-1"]);
 });
 
+test("--help ARGUMENTS names a scope flag by the path param it fills, or by the query parameter it sets", async () => {
+  const path = await capture(["ships", "list", "--help"], fleet.manifest.descriptors);
+  assert.equal(path.code, EXIT.OK);
+  assert.match(path.out, /^ARGUMENTS\n {2}--crew <crew> {3}the \{crew_id\} in \/gp\/crews\/\{crew_id\}\/ships\n/m);
+  const query = await capture(["ships", "benefits", "list", "--help"], fleet.manifest.descriptors);
+  assert.match(query.out, /^ARGUMENTS\n {2}--country <country> {3}the country_code query parameter\n/m);
+  assert.doesNotMatch(query.out, /\{country_code\}/);
+  // A form with a scope flag and no argument still gets its ARGUMENTS block (above); one with neither gets none.
+  const none = await capture(["ships", "reviews", "create", "--bulk", "--help"], fleet.manifest.descriptors);
+  assert.doesNotMatch(none.out, /ARGUMENTS/);
+  const contract = JSON.parse((await capture(["ships", "benefits", "list", "--help", "--json"], fleet.manifest.descriptors)).out);
+  assert.deepEqual(contract.scopes, [{ flag: "country", name: "country", param: "country_code", in: "query" }]);
+});
+
 test("--help --json describes a form's arguments, scopes and selectors, and gives every form's contract until one is picked", async () => {
   const one = JSON.parse((await capture(["ships", "list", "--help", "--json"], fleet.manifest.descriptors)).out);
   assert.deepEqual([one.arguments, one.scopes, one.selectors], [[], [{ flag: "crew", name: "crew", param: "crew_id", in: "path" }], [{ flag: "worker-type", value: "gp", optional: true }]]);

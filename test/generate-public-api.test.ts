@@ -26,14 +26,44 @@ test("it needs --from", () => {
   assert.match(none.stderr, /Usage: generate-public-api\.ts --from <file\|url>/);
 });
 
-test("a --map that is not an array of entries is an error, and nothing is written", () => {
+test("a --map that is not a valid command map names the file and the entry at fault, and nothing is written", () => {
   const dir = mkdtempSync(join(tmpdir(), "generate-public-api-"));
-  const map = join(dir, "map.json");
-  writeFileSync(map, JSON.stringify({ entries: [] }));
-  const { code, stderr } = generate(["--from", fixture("widgets.json"), "--map", map, "--out", dir, "--previous", EMPTY]);
-  assert.equal(code, 1);
-  assert.match(stderr, /map\.json is not a command map \(an array of entries\)/);
-  assert.equal(existsSync(join(dir, "manifest.json")), false);
+  const cases: Array<[string, unknown, RegExp]> = [
+    ["object.json", { entries: [] }, /map\.json: the command map must be a JSON array of entries/],
+    ["mistyped.json", [{ method: "GET", paht: "/widgets", command: "deel widgets list" }], /mistyped\.json: entry 0 needs a non-empty string path/],
+    ["nomethod.json", [{ path: "/widgets", command: "deel widgets list" }], /nomethod\.json: entry 0 needs a non-empty string method/],
+    ["nocommand.json", [{ method: "GET", path: "/widgets" }], /nocommand\.json: entry 0 needs a non-empty string command/],
+    ["badapi.json", [{ method: "GET", path: "/widgets", command: "deel widgets list", api: "SCIM" }], /badapi\.json: entry 0 has an api that is neither "rest" nor "scim"/],
+  ];
+  for (const [name, content, message] of cases) {
+    const map = join(dir, name === "object.json" ? "map.json" : name);
+    writeFileSync(map, JSON.stringify(content));
+    const { code, stderr } = generate(["--from", fixture("widgets.json"), "--map", map, "--out", dir, "--previous", EMPTY]);
+    assert.equal(code, 1, name);
+    assert.match(stderr, message, name);
+    assert.doesNotMatch(stderr, /TypeError|at .*\.ts:\d+/, name);
+    assert.equal(existsSync(join(dir, "manifest.json")), false);
+  }
+  const broken = join(dir, "broken.json");
+  writeFileSync(broken, "[{");
+  assert.match(generate(["--from", fixture("widgets.json"), "--map", broken, "--out", dir, "--previous", EMPTY]).stderr, /broken\.json: /);
+});
+
+test("a --previous that is not a generated manifest names the file and the descriptor at fault", () => {
+  const dir = mkdtempSync(join(tmpdir(), "generate-public-api-"));
+  for (const [content, message] of [
+    [{ nodescriptors: [] }, /previous\.json is not a generated manifest \(it has no descriptors list\)/],
+    [{ descriptors: [{ method: "GET", path: "/a", command: "x", params: [] }] }, /descriptor 0 needs a command that is a list of words/],
+    [{ descriptors: [{ method: "GET", path: "/a", command: ["a"] }] }, /descriptor 0 needs a params list/],
+    [{ descriptors: [null] }, /descriptor 0 must be an object/],
+  ] as Array<[unknown, RegExp]>) {
+    const previous = join(dir, "previous.json");
+    writeFileSync(previous, JSON.stringify(content));
+    const { code, stderr } = generate(["--from", fixture("widgets.json"), "--out", dir, "--previous", previous]);
+    assert.equal(code, 1);
+    assert.match(stderr, message);
+    assert.doesNotMatch(stderr, /TypeError/);
+  }
 });
 
 test("--from writes the manifest to --out and the summary to --summary", () => {

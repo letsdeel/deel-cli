@@ -2,15 +2,14 @@
 // Checks that every entry in the command map (src/public-api/commands.json) makes a command the CLI can call.
 // Exit code 0 means no failures; warnings are information for a reviewer and don't fail the run.
 
-import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { bindForm, parseCommand } from "./public-api/command-map.ts";
+import { bindForm, parseCommand, readCommandMap } from "./public-api/command-map.ts";
 import type { MapEntry, ParsedCommand } from "./public-api/command-map.ts";
-import { GLOBAL_FLAGS, reservedClashes } from "./public-api/generate.ts";
+import { GLOBAL_FLAGS, readGeneratedManifest, reservedClashes } from "./public-api/generate.ts";
 import type { Reserved } from "./public-api/generate.ts";
 import { formUsage } from "../src/public-api/commands.ts";
-import type { Descriptor, GeneratedManifest } from "../src/types.ts";
+import type { Descriptor } from "../src/types.ts";
 import { manifest as handPicked } from "../src/manifest.generated.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
 
@@ -33,31 +32,6 @@ const lineKey = (command: ParsedCommand) =>
     command.words,
     [...command.labels.filter((l) => l.flag).map((l) => `--${l.flag}`), ...command.selectors.map((s) => `--${s.flag}${s.value ? ` ${s.value}` : ""}`)].sort(),
   ]);
-
-const ENTRY_FIELDS = new Set(["method", "path", "command", "api", "collapse"]);
-
-// Why one parsed map entry can't be checked, or undefined: the fields MapEntry types, each as the generator reads it.
-function entryShapeError(item: unknown): string | undefined {
-  if (!item || typeof item !== "object" || Array.isArray(item)) return "must be an object";
-  const entry = item as Record<string, unknown>;
-  for (const field of ["method", "path", "command"]) if (typeof entry[field] !== "string" || !entry[field]) return `needs a non-empty string ${field}`;
-  if (!/^[A-Za-z]+$/.test(entry.method as string)) return "has a method that is not an HTTP method name";
-  if (!(entry.path as string).startsWith("/")) return "has a path that does not start with /";
-  if (entry.api !== undefined && entry.api !== "rest" && entry.api !== "scim") return 'has an api that is neither "rest" nor "scim"';
-  if (entry.collapse !== undefined && (typeof entry.collapse !== "string" || !entry.collapse)) return "has a collapse that is not a non-empty string";
-  const unknown = Object.keys(entry).filter((field) => !ENTRY_FIELDS.has(field));
-  return unknown.length > 0 ? `has unknown field(s) ${unknown.join(", ")} (a mistyped name would be ignored)` : undefined;
-}
-
-// Why a parsed map file can't be checked: it must be an array of entries MapEntry describes.
-export function mapShapeError(value: unknown): string | undefined {
-  if (!Array.isArray(value)) return "the command map must be a JSON array of entries";
-  for (const [index, item] of value.entries()) {
-    const problem = entryShapeError(item);
-    if (problem) return `entry ${index} ${problem}: ${JSON.stringify(item)?.slice(0, 120)}`;
-  }
-  return undefined;
-}
 
 export function checkMap(entries: MapEntry[], options: CheckOptions = {}): { failures: Finding[]; warnings: Finding[] } {
   const failures: Finding[] = [];
@@ -137,15 +111,17 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const file = resolve(process.cwd(), process.argv[2] ?? resolve(REPO_ROOT, "src/public-api/commands.json"));
-  const released = (JSON.parse(readFileSync(resolve(REPO_ROOT, "src/public-api/manifest.json"), "utf8")) as GeneratedManifest).descriptors;
-  const reserved = { commands: handPicked.descriptors, topLevel: RESERVED_COMMANDS };
-  const map: unknown = JSON.parse(readFileSync(file, "utf8"));
-  const shapeError = mapShapeError(map);
-  if (shapeError) {
-    process.stderr.write(`FAIL  ${file}: ${shapeError}\n`);
+  let map: MapEntry[];
+  let released: Descriptor[];
+  try {
+    map = readCommandMap(file);
+    released = readGeneratedManifest(resolve(REPO_ROOT, "src/public-api/manifest.json")).descriptors;
+  } catch (error) {
+    process.stderr.write(`FAIL  ${(error as Error).message}\n`);
     process.exit(1);
   }
-  const { failures, warnings } = checkMap(map as MapEntry[], { reserved, released });
+  const reserved = { commands: handPicked.descriptors, topLevel: RESERVED_COMMANDS };
+  const { failures, warnings } = checkMap(map, { reserved, released });
   for (const f of failures) process.stderr.write(`FAIL  ${f.message}\n      ${f.entry}\n`);
   for (const w of warnings) process.stderr.write(`warn  ${w.message}\n      ${w.entry}\n`);
   process.stderr.write(`command map: ${failures.length} failure(s), ${warnings.length} warning(s)\n`);

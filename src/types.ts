@@ -38,11 +38,14 @@ export type Descriptor = {
   responseKind: "object" | "array" | "none"; // shape of the success response's data
   responseFields: CliParam[]; // top-level fields of the response data (the contract)
   // Generated public API commands only (src/public-api/manifest.json):
-  api?: "rest" | "scim";
+  api?: Api;
   beta?: boolean;
   versions?: VersionInfo[]; // every live version of the endpoint, oldest first
   form?: CommandForm; // how the command line picks this endpoint and fills its path params
 };
+
+// Which of Deel's two API surfaces an endpoint belongs to; the only place the pair is spelled out.
+export type Api = "rest" | "scim";
 
 // The command-map shape of one endpoint: `deel <words> <positionals> [selectors] [scopes]`.
 export type CommandForm = {

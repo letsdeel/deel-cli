@@ -5,7 +5,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { checkMap, mapShapeError } from "../scripts/check-command-map.ts";
+import { checkMap } from "../scripts/check-command-map.ts";
+import { isApi, mapShapeError, readCommandMap } from "../scripts/public-api/command-map.ts";
+import { readGeneratedManifest } from "../scripts/public-api/generate.ts";
 import type { MapEntry } from "../scripts/public-api/command-map.ts";
 import type { Descriptor } from "../src/types.ts";
 
@@ -58,6 +60,41 @@ test("a map file that isn't an array of entries fails with a clear message inste
     assert.match(run.stderr, /^FAIL {2}.*check-command-map-.*: (the command map must be a JSON array|entry 0 needs a non-empty string command)/m);
     assert.doesNotMatch(run.stderr, /at .*\.ts:\d+/);
   }
+});
+
+test("readCommandMap names the file and the entry at fault, for a mistyped field, a missing one, bad JSON and a missing file", () => {
+  const dir = mkdtempSync(join(tmpdir(), "check-command-map-"));
+  const write = (name: string, content: string) => (writeFileSync(join(dir, name), content), join(dir, name));
+  const good = write("good.json", JSON.stringify([entry("GET", "/a", "deel a list")]));
+  assert.deepEqual(readCommandMap(good), [entry("GET", "/a", "deel a list")]);
+  assert.throws(() => readCommandMap(write("paht.json", '[{"method":"GET","paht":"/a","command":"deel a list"}]')), /paht\.json: entry 0 needs a non-empty string path/);
+  assert.throws(() => readCommandMap(write("nometh.json", '[{"path":"/a","command":"deel a list"}]')), /nometh\.json: entry 0 needs a non-empty string method/);
+  assert.throws(() => readCommandMap(write("object.json", "{}")), /object\.json: the command map must be a JSON array/);
+  assert.throws(() => readCommandMap(write("bad.json", "[{")), /bad\.json: /);
+  assert.throws(() => readCommandMap(join(dir, "missing.json")), /missing\.json/);
+  // The map check and the generator read the map through this one function, so they refuse the same files.
+  assert.doesNotMatch(readFileSync(new URL("../scripts/generate-public-api.ts", import.meta.url), "utf8"), /JSON\.parse/);
+});
+
+test("the check refuses a damaged released manifest by name, not with a TypeError", () => {
+  const dir = mkdtempSync(join(tmpdir(), "check-command-map-"));
+  const manifest = join(dir, "manifest.json");
+  for (const content of ['{"descriptors": [{"method": "GET"}]}', "{}"]) {
+    writeFileSync(manifest, content);
+    assert.throws(() => readGeneratedManifest(manifest), /manifest\.json is not a generated manifest/);
+  }
+  writeFileSync(manifest, JSON.stringify({ generator: "x", descriptors: [{ method: "GET", path: "/a", command: ["a", "list"], params: [], form: { positionals: [], scopes: [], selectors: [] } }] }));
+  assert.equal(readGeneratedManifest(manifest).descriptors.length, 1);
+  writeFileSync(manifest, JSON.stringify({ descriptors: [{ method: "GET", path: "/a", command: ["a"], params: [], form: { positionals: [] } }] }));
+  assert.throws(() => readGeneratedManifest(manifest), /descriptor 0 has a form without positionals, scopes and selectors/);
+  assert.throws(() => readGeneratedManifest(join(dir, "nope.json")), /nope\.json/);
+  writeFileSync(manifest, "not json");
+  assert.throws(() => readGeneratedManifest(manifest), /manifest\.json: /);
+});
+
+test("isApi accepts exactly the APIs the type names, and nothing inherited", () => {
+  assert.deepEqual(["rest", "scim"].map(isApi), [true, true]);
+  for (const bad of ["SCIM", "", "constructor", "toString", undefined, null, 1, {}]) assert.equal(isApi(bad), false, String(bad));
 });
 
 test("a command line must parse, with lowercase kebab-case words", () => {

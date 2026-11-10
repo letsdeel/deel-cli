@@ -9,6 +9,18 @@ export const RETRY_BASE_DELAY_MS = 200;
 // --- Local logging ---
 export const LOG_MAX_BYTES_DEFAULT = 10 * 1024 * 1024;
 export const LOG_MAX_FILES_DEFAULT = 5;
+export const LOG_DIR_MODE = 0o700;  // owner read/write/enter; no group or other access
+export const LOG_FILE_MODE = 0o600; // owner read/write only
+// Substrings matched (case-insensitive) against keys; a match masks the value.
+export const SENSITIVE_LOG_KEYS = new Set([
+  "token", "password", "secret", "authorization", "credential",
+  "api_key", "apikey", "ssn", "tax", "iban", "swift", "email",
+  "phone", "mobile", "dob", "birth", "address", "bank", "card",
+  "cvv", "cvc", "pin", "passport", "national_id", "routing", "account_number",
+  "signing_key",
+]);
+
+// --- Executor: withheld fields and one-shot endpoints ---
 // Response fields that are secrets the CLI never prints: a webhook's signing key comes back on every webhook read
 // and write, and stays viewable in Developer Center. Removed from the top level of data and of each array item.
 export const WITHHELD_RESPONSE_FIELDS: Record<string, string> = {
@@ -23,17 +35,6 @@ export const SEND_ONCE_ROUTES = new Set(["POST /webhooks/{}/simulate"]);
 export const OUTCOME_ROUTES: Record<string, { field: string; hint: string }> = {
   "POST /webhooks/{}/simulate": { field: "is_success", hint: "The test delivery did not succeed; the printed response shows what the receiver answered." },
 };
-
-export const LOG_DIR_MODE = 0o700;  // owner read/write/enter; no group or other access
-export const LOG_FILE_MODE = 0o600; // owner read/write only
-// Substrings matched (case-insensitive) against keys; a match masks the value.
-export const SENSITIVE_LOG_KEYS = new Set([
-  "token", "password", "secret", "authorization", "credential",
-  "api_key", "apikey", "ssn", "tax", "iban", "swift", "email",
-  "phone", "mobile", "dob", "birth", "address", "bank", "card",
-  "cvv", "cvc", "pin", "passport", "national_id", "routing", "account_number",
-  "signing_key",
-]);
 
 // --- Idempotency ---
 // Fixed DeelCLI namespace for deterministic UUIDv5 keys.

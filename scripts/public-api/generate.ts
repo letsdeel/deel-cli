@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { bodyFrom, responseFrom } from "../../.claude/skills/deel-cli-extractor/extract.ts";
 import type { CliParam, Descriptor, GeneratedManifest, ScalarType, VersionInfo } from "../../src/types.ts";
 import { commonArgs } from "../../src/commands/shared.ts";
@@ -370,6 +371,36 @@ export function summarize(before: Descriptor[], after: Descriptor[]): Summary {
     .map(entry);
   const bump = removed.length ? "major" : added.length ? "minor" : changed.length ? "patch" : "none";
   return { added, changed, removed, bump };
+}
+
+// Why one descriptor of a manifest file can't be used, or undefined: what the generator and the checks read of it.
+function descriptorShapeError(item: unknown): string | undefined {
+  if (!item || typeof item !== "object" || Array.isArray(item)) return "must be an object";
+  const entry = item as Record<string, unknown>;
+  if (typeof entry.method !== "string" || typeof entry.path !== "string") return "needs a string method and path";
+  if (!Array.isArray(entry.command) || !entry.command.every((word) => typeof word === "string")) return "needs a command that is a list of words";
+  if (!Array.isArray(entry.params)) return "needs a params list";
+  const form = entry.form as Record<string, unknown> | undefined;
+  if (form !== undefined && (!form || !["positionals", "scopes", "selectors"].every((key) => Array.isArray(form[key])))) return "has a form without positionals, scopes and selectors";
+  return undefined;
+}
+
+// A generated manifest file as the generator (--previous) and the map check (the released names) read it: checked
+// before use, so a damaged file fails with its name and the descriptor at fault, never with a TypeError further on.
+export function readGeneratedManifest(file: string): GeneratedManifest {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(readFileSync(file, "utf8"));
+  } catch (error) {
+    throw new Error(`${file}: ${(error as Error).message}`);
+  }
+  const descriptors = (parsed as { descriptors?: unknown } | null)?.descriptors;
+  if (!Array.isArray(descriptors)) throw new Error(`${file} is not a generated manifest (it has no descriptors list)`);
+  for (const [index, item] of descriptors.entries()) {
+    const problem = descriptorShapeError(item);
+    if (problem) throw new Error(`${file} is not a generated manifest: descriptor ${index} ${problem}`);
+  }
+  return parsed as GeneratedManifest;
 }
 
 export function renderManifest(manifest: GeneratedManifest): string {
