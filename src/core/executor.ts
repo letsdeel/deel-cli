@@ -15,7 +15,7 @@ import { maskUrlQuery } from "./logging.ts";
 import { envelope, render } from "./output.ts";
 import { HEADER, OUTCOME_ROUTES, SEND_ONCE_ROUTES, WITHHELD_RESPONSE_FIELDS, withheldFieldFor } from "./constants.ts";
 import type { VersionChoice, VersionFlags } from "./versions.ts";
-import { BETA_ACCESS_HINT, BETA_ERROR, betaFallback, chooseVersion } from "./versions.ts";
+import { API_VERSION_NONE, BETA_ACCESS_HINT, BETA_ACCESS_HINT_NONE, BETA_ERROR, betaFallback, chooseVersion } from "./versions.ts";
 
 export type ParsedCall = {
   flags: Record<string, string | string[]>; // path + query values (arrays for repeatable query params)
@@ -206,9 +206,10 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   debugSent(response.status);
 
   // A beta that graduated (or vanished) since the manifest was generated: the API rejects the request
-  // before any service runs, so one retry is safe even for a POST. It keeps the idempotency key.
+  // before any service runs, so one retry is safe even for a POST. It keeps the idempotency key. A send-once route
+  // (SEND_ONCE_ROUTES) is never sent twice, so its error is surfaced instead.
   const code = response.status >= 400 ? errorCode(response.json) : undefined;
-  const fallback = betaFallback(choice, code, descriptor.versions, ctx.clock(), opts.version?.apiVersion !== undefined, firstError(response.json)?.details?.latest_stable_version);
+  const fallback = sendOnce ? undefined : betaFallback(choice, code, descriptor.versions, ctx.clock(), opts.version?.apiVersion !== undefined, firstError(response.json)?.details?.latest_stable_version);
   if (fallback) {
     if (opts.debug) ctx.io.err(`[debug] ${code}: ${fallback.reason}; retrying once without x-beta\n`);
     choice = fallback.choice;
@@ -220,8 +221,9 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   }
 
   if (response.status >= 400) {
-    const error = errorFromResponse(response.status, response.json, requestId, choice.beta);
-    if (error.code === BETA_ERROR.required && !choice.beta) error.next = BETA_ACCESS_HINT;
+    // `true`: the hint below knows better than the default one whether --beta can be added, and keeps the API's own.
+    const error = errorFromResponse(response.status, response.json, requestId, true);
+    if (error.code === BETA_ERROR.required && !choice.beta) error.next ??= opts.version?.apiVersion === API_VERSION_NONE ? BETA_ACCESS_HINT_NONE : BETA_ACCESS_HINT;
     throw error;
   }
 
@@ -296,9 +298,15 @@ function errorCodeOf(item: any): string | undefined {
   return typeof code === "string" && code ? code : undefined;
 }
 
+// The list of an error response: `{ errors: [...] }`, or the nested `{ errors: { errors: [...] } }` some services answer.
+function errorList(body: any): any[] | undefined {
+  return Array.isArray(body?.errors) ? body.errors : Array.isArray(body?.errors?.errors) ? body.errors.errors : undefined;
+}
+// The error that names the failure: the first of the list, else the `error` object, else the body itself.
 function firstError(json: unknown): any {
   const body = json as any;
-  return Array.isArray(body?.errors) ? body.errors[0] : (body?.error ?? body);
+  const list = errorList(body);
+  return list ? list[0] : (body?.error ?? body);
 }
 function errorCode(json: unknown): string | undefined {
   return errorCodeOf(firstError(json));
@@ -314,7 +322,7 @@ export function errorFromResponse(status: number, json: unknown, requestId: stri
   const body = json as any;
   // Most services answer { errors: [...] } or { error: {...} }; some nest the list ({ errors: { errors: [...] } })
   // or the message ({ responseMessage: { message } }), and those messages are still the user's best hint.
-  const list: any[] | undefined = Array.isArray(body?.errors) ? body.errors : Array.isArray(body?.errors?.errors) ? body.errors.errors : undefined;
+  const list = errorList(body);
 
   let code: string;
   let message: string;

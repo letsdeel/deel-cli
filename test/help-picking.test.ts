@@ -16,6 +16,7 @@ const endpoints: Array<[string, string, string]> = [
   ["POST", "/fleet/reviews/many", "deel ships reviews create --bulk"],
   ["POST", "/fleet/{ship_id}/reviews", "deel ships reviews create <ship>"],
   ["GET", "/gp/crews/{crew_id}/ships", "deel ships list --crew <crew> [--worker-type gp]"],
+  ["POST", "/fleet/notes", "deel ships notes create [--bulk]"],
 ];
 const definitions = parseDefinitions(
   endpoints.map(([method, path]) => ({
@@ -99,4 +100,12 @@ test("a switch such as --bulk does not swallow the word after it", async () => {
 
 test("a word that is not a command is named in the error even after a picking flag's value", async () => {
   await assert.rejects(capture(["--as", "worker", "shps"]), (error: Error) => /Unknown command 'shps'\./.test(error.message) && /Did you mean: ships\?/.test(error.message));
+});
+
+test("a flag written as an optional switch, [--bulk], is explained too", async () => {
+  const { out } = await capture(["ships", "notes", "--help"]);
+  assert.match(out, /^ {2}create \[--bulk\] {2,}/m);
+  assert.match(out, /^ {2}--bulk {2,}many at once$/m);
+  // `--bulk` is not mistaken for a longer flag, nor the other way round.
+  assert.doesNotMatch((await capture(["ships", "list", "--help"])).out, /--bulk {2,}many at once/);
 });

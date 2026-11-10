@@ -64,6 +64,16 @@ test("deel commands --filter keeps the rows that contain every word, and --json 
   assert.match(empty.err, /--filter needs the text to look for/);
 });
 
+test("deel commands --filter with no value fails as a value flag does, and sends nothing", async () => {
+  for (const argv of [["commands", "--filter"], ["commands", "--filter="], ["commands", "--filter", "--json"]]) {
+    await assert.rejects(
+      run(argv),
+      (error: { code?: string; message: string }) => error.code === "usage.flag_value" && /^--filter needs a value\./.test(error.message),
+      argv.join(" "),
+    );
+  }
+});
+
 test("commandRows sorts by command, then path, whatever order the rows come in; renderCommandRows aligns the columns", () => {
   const plain = manifest.descriptors.find((d) => d.path === "/contracts/{contract_id}")!;
   const eor = manifest.descriptors.find((d) => d.path === "/eor/contracts/{contract_id}/details")!;

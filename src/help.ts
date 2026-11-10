@@ -397,7 +397,8 @@ export function printGroupHelp(cmd: CommandDef, path: string[], title: string, a
   const rows = groupRows(cmd, path, at);
   out(`\n${title}\n\nCommands:\n`);
   out(rowLines(rows));
-  const used = Object.keys(PICKING_LEGEND).filter((flag) => rows.some((row) => row.name.includes(`--${flag} `) || row.name.endsWith(`--${flag}`)));
+  // A flag is in use when a line names it as a whole word: `--bulk`, `--bulk <x>` and the optional `[--bulk]` all count.
+  const used = Object.keys(PICKING_LEGEND).filter((flag) => rows.some((row) => new RegExp(`--${flag}(?![\\w-])`).test(row.name)));
   if (used.length) out(`\nFlags that pick the endpoint:\n${used.map((flag) => `  ${PICKING_LEGEND[flag]}\n`).join("")}`);
   const what = apiCommands ? "its arguments, flags and fields" : "its flags";
   const example = rows[0] ? ` (e.g. ${exampleLine(path, rows[0].name)})` : "";

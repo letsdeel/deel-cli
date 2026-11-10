@@ -317,12 +317,13 @@ function descriptorsFor(positionals: string[], matched: number): Descriptor[] {
 async function printVersions(descriptor: Descriptor, argv: string[]): Promise<void> {
   const listing = versionListing(descriptor, Date.now());
   const io = realIO();
-  const args = parseArgs(argv, commonArgs);
-  if (args.json === false) {
+  const opts = outputOpts(parseArgs(argv, commonArgs));
+  // The table is the human form: only on a terminal with --no-json, and never when --jq, --fields or --quiet shape the data.
+  if (!opts.json && io.interactive && !opts.jq && !opts.fields && !opts.quiet) {
     io.out(versionTable(listing));
     return;
   }
-  await render(io, envelope(listing), outputOpts(args));
+  await render(io, envelope(listing), opts);
 }
 
 // Single descriptor for a resolved path. For variant groups, selects by the variant
@@ -346,9 +347,10 @@ function descriptorFor(positionals: string[], matched: number, argv: string[]): 
   return undefined;
 }
 
-// `--version <date>` after a command picks the API version, so only a bare `--version` (or -v) prints the CLI's.
+// `--version <date>` after a command picks the API version, so only a bare `--version` prints the CLI's, even behind a
+// flag's value (`--env demo --version`), which run()'s first check cannot tell from a command word. (-v is answered there.)
 function wantsCliVersion(argv: string[]): boolean {
-  return argv.includes("-v") || (argv.includes("--version") && wordsOf(argv, valuedFlags(commonArgs)).length === 0);
+  return argv.includes("--version") && wordsOf(argv, valuedFlags(commonArgs)).length === 0;
 }
 
 export async function run(argv: string[]): Promise<number> {

@@ -305,7 +305,7 @@ Like every generated command, `delete` runs as soon as it is typed: there is no 
 
 A webhook id can start with `-`, which the argument parser reads as a flag. Put it after `--`, which ends the options: `deel webhooks get -- -WZ1uT2DFF01`. The same works for any generated command.
 
-`test` runs the delivery from Deel's servers, so the receiver URL must be publicly reachable; it is limited to 10 simulations per hour per event type. It prints the delivery, then exits 1 when the response reports `is_success: false`. Each run sends a new event: it is sent once, with no retry (except the one retry of a beta the API rejects before running anything, see [API versions](#api-versions)) and no derived `Idempotency-Key`.
+`test` runs the delivery from Deel's servers, so the receiver URL must be publicly reachable; it is limited to 10 simulations per hour per event type. It prints the delivery, then exits 1 when the response reports `is_success: false`. Each run sends a new event: it is sent once, with no retry and no derived `Idempotency-Key`; the retry of a rejected beta (see [API versions](#api-versions)) does not apply to it.
 
 ## API versions
 
@@ -325,7 +325,7 @@ deel <command> --beta
 deel <command> --version 2026-01-01
 ```
 
-If a beta graduates (or ends) after this CLI was released, the API rejects `X-Beta` before running anything; the CLI then retries once, without `X-Beta` (with the same version, or with the stable version the API names (else the newest stable one in the CLI's own list) when nothing is in beta any more and you did not pin a version with `--version`) and with the same idempotency key. `--debug` shows the retry.
+If a beta graduates (or ends) after this CLI was released, the API rejects `X-Beta` before running anything; the CLI then retries once, without `X-Beta` (with the same version, or with the stable version the API names (else the newest stable one in the CLI's own list) when nothing is in beta any more and you did not pin a version with `--version`) and with the same idempotency key. `--debug` shows the retry. A command that is sent once (`webhooks test`) is never retried.
 
 ## Environments
 
@@ -342,7 +342,7 @@ base URL. The `deel scim …` commands use the sibling `/scim` base path
 
 ## Beta endpoints
 
-A command whose only version is a beta sends `X-Beta: true` by itself, so `--beta` is optional on `deel dev logs list`, `deel dev tokens list` or `deel webhooks test …`; the examples in this README spell it out. `--beta` picks the newest beta of a command that also has a stable version, and fails with `usage.beta` when it has none. A beta called without the header (for example with `--version none`) answers `BETA_ACCESS_REQUIRED`; the CLI then suggests `--beta`. See [API versions](#api-versions).
+A command whose only version is a beta sends `X-Beta: true` by itself, so `--beta` is optional on `deel dev logs list`, `deel dev tokens list` or `deel webhooks test …`; the examples in this README spell it out. `--beta` picks the newest beta of a command that also has a stable version, and fails with `usage.beta` when it has none; on a hand-picked command (`adjustments`, `jobs`), which lists no versions, it only adds `X-Beta`. A beta called without the header (for example with `--version none`) answers `BETA_ACCESS_REQUIRED`; the CLI then suggests `--beta`. See [API versions](#api-versions).
 
 ## Corporate proxies & custom CAs
 

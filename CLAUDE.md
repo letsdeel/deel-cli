@@ -56,7 +56,7 @@ Coverage floor over `src/**` (in `test:coverage`): lines ≥ 80 %, branches ≥ 
 
 ### Conventions baked into the executor/output
 
-- Every mutating request gets an `Idempotency-Key`: a deterministic UUIDv5 over the canonicalized request (`core/idempotency.ts`), overridable with `--idempotency-key`. The routes in `SEND_ONCE_ROUTES` (`core/constants.ts`, e.g. `webhooks test`) act on every call, so they get no derived key and no retry.
+- Every mutating request gets an `Idempotency-Key`: a deterministic UUIDv5 over the canonicalized request (`core/idempotency.ts`), overridable with `--idempotency-key`. The routes in `SEND_ONCE_ROUTES` (`core/constants.ts`, e.g. `webhooks test`) act on every call, so they get no derived key and no retry. `execute()` owns `X-Version` and `X-Beta` (`core/versions.ts`: `chooseVersion` picks them, `betaFallback` retries a request the API rejects before running it, once, with the same idempotency key, never on a send-once route); `runDescriptor` hands the transport `beta: false` so the transport's beta middleware never adds `X-Beta` back on that retry.
 - Bodies are wrapped under `{ data: ... }` when the descriptor says `bodyWrapper: "data"` (unless the user already wrapped). Batch-size caps (`maxItems`) are enforced client-side.
 - Output is always a JSON envelope `{ data, meta: { request_id }, page? }` by default; `--fields`, `--jq`, `--raw`, `--quiet`, `--no-json` in `core/output.ts`.
 - **Exit codes are binary (0/1).** Failure detail lives in the stderr envelope `{ error: { code, message, next, request_id } }`; throw `CliError(code, message, next?)` (`core/errors.ts`) with a dotted code like `usage.variant`, `auth.missing`, `http.<status>`.

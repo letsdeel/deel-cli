@@ -6,6 +6,7 @@ import type { ExecOpts } from "../src/core/executor.ts";
 import { createContext } from "../src/core/context.ts";
 import { captureIO } from "../src/core/io.ts";
 import type { HttpRequest, HttpResponse } from "../src/core/http.ts";
+import { AGENT_ENV_SIGNALS } from "../src/core/constants.ts";
 import { betaFallback, chooseVersion, newestBeta, newestStable, versionListing, versionTable } from "../src/core/versions.ts";
 import type { Descriptor, VersionInfo } from "../src/types.ts";
 import { run } from "../src/cli.ts";
@@ -177,12 +178,12 @@ test("--beta without a beta version is a usage error", async () => {
   assert.equal(seen.length, 0);
 });
 
-test("--beta on a command without a version list is a usage error", async () => {
-  const { seen, error } = await call(descriptor({ versions: undefined }), [ok()], { beta: true });
-  assert.equal(error.code, "usage.versions");
-  assert.match(error.message, /--beta needs the list of API versions/);
-  assert.match(error.next, /--version/);
-  assert.equal(seen.length, 0);
+test("--beta on a command without a version list adds X-Beta to its own version, as it always did", async () => {
+  const { seen, error } = await call(descriptor({ versions: undefined, version: "2025-01-01" }), [ok()], { beta: true });
+  assert.equal(error, undefined);
+  assert.equal(seen.length, 1);
+  assert.equal(seen[0].headers["x-version"], "2025-01-01");
+  assert.equal(seen[0].headers["x-beta"], "true");
 });
 
 test("INVALID_VERSION_BETA: retries once with the same version, without X-Beta, same idempotency key", async () => {
@@ -282,6 +283,29 @@ test("BETA_ACCESS_REQUIRED surfaces the error with a --beta hint (both error sha
   }
 });
 
+test("BETA_ACCESS_REQUIRED keeps the hint the API gives, and after --version none names a date instead of --beta alone", async () => {
+  const given = await call(descriptor(), [fail(400, { error: { code: "BETA_ACCESS_REQUIRED", message: "Beta access required", next: "Ask your admin for beta access." } })], { apiVersion: "2027-01-01" });
+  assert.equal(given.error.next, "Ask your admin for beta access.");
+  const none = await call(descriptor(), [fail(400, { error: { code: "BETA_ACCESS_REQUIRED", message: "Beta access required" } })], { apiVersion: "none" });
+  assert.match(none.error.next, /--version <YYYY-MM-DD> --beta/);
+  assert.doesNotMatch(none.error.next, /add --beta/);
+});
+
+test("a beta error in the nested { errors: { errors: [...] } } shape is retried like the others", async () => {
+  const nested = fail(400, { errors: { errors: [{ code: "INVALID_VERSION_BETA", message: "Version is not in beta" }] } });
+  const { seen, error } = await call(descriptor({ version: "2026-09-15", beta: true }), [nested, ok()]);
+  assert.equal(error, undefined);
+  assert.equal(seen.length, 2);
+  assert.equal("x-beta" in seen[1].headers, false);
+});
+
+test("a send-once route is never sent twice by the beta fallback; its error is surfaced", async () => {
+  const simulate = descriptor({ method: "POST", path: "/webhooks/{}/simulate", version: "2026-09-15", beta: true });
+  const { seen, error } = await call(simulate, [fail(400, { errors: [{ code: "INVALID_VERSION_BETA", message: "Version is not in beta" }] }), ok()]);
+  assert.equal(seen.length, 1);
+  assert.equal(error.code, "INVALID_VERSION_BETA");
+});
+
 test("versionListing marks beta (as of now) and the default version", () => {
   const listing = versionListing(descriptor(), NOW);
   assert.equal(listing.version, "2026-04-01");
@@ -339,6 +363,21 @@ function recordingFetch(seen: Headers[]): typeof fetch {
   }) as typeof fetch;
 }
 
+// Runs `fn` as if stdout were a terminal in a plain shell (no CI or agent signal in the environment).
+async function onTerminal<T>(fn: () => Promise<T>): Promise<T> {
+  const tty = Object.getOwnPropertyDescriptor(process.stdout, "isTTY");
+  const saved = AGENT_ENV_SIGNALS.map((name) => [name, process.env[name]] as const);
+  for (const name of AGENT_ENV_SIGNALS) delete process.env[name];
+  Object.defineProperty(process.stdout, "isTTY", { value: true, configurable: true });
+  try {
+    return await fn();
+  } finally {
+    if (tty) Object.defineProperty(process.stdout, "isTTY", tty);
+    else delete (process.stdout as { isTTY?: boolean }).isTTY;
+    for (const [name, value] of saved) if (value !== undefined) process.env[name] = value;
+  }
+}
+
 const BASE = ["--base-url", "https://example.test/rest", "--no-log"];
 
 test("deel <beta-only command> sends X-Beta; --version and --beta reach the request", async () => {
@@ -378,8 +417,13 @@ test("--versions prints the version list without a request (JSON, --jq, table)",
   const fields = await cli(["widgets", "reports", "list", "--versions", "--fields", "version,beta"]);
   assert.deepEqual(JSON.parse(fields.out).data, { version: "2026-01-01", beta: false });
 
-  const table = await cli(["widgets", "reports", "list", "--versions", "--no-json"]);
+  // The table is the human form: on a terminal with --no-json. Piped, or shaped by --jq/--fields, it stays data.
+  const table = await onTerminal(() => cli(["widgets", "reports", "list", "--versions", "--no-json"]));
   assert.match(table.out, /2026-06-01\s+beta\s+2099-01-01/);
+  const piped = await cli(["widgets", "reports", "list", "--versions", "--no-json"]);
+  assert.equal(JSON.parse(piped.out).data.version, "2026-01-01");
+  const shaped = await onTerminal(() => cli(["widgets", "reports", "list", "--versions", "--no-json", "--jq", ".version"]));
+  assert.equal(shaped.out, JSON.stringify("2026-01-01") + "\n");
 
   const get = await cli(["widgets", "get", "--versions"]);
   assert.equal(get.code, EXIT.OK);
@@ -422,4 +466,17 @@ test("the version flags are global options", async () => {
   assert.match(out, /--version=<version>/);
   assert.match(out, /--beta\s/);
   assert.match(out, /--versions\s/);
+});
+
+test("deel <cmd> --beta: the retry after INVALID_VERSION_BETA goes out without X-Beta, as the transport adds none", async () => {
+  const seen: Headers[] = [];
+  const answers = [
+    () => new Response(JSON.stringify({ errors: [{ code: "INVALID_VERSION_BETA", message: "Version is not in beta" }] }), { status: 400 }),
+    () => new Response(JSON.stringify({ data: [] }), { status: 200 }),
+  ];
+  const stub = (async (_url: unknown, init?: RequestInit) => (seen.push(new Headers(init?.headers)), answers[seen.length - 1]())) as typeof fetch;
+  const result = await cli(["widgets", "reports", "list", "--beta", ...BASE], stub);
+  assert.equal(result.code, EXIT.OK, result.err);
+  assert.deepEqual(seen.map((headers) => headers.get("x-beta")), ["true", null]);
+  assert.equal(seen[1].get("x-version"), seen[0].get("x-version"));
 });

@@ -72,7 +72,8 @@ export function chooseVersion(descriptor: Descriptor, flags: VersionFlags, now: 
   }
 
   if (flags.beta) {
-    if (!versions) throw noVersionData(descriptor, "--beta");
+    // A hand-picked command has no list to pick a beta from: --beta only adds X-Beta to its own version, as it always did.
+    if (!versions) return { version: descriptor.version, beta: true };
     const beta = newestBeta(versions, now);
     if (!beta) {
       throw new CliError(
@@ -104,6 +105,8 @@ export function betaFallback(sent: VersionChoice, errorCode: string | undefined,
 }
 
 export const BETA_ACCESS_HINT = "This version is in beta: add --beta (or pick a stable version with --version <YYYY-MM-DD>; see --versions).";
+// After `--version none` the CLI cannot add --beta (the two are refused together), so the hint names a date instead.
+export const BETA_ACCESS_HINT_NONE = "This version is in beta: --version none sends no version, so pick one with --version <YYYY-MM-DD> --beta (see --versions).";
 
 export type VersionRow = VersionInfo & { beta: boolean; default: boolean };
 
