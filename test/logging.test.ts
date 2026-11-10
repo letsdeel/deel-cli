@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { withLogging } from "../src/core/http.ts";
 import type { HttpRequest, HttpResponse, Transport } from "../src/core/http.ts";
-import { isLinkKey, isSensitiveKey, keyWords, log, maskLink, maskUrlQuery, setLoggingEnabled, setLogBodiesEnabled } from "../src/core/logging.ts";
+import { isLinkKey, isSensitiveKey, keyWords, log, looksPersonal, maskLink, maskUrlQuery, setLoggingEnabled, setLogBodiesEnabled } from "../src/core/logging.ts";
 import { loadGeneratedDescriptors } from "../src/public-api/commands.ts";
 import type { CliParam } from "../src/types.ts";
 
@@ -251,4 +251,27 @@ test("the log masks credentials, identifiers and personal data by name, in every
   for (const key of ordinary) assert.equal(isSensitiveKey(key), false, key);
   // Short names match as whole words, so they don't hide ordinary words that contain them.
   for (const key of ["company", "panel", "planning", "setting", "single", "tiny", "ipsum"]) assert.equal(isSensitiveKey(key), false, key);
+});
+
+test("an email or a JWT is masked wherever it sits, in a URL query value or a body string, whatever its key", () => {
+  assert.equal(maskUrlQuery("https://api.example.test/rest/people?q=ana@example.com&limit=5"), "https://api.example.test/rest/people?q=***&limit=5");
+  assert.equal(maskUrlQuery("https://api.example.test/rest/people?search=ana%40example.com&filter=a%2Bb%40example.org"), "https://api.example.test/rest/people?search=***&filter=***");
+  assert.equal(maskUrlQuery("https://api.example.test/x?next=https%3A%2F%2Fa.test%2Fp%3Fe%3Dana%40example.com"), "https://api.example.test/x?next=https%3A%2F%2Fa.test%2Fp%3Fe%3D***");
+  assert.equal(maskUrlQuery("https://api.example.test/x?note=see+eyJhbGciOi.eyJzdWIiOi.c2ln+now"), "https://api.example.test/x?note=see%20***%20now");
+  // Ordinary values, and a bare @ that is no address, stay readable.
+  assert.equal(maskUrlQuery("https://api.example.test/x?q=widgets&at=@home&status=open"), "https://api.example.test/x?q=widgets&at=@home&status=open");
+  assert.equal(looksPersonal("ana@example.com"), true);
+  assert.equal(looksPersonal("plain text"), false);
+});
+
+test("a body string that holds an email or a JWT is masked even under an ordinary key", () => {
+  const dir = mkdtempSync(join(tmpdir(), "deel-log-"));
+  process.env.DEEL_LOG_DIR = dir;
+  setLoggingEnabled(true);
+  log({ kind: "request", response: { note: "ask ana@example.com about it", title: "Quarterly review", items: [{ memo: "token eyJhbGciOi.eyJzdWIiOi.c2ln" }, { memo: "plain" }] } });
+  const parsed = JSON.parse(readFileSync(join(dir, "deel.log"), "utf8").trim().split("\n").pop()!);
+  assert.equal(parsed.response.note, "ask *** about it");
+  assert.equal(parsed.response.title, "Quarterly review");
+  assert.deepEqual(parsed.response.items, [{ memo: "token ***" }, { memo: "plain" }]);
+  delete process.env.DEEL_LOG_DIR;
 });

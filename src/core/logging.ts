@@ -71,6 +71,12 @@ function decoded(text: string): string {
 // (`?email=...`, `?personalId=...`, `?ids[]=...`, a repeated key, an encoded key); the other parameters, the path and the
 // host stay readable. The fragment is never sent to a server and may hold a token, so it is cut. A value under a link key
 // (`?redirect_url=...`) loses its own query like a link in a body. Text that isn't a URL passes unchanged.
+// A value that is personal data whatever key carries it: an email address (`?q=ana@example.com`, a free-text `note`) or
+// a JWT-shaped token. Key names can't catch a search or filter parameter, or a note, that holds one.
+const PERSONAL_TEXT = "[^\\s@/?&=]+@[^\\s@/?&=]+\\.[^\\s@/?&=]+|\\beyJ[\\w-]+\\.[\\w-]+\\.[\\w-]*";
+export const looksPersonal = (text: string): boolean => new RegExp(PERSONAL_TEXT).test(text);
+const maskPersonalText = (text: string): string => text.replace(new RegExp(PERSONAL_TEXT, "g"), "***");
+
 export function maskUrlQuery(url: string): string {
   const hash = url.indexOf("#");
   const withoutFragment = hash === -1 ? url : url.slice(0, hash);
@@ -85,7 +91,8 @@ export function maskUrlQuery(url: string): string {
       const key = decoded(pair.slice(0, equals)).replace(/\[\]$/, "");
       const value = pair.slice(equals + 1);
       if (isSensitiveKey(key)) return `${pair.slice(0, equals)}=***`;
-      return isLinkKey(key) ? `${pair.slice(0, equals)}=${encodeURIComponent(maskLink(decoded(value)))}` : pair;
+      if (isLinkKey(key)) return `${pair.slice(0, equals)}=${encodeURIComponent(maskPersonalText(maskLink(decoded(value))))}`;
+      return looksPersonal(decoded(value)) ? `${pair.slice(0, equals)}=${encodeURIComponent(maskPersonalText(decoded(value)))}` : pair;
     });
   return `${withoutFragment.slice(0, cut)}?${params.join("&")}${hash === -1 ? "" : "#***"}`;
 }
@@ -93,7 +100,7 @@ export function maskUrlQuery(url: string): string {
 // `link` is true under a link key, which masks the query of the strings it holds (or lists). The entry's own top-level
 // keys are not redacted this way: its `url` is the request URL, kept whole under --log-bodies.
 function redact(value: unknown, link = false): unknown {
-  if (typeof value === "string") return link ? maskLink(value) : value;
+  if (typeof value === "string") return maskPersonalText(link ? maskLink(value) : value);
   if (Array.isArray(value)) return value.map((item) => redact(item, link));
   if (value && typeof value === "object") {
     const redacted: Record<string, unknown> = {};
