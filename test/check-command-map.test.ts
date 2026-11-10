@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { checkMap } from "../scripts/check-command-map.ts";
+import { checkMap, readDomainNames } from "../scripts/check-command-map.ts";
 import type { MapEntry } from "../scripts/public-api/command-map.ts";
 import type { Descriptor } from "../src/types.ts";
 
@@ -27,6 +27,8 @@ test("the check exits 1 and names each failure when the map file it is given has
   const run = spawnSync(process.execPath, ["scripts/check-command-map.ts", map], { cwd: ROOT, encoding: "utf8" });
   assert.equal(run.status, 1, run.stderr);
   assert.match(run.stderr, /^FAIL {2}path param \{a_id\} of \/a\/\{a_id\} has no argument in the command$/m);
+  // The script passes the domains of domains.json to the check: `things` is not one of them.
+  assert.match(run.stderr, /^FAIL {2}'things' is not in src\/public-api\/domains.json/m);
   assert.match(run.stderr, /^command map: [1-9]\d* failure\(s\)/m);
 });
 
@@ -90,4 +92,39 @@ test("names: the map may not take a hand-picked or static name, and a released c
   assert.deepEqual(checkMap([entry("GET", "/things/{id}", "deel things get <id>")], { released }).failures, []);
   assert.match(checkMap([entry("GET", "/things/{id}", "deel things show <id>")], { released }).failures.map((f) => f.message).join(), /released as "deel things get <id>", the map now says "deel things show <id>"/);
   assert.match(checkMap([entry("GET", "/other", "deel other list")], { released }).failures.map((f) => f.message).join(), /removed from the map/);
+});
+
+test("every domain of the map has a stage and description in domains.json", () => {
+  const failures = checkMap([entry("GET", "/x", "deel widgets list")], { domains: ["contracts"] }).failures;
+  assert.match(failures.map((f) => f.message).join(), /'widgets' is not in src\/public-api\/domains.json/);
+  assert.deepEqual(checkMap([entry("GET", "/x", "deel contracts list")], { domains: ["contracts"] }).failures, []);
+});
+
+test("readDomainNames reads every domain of every stage, and refuses a file that cannot give help its text", () => {
+  const dir = mkdtempSync(join(tmpdir(), "check-command-map-domains-"));
+  const write = (name: string, content: unknown) => {
+    const file = join(dir, name);
+    writeFileSync(file, typeof content === "string" ? content : JSON.stringify(content));
+    return file;
+  };
+  const domain = { name: "contracts", description: "Contracts" };
+  assert.deepEqual(readDomainNames(write("ok.json", [{ stage: "Hiring", domains: [domain, { name: "ats", description: "Jobs" }] }, { stage: "Pay", domains: [] }])), ["contracts", "ats"]);
+  assert.deepEqual(readDomainNames(join(fileURLToPath(new URL("../src/public-api/", import.meta.url)), "domains.json")).includes("contracts"), true);
+  const refused: Array<[string, unknown, RegExp]> = [
+    ["not-json.json", "{nope", /cannot read .*not-json\.json/],
+    ["object.json", { stage: "Hiring" }, /must be a list of stages/],
+    ["no-stage.json", [{ domains: [domain] }], /stage 0 needs a non-empty "stage"/],
+    ["no-domains.json", [{ stage: "Hiring" }], /stage 0 needs a non-empty "stage" and a "domains" list/],
+    ["numeric-name.json", [{ stage: "Hiring", domains: [{ name: 3, description: "x" }] }], /needs a non-empty "name" and "description"/],
+    ["no-description.json", [{ stage: "Hiring", domains: [{ name: "contracts" }] }], /needs a non-empty "name" and "description"/],
+    ["blank-description.json", [{ stage: "Hiring", domains: [{ name: "contracts", description: " " }] }], /needs a non-empty "name" and "description"/],
+  ];
+  for (const [name, content, message] of refused) assert.throws(() => readDomainNames(write(name, content)), message, name);
+});
+
+test("a domain of domains.json that no command uses is a warning, not a failure", () => {
+  const reserved = { commands: [{ command: ["jobs", "list"] } as Descriptor], topLevel: new Set(["auth"]) };
+  const result = checkMap([entry("GET", "/x", "deel contracts list")], { domains: ["contracts", "ghost", "jobs", "auth"], reserved });
+  assert.deepEqual(result.failures, []);
+  assert.deepEqual(result.warnings.filter((w) => w.message.includes("domains.json")).map((w) => w.entry), ["ghost"]);
 });

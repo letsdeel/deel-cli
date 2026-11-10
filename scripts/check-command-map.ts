@@ -2,6 +2,7 @@
 // Checks that every entry in the command map (src/public-api/commands.json) makes a command the CLI can call.
 // Exit code 0 means no failures; warnings are information for a reviewer and don't fail the run.
 
+import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { bindForm, parseCommand, readCommandMap } from "./public-api/command-map.ts";
@@ -22,6 +23,7 @@ export type Finding = { entry: string; message: string };
 export type CheckOptions = {
   reserved?: Reserved; // hand-picked and static command names, which the map may not take
   released?: Descriptor[]; // the committed manifest: a released command line never changes
+  domains?: string[]; // the top-level words src/public-api/domains.json describes (and orders by stage) for deel --help
 };
 
 const routeOf = (method: string, path: string, api = "rest") => `${api === "scim" ? "scim " : ""}${method.toUpperCase()} ${path.replace(/\{[^}]+\}/g, "{}")}`;
@@ -79,6 +81,19 @@ export function checkMap(entries: MapEntry[], options: CheckOptions = {}): { fai
     else fail(`same command line as ${before.path}`);
   }
 
+  // Every domain has a stage and a description in domains.json, which deel --help lists it by.
+  if (options.domains) {
+    const known = new Set(options.domains);
+    for (const domain of new Set(parsed.map((p) => p.words[0]))) {
+      if (!known.has(domain)) failures.push({ entry: domain, message: `'${domain}' is not in src/public-api/domains.json, which gives every domain its stage and description` });
+    }
+    // A domain is in use through the map, a hand-picked command or a static one.
+    const used = new Set([...parsed.map((p) => p.words[0]), ...(options.reserved?.commands ?? []).map((d) => d.command[0])]);
+    for (const domain of known) {
+      if (!used.has(domain) && !options.reserved?.topLevel.has(domain)) warnings.push({ entry: domain, message: `'${domain}' is in src/public-api/domains.json but no command of the map starts with it` });
+    }
+  }
+
   // Hand-picked and static names stay theirs, and a released command line never changes.
   if (options.reserved) {
     const names = [...new Set(parsed.map((p) => p.words.join(" ")))];
@@ -107,21 +122,45 @@ function usageOf(entry: MapEntry | undefined, released: Descriptor): string | un
   }
 }
 
+// The domain names domains.json lists, under their lifecycle stages. A missing or malformed file is a failure, not a crash,
+// and so is a stage or domain without the text `deel --help` prints for it.
+export function readDomainNames(file: string): string[] {
+  let stages: unknown;
+  try {
+    stages = JSON.parse(readFileSync(file, "utf8"));
+  } catch (error) {
+    throw new Error(`cannot read ${file}: ${(error as Error).message}`);
+  }
+  const text = (value: unknown): value is string => typeof value === "string" && value.trim() !== "";
+  if (!Array.isArray(stages)) throw new Error(`${file} must be a list of stages, each with a stage name and a domains list`);
+  const names: string[] = [];
+  for (const [index, stage] of stages.entries()) {
+    if (!text(stage?.stage) || !Array.isArray(stage?.domains)) throw new Error(`${file}: stage ${index} needs a non-empty "stage" and a "domains" list`);
+    for (const domain of stage.domains) {
+      if (!text(domain?.name) || !text(domain?.description)) throw new Error(`${file}: a domain of stage "${stage.stage}" needs a non-empty "name" and "description"`);
+      names.push(domain.name);
+    }
+  }
+  return names;
+}
+
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const file = resolve(process.cwd(), process.argv[2] ?? resolve(REPO_ROOT, "src/public-api/commands.json"));
   let map: MapEntry[];
   let released: Descriptor[];
+  let domains: string[];
   try {
     map = readCommandMap(file);
     released = readGeneratedManifest(resolve(REPO_ROOT, "src/public-api/manifest.json")).descriptors;
+    domains = readDomainNames(resolve(REPO_ROOT, "src/public-api/domains.json"));
   } catch (error) {
     process.stderr.write(`FAIL  ${(error as Error).message}\n`);
     process.exit(1);
   }
   const reserved = { commands: handPicked.descriptors, topLevel: RESERVED_COMMANDS };
-  const { failures, warnings } = checkMap(map, { reserved, released });
+  const { failures, warnings } = checkMap(map, { reserved, released, domains });
   for (const f of failures) process.stderr.write(`FAIL  ${f.message}\n      ${f.entry}\n`);
   for (const w of warnings) process.stderr.write(`warn  ${w.message}\n      ${w.entry}\n`);
   process.stderr.write(`command map: ${failures.length} failure(s), ${warnings.length} warning(s)\n`);

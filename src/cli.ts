@@ -7,9 +7,9 @@
 import { defineCommand, parseArgs, runCommand, showUsage } from "citty";
 import type { ArgsDef, CommandDef } from "citty";
 import type { Descriptor } from "./types.ts";
-import { manifest } from "./manifest.generated.ts";
-import { generatedDescriptors, loadGeneratedDescriptors, matchForm, pickingFlags, selectForm, usageOf } from "./public-api/commands.ts";
-import { acceptsFlag, argvEnables, argvMentionsFlag, flagMissingValue, flagOf, joinSwitchValues } from "./core/flags.ts";
+import { allDescriptors, loadGeneratedDescriptors, matchForm, pickingFlags, selectForm, usageOf } from "./public-api/commands.ts";
+import { acceptsFlag, argvEnables, argvMentionsFlag, flagMissingValue, flagOf, joinSwitchValues, unknownFlag } from "./core/flags.ts";
+export { unknownFlag };
 import { parseInput } from "./core/input.ts";
 import { createContext } from "./core/context.ts";
 import { execute } from "./core/executor.ts";
@@ -20,11 +20,20 @@ import { CLI_VERSION } from "./version.ts";
 import { commandToken, commonArgs, configFrom, gatherFiles, gatherFlagValues, outputOpts, refuseMissingValues, valuedFlags } from "./commands/shared.ts";
 import type { Args } from "./commands/shared.ts";
 import { staticCommands } from "./commands/index.ts";
-import { printActionHelp, printFormsHelp, printFormsJson, printContractJson, printGlobalOptions, printSkeleton, printVariantGroupHelp, printVersion } from "./help.ts";
-
-function allDescriptors(): Descriptor[] {
-  return [...manifest.descriptors, ...generatedDescriptors()];
-}
+import {
+  didYouMean,
+  groupTitle,
+  printActionHelp,
+  printContractJson,
+  printFormsHelp,
+  printFormsJson,
+  printGlobalOptions,
+  printGroupHelp,
+  printRootHelp,
+  printSkeleton,
+  printVariantGroupHelp,
+  printVersion,
+} from "./help.ts";
 
 // ---------------- generated action commands ----------------
 
@@ -150,19 +159,6 @@ function switchesOf(descriptors: Descriptor[]): string[] {
   return [...globals, ...own, ...descriptors.flatMap((d) => (d.form?.selectors ?? []).filter((s) => s.value === undefined).map((s) => s.flag))];
 }
 
-// The first flag in argv, as typed, that none of `known` accepts in any spelling the parser reads (--a-b, --aB, --no-a).
-export function unknownFlag(argv: string[], known: string[]): string | undefined {
-  for (const token of argv) {
-    if (token === "--") break;
-    if (/^-[A-Za-z]/.test(token)) return token.split("=")[0]; // no short flags beyond -h and -v, read earlier
-    if (!token.startsWith("--")) continue;
-    const key = token.slice(2).split("=")[0];
-    const accepted = (name: string) => known.some((flag) => acceptsFlag(flag, name));
-    if (!accepted(key) && !(key.startsWith("no-") && accepted(key.slice(3)))) return `--${key}`;
-  }
-  return undefined;
-}
-
 // The endpoints that share a generated command's words: the selector and scope flags given pick one. That
 // endpoint then parses the arguments with its own flag definitions, so a flag's type, enum and required-ness
 // come from it alone, and its positionals fill the path params in order.
@@ -237,7 +233,7 @@ function treeToCommand(name: string, node: CommandTree | Descriptor | Descriptor
   if (!(node instanceof Map)) return (node as Descriptor).form ? formCommand([node as Descriptor]) : actionCommand(node as Descriptor);
   const subCommands: Record<string, CommandDef> = {};
   for (const [childName, childNode] of node as CommandTree) subCommands[childName] = treeToCommand(childName, childNode);
-  return defineCommand({ meta: { name, description: `${name} operations` }, subCommands });
+  return defineCommand({ meta: { name }, subCommands });
 }
 
 // ---------------- root ----------------
@@ -262,6 +258,13 @@ function wordsAt(argv: string[], valued: string[]): Array<{ word: string; index:
 }
 
 const wordsOf = (argv: string[], valued: string[]): string[] => wordsAt(argv, valued).map(({ word }) => word);
+
+// The flags that take a value: the global ones, and those that pick among the endpoints sharing a command's words
+// (`--worker-type eor`, `--as worker`, `--contract <id>`), so `deel contracts --worker-type eor --help` reads `eor` as a value.
+function valueFlags(): string[] {
+  const picking = allDescriptors().flatMap((d) => (d.form ? [...d.form.selectors.filter((s) => s.value !== undefined).map((s) => s.flag), ...d.form.scopes.map((s) => s.flag)] : []));
+  return [...new Set([...valuedFlags(commonArgs), ...picking])];
+}
 
 // An option other than a help switch: what citty would drop if it stood before a command's last word. (Help is
 // answered by run() itself, so it is never dropped.)
@@ -320,28 +323,28 @@ export async function run(argv: string[]): Promise<number> {
     return EXIT.OK;
   }
 
-  // The command's words, without the values of the flags before them (`--env demo`): every decision below reads these.
-  const found = wordsAt(options, valuedFlags(commonArgs));
-  const words = found.map(({ word }) => word);
-  const first = words[0];
-
   // A static command (auth, job) never needs the generated manifest.
+  const first = wordsOf(options, valuedFlags(commonArgs))[0];
   if (!(first && Object.hasOwn(staticCommands, first))) await loadGeneratedDescriptors();
   const root = buildRoot();
+
+  // The command's words, without the values of the flags (`--env demo`, `--worker-type eor`): every decision below reads these.
+  const found = wordsAt(options, valueFlags());
+  const words = found.map(({ word }) => word);
   const { cmd, parent, matched } = resolve(root, words);
   const wantsHelp = options.includes("--help") || options.includes("-h");
   const isGroup = typeof cmd.run !== "function";
 
   if (words.length > 0 && matched === 0) {
     const before = options.slice(0, found[0].index).some(isOption);
-    throw new CliError("usage.command", `Unknown command '${first}'.`, before ? "Options go after the command: deel <command> … --option." : "Run 'deel --help' to see available commands.");
+    throw new CliError("usage.command", `Unknown command '${words[0]}'.${didYouMean(words[0], root)}`, before ? "Options go after the command: deel <command> … --option." : "Run 'deel --help' to see available commands.");
   }
   // A word after a group that names none of its commands (a removed or mistyped one) fails instead of showing the
   // group's help and exiting 0.
   const stray = isGroup ? words[matched] : undefined;
   if (stray !== undefined) {
     const group = words.slice(0, matched).join(" ");
-    throw new CliError("usage.command", `Unknown command 'deel ${group} ${stray}'.`, `Run 'deel ${group} --help' to see its commands.`);
+    throw new CliError("usage.command", `Unknown command 'deel ${group} ${stray}'.${didYouMean(stray, cmd)}`, `Run 'deel ${group} --help' to see its commands.`);
   }
 
   const positionals = words;
@@ -380,10 +383,21 @@ export async function run(argv: string[]): Promise<number> {
     else printActionHelp(descriptor);
     return EXIT.OK;
   }
-  // Root / domain / group help: citty's usage; add the global-options section at root.
-  if (wantsHelp || isGroup) {
+  const at = (path: string[]) => descriptorsFor(path, path.length);
+  if (cmd === root && (wantsHelp || isGroup)) {
+    printRootHelp(root, new Set(Object.keys(staticCommands)), at);
+    printGlobalOptions();
+    return EXIT.OK;
+  }
+  if (isGroup) {
+    const path = positionals.slice(0, matched);
+    const own = Object.hasOwn(staticCommands, path[0]) ? (cmd.meta as { description?: string } | undefined)?.description : undefined;
+    printGroupHelp(cmd, path, own ?? groupTitle(path), at, !Object.hasOwn(staticCommands, path[0]));
+    return EXIT.OK;
+  }
+  // A static command's own help (auth login, job status, commands, ...): citty's usage.
+  if (wantsHelp) {
     await showUsage(cmd, parent);
-    if (cmd === root) printGlobalOptions();
     return EXIT.OK;
   }
 

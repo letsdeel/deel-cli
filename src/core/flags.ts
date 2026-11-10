@@ -74,3 +74,16 @@ export function flagMissingValue(argv: string[], flags: string[]): string | unde
   }
   return undefined;
 }
+
+// The first flag in argv, as typed, that none of `known` accepts in any spelling the parser reads (--a-b, --aB, --no-a).
+export function unknownFlag(argv: string[], known: string[]): string | undefined {
+  for (const token of argv) {
+    if (token === "--") break;
+    if (/^-[A-Za-z]/.test(token)) return token.split("=")[0]; // no short flags beyond -h and -v, read earlier
+    if (!token.startsWith("--")) continue;
+    const key = token.slice(2).split("=")[0];
+    const accepted = (name: string) => known.some((flag) => acceptsFlag(flag, name));
+    if (!accepted(key) && !(key.startsWith("no-") && accepted(key.slice(3)))) return `--${key}`;
+  }
+  return undefined;
+}

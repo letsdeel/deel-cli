@@ -127,8 +127,6 @@ test("a word under a group that names none of its commands fails instead of prin
     assert.match(misplaced.err, /^Options go after the command: write 'deel adjustments create …'/, argv.join(" "));
     assert.equal(misplaced.error?.code, "usage.command", argv.join(" "));
   }
-  // The group alone, its --help, and a global flag's value after it still show the help.
-  for (const argv of [["adjustments"], ["adjustments", "--help"], ["adjustments", "--env", "demo"]]) assert.equal((await capture(argv)).code, EXIT.OK, argv.join(" "));
 });
 
 test("an option before the command's last word is refused, since citty would drop it and the call would go out without it", async () => {

@@ -7,8 +7,9 @@ import type { CliParam, Descriptor } from "./types.ts";
 import { CLI_VERSION } from "./version.ts";
 import { commonArgs } from "./commands/shared.ts";
 import { flagOf } from "./core/flags.ts";
+import type { CommandDef } from "citty";
 import { withheldFieldFor } from "./core/constants.ts";
-import { usageOf } from "./public-api/commands.ts";
+import { domainOf, STAGE_ORDER, usageOf } from "./public-api/commands.ts";
 
 // Flattens nested object fields into dotted paths (request.amount, ...) so every
 // field is visible, however deep, without changing the CliParam shape callers rely on.
@@ -254,3 +255,185 @@ export function printSkeleton(descriptor: Descriptor): void {
   }
 }
 
+
+// ---------------- root and group help ----------------
+// A group lists every command reachable through single-child groups by its relative path ("invite send <contract>"),
+// one line per endpoint when several share the words, and a child with a bigger subtree as a count.
+
+type HelpRow = { name: string; description: string; kind: "leaf" | "chain" | "group" };
+// The descriptors at a command path (a leaf with several endpoints has several).
+export type DescriptorsAt = (words: string[]) => Descriptor[];
+
+function subCommandsOf(cmd: CommandDef): Record<string, CommandDef> {
+  return (cmd.subCommands as Record<string, CommandDef> | undefined) ?? {};
+}
+
+export function isGroupCommand(cmd: CommandDef): boolean {
+  return typeof cmd.run !== "function" && Object.keys(subCommandsOf(cmd)).length > 0;
+}
+
+function descriptionOf(cmd: CommandDef): string {
+  return (cmd.meta as { description?: string } | undefined)?.description ?? "";
+}
+
+const ACTION_ORDER = ["list", "get", "create", "update", "delete"];
+
+export const byName = (a: string, b: string): number => a.localeCompare(b, "en");
+
+const rank = (row: HelpRow) => {
+  const verb = row.name.split(" ")[0];
+  return ACTION_ORDER.includes(verb) ? ACTION_ORDER.indexOf(verb) : ACTION_ORDER.length;
+};
+
+// The lines a leaf contributes: one per endpoint of a generated command, one per variant of a hand-picked one.
+function leafRows(name: string, words: string[], node: CommandDef, at: DescriptorsAt, kind: HelpRow["kind"]): HelpRow[] {
+  const descriptors = at(words);
+  if (descriptors.length && descriptors[0].form) {
+    const prefix = `deel ${words.join(" ")}`;
+    return descriptors.map((d) => ({ name: `${name}${usageOf(d).slice(prefix.length)}`, description: d.summary ?? "", kind }));
+  }
+  if (descriptors.length > 1 && descriptors[0].variant) return descriptors.map((d) => ({ name: `${name} --${d.variant}`, description: d.summary ?? "", kind }));
+  return [{ name, description: descriptors[0]?.summary ?? descriptionOf(node), kind }];
+}
+
+function countCommands(cmd: CommandDef, words: string[], at: DescriptorsAt): number {
+  if (!isGroupCommand(cmd)) return Math.max(1, at(words).length);
+  let count = 0;
+  for (const [name, child] of Object.entries(subCommandsOf(cmd))) count += countCommands(child, [...words, name], at);
+  return count;
+}
+
+function groupRows(cmd: CommandDef, path: string[], at: DescriptorsAt): HelpRow[] {
+  const rows: HelpRow[] = [];
+  for (const [name, child] of Object.entries(subCommandsOf(cmd))) {
+    const rel = [name];
+    let node = child;
+    // Below the root a chain of single children is shown as one command; at the root each line is the domain itself
+    // (`scim`, not `scim users`), the word that `deel <word> --help` opens.
+    while (path.length > 0 && isGroupCommand(node)) {
+      const entries = Object.entries(subCommandsOf(node));
+      if (entries.length !== 1) break;
+      rel.push(entries[0][0]);
+      node = entries[0][1];
+    }
+    const words = [...path, ...rel];
+    if (isGroupCommand(node)) {
+      const total = countCommands(node, words, at);
+      const count = `${total} ${total === 1 ? "command" : "commands"}`;
+      const own = path.length === 0 ? (domainOf(rel[0])?.description ?? (descriptionOf(node) || undefined)) : undefined;
+      rows.push({ name: rel.join(" "), description: own ? `${own} (${count})` : count, kind: "group" });
+    } else rows.push(...leafRows(rel.join(" "), words, node, at, rel.length === 1 ? "leaf" : "chain"));
+  }
+  const of = (kind: HelpRow["kind"]) => rows.filter((row) => row.kind === kind);
+  return [
+    ...of("leaf").sort((a, b) => rank(a) - rank(b) || byName(a.name, b.name)),
+    ...of("chain").sort((a, b) => byName(a.name, b.name)),
+    ...of("group").sort((a, b) => byName(a.name, b.name)),
+  ];
+}
+
+// Names longer than this overflow the column instead of pushing every description right.
+const NAME_COLUMN_MAX = 44;
+
+function nameWidth(rows: { name: string }[]): number {
+  return Math.min(NAME_COLUMN_MAX, Math.max(0, ...rows.map((row) => row.name.length)));
+}
+
+function rowLines(rows: { name: string; description: string }[], indent = "  "): string {
+  const width = nameWidth(rows);
+  return rows.map((row) => `${indent}${row.name.padEnd(width)}   ${row.description}`.trimEnd() + "\n").join("");
+}
+
+// The words of a domain.json stage keep the order of the stages, so the setup of an organization comes before paying
+// workers; the static commands (auth, job, commands) come first, and a word domains.json does not know comes last.
+const rootRank = (word: string, staticNames: Set<string>): number => {
+  if (staticNames.has(word)) return -1;
+  const stage = domainOf(word)?.stage;
+  return stage === undefined ? STAGE_ORDER.length : STAGE_ORDER.indexOf(stage);
+};
+
+// `deel --help`: one line per top-level word, the word you type first, then what it covers.
+export function printRootHelp(root: CommandDef, staticNames: Set<string>, at: DescriptorsAt): void {
+  const out = process.stdout.write.bind(process.stdout);
+  const rows = groupRows(root, [], at).sort((a, b) => rootRank(a.name.split(" ")[0], staticNames) - rootRank(b.name.split(" ")[0], staticNames) || byName(a.name, b.name));
+  const width = nameWidth(rows);
+
+  out(`\n${descriptionOf(root)} (deel ${CLI_VERSION})\n\n`);
+  out(`USAGE  deel <command> [<subcommand> ...] [arguments] [OPTIONS]\n\n`);
+  out(`Commands:\n`);
+  for (const row of rows) out(`  ${row.name.padEnd(width)}   ${row.description}`.trimEnd() + "\n");
+  const first = rows.find((row) => !staticNames.has(row.name.split(" ")[0]));
+  out(`\nAdd --help to a command to see its commands${first ? ` (e.g. ${exampleLine([], first.name)})` : ""}. Search every command: deel commands --filter TEXT.\n`);
+}
+
+// A line a reader can paste: the row's words only. Its <arguments> would read as shell redirections, and the
+// words alone give its help (or, for words several endpoints share, the list that leads to each one's help).
+function exampleLine(path: string[], row: string): string {
+  const words = row.split(/\s+/).filter(Boolean);
+  const end = words.findIndex((t) => /^[<\[-]/.test(t));
+  return ["deel", ...path, ...(end === -1 ? words : words.slice(0, end)), "--help"].join(" ");
+}
+
+// What the flags that pick an endpoint mean, shown under a group whose lines use them.
+const PICKING_LEGEND: Record<string, string> = {
+  "worker-type": "--worker-type <type>   the contract or worker type (eor, gp, daas, contractor, employee); a line without it calls the endpoint whose path names no type",
+  as: "--as <side>            the side acting: worker (not the client), or client where a line says so",
+  "file-format": "--file-format <format> the document as a file (pdf, csv)",
+  bulk: "--bulk                 many at once",
+  status: "--status <value>       sets the record's own state",
+};
+
+// `apiCommands` is false for a static group (auth, job), whose commands send no request body.
+export function printGroupHelp(cmd: CommandDef, path: string[], title: string, at: DescriptorsAt, apiCommands = true): void {
+  const out = process.stdout.write.bind(process.stdout);
+  const rows = groupRows(cmd, path, at);
+  out(`\n${title}\n\nCommands:\n`);
+  out(rowLines(rows));
+  // A flag is in use when a line names it as a whole word: `--bulk`, `--bulk <x>` and the optional `[--bulk]` all count.
+  const used = Object.keys(PICKING_LEGEND).filter((flag) => rows.some((row) => new RegExp(`--${flag}(?![\\w-])`).test(row.name)));
+  if (used.length) out(`\nFlags that pick the endpoint:\n${used.map((flag) => `  ${PICKING_LEGEND[flag]}\n`).join("")}`);
+  const what = apiCommands ? "its arguments, flags and fields" : "its flags";
+  const example = rows[0] ? ` (e.g. ${exampleLine(path, rows[0].name)})` : "";
+  out(`\nAdd --help to a line's words for ${what}${example}.\n`);
+}
+
+// The title of a group's help: a top-level domain's description, else its path.
+export function groupTitle(path: string[]): string {
+  const domain = path.length === 1 ? domainOf(path[0]) : undefined;
+  return domain ? `deel ${path[0]} — ${domain.description}` : `deel ${path.join(" ")}`;
+}
+
+// Edit distance where swapping two adjacent letters ("lsit") counts as one edit.
+function editDistance(a: string, b: string): number {
+  const rows = Array.from({ length: a.length + 1 }, (_, i) => Array.from({ length: b.length + 1 }, (_, j) => (i === 0 ? j : j === 0 ? i : 0)));
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      rows[i][j] = Math.min(rows[i - 1][j] + 1, rows[i][j - 1] + 1, rows[i - 1][j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) rows[i][j] = Math.min(rows[i][j], rows[i - 2][j - 2] + 1);
+    }
+  }
+  return rows[a.length][b.length];
+}
+
+// "Did you mean" for an unknown command word: the children of the deepest matched node
+// that start with it or are within a small edit distance of it.
+export function suggestions(word: string, candidates: string[], limit = 5): string[] {
+  const target = word.toLowerCase();
+  if (!target) return [];
+  const allowed = Math.max(1, Math.floor(target.length / 3));
+  return candidates
+    // Two words whose lengths differ by more than `allowed` cannot be within that many edits: skip the matrix for them.
+    .filter((candidate) => candidate.startsWith(target) || Math.abs(candidate.length - target.length) <= allowed)
+    .map((candidate) => ({ candidate, distance: candidate.startsWith(target) ? 0 : editDistance(target, candidate) }))
+    .filter((entry) => entry.distance <= allowed)
+    .sort((a, b) => a.distance - b.distance || byName(a.candidate, b.candidate))
+    .slice(0, limit)
+    .map((entry) => entry.candidate);
+}
+
+// " Did you mean: a, b?" for a mistyped word among the node's commands, or "" when none is close.
+export function didYouMean(word: string, node: CommandDef): string {
+  const similar = suggestions(word, Object.keys(subCommandsOf(node)));
+  return similar.length ? ` Did you mean: ${similar.join(", ")}?` : "";
+}
