@@ -318,6 +318,12 @@ test("BETA_ACCESS_REQUIRED after X-Beta was sent gets no hint to add --beta, and
   assert.equal(given.error.next, "Ask your admin.");
 });
 
+test("--versions on a hand-picked command with several variants asks for a variant flag, and names them", async () => {
+  const { error } = await cli(["adjustments", "create", "--versions"]);
+  assert.equal(error.code, "usage.versions");
+  assert.match(error.message, /^'deel adjustments create' has several endpoints; pick one with --invoice, --payroll$/);
+});
+
 test("--help wins over --versions: it prints the help, even where --versions alone would be refused", async () => {
   const help = await cli(["widgets", "reports", "list", "--versions", "--help"]);
   assert.equal(help.code, EXIT.OK);
