@@ -199,3 +199,7 @@ test("without --previous the released names come from the manifest committed nex
   assert.equal(renamed.code, 1);
   assert.match(renamed.stderr, /Lock: POST \/widgets was released as "deel widgets create"/);
 });
+
+test("the generator reads the command map through readCommandMap, as the map check does, so both refuse the same files", () => {
+  assert.doesNotMatch(readFileSync(new URL("../scripts/generate-public-api.ts", import.meta.url), "utf8"), /JSON\.parse/);
+});

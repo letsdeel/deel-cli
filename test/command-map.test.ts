@@ -1,7 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
-import { bindForm, parseCommand } from "../scripts/public-api/command-map.ts";
+import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { bindForm, isApi, mapShapeError, parseCommand, readCommandMap } from "../scripts/public-api/command-map.ts";
+import type { MapEntry } from "../scripts/public-api/command-map.ts";
+
+const entry = (method: string, path: string, command: string, extra: Partial<MapEntry> = {}): MapEntry => ({ method, path, command, ...extra });
 
 test("parseCommand reads words, positionals, scope flags and the three kinds of selector", () => {
   assert.deepEqual(parseCommand("deel contracts get <contract> --file-format pdf [--worker-type eor] --as worker --bulk --contract <c>"), {
@@ -54,4 +59,42 @@ test("the committed manifest binds every entry's arguments as the command map sa
     checked++;
   }
   assert.ok(checked > 500, `${checked} entries checked`);
+});
+
+test("mapShapeError accepts a well-formed map and names the first entry that is not one", () => {
+  assert.equal(mapShapeError([entry("GET", "/a", "deel a list"), { ...entry("GET", "/b", "deel b list"), collapse: "k", api: "scim" }]), undefined);
+  assert.match(mapShapeError({ method: "GET" }) ?? "", /must be a JSON array/);
+  const bads: Array<[unknown[], RegExp]> = [
+    [[null], /^entry 0 must be an object/],
+    [["deel a list"], /^entry 0 must be an object/],
+    [[[]], /^entry 0 must be an object/],
+    [[{ method: "GET", path: "/a" }], /^entry 0 needs a non-empty string command/],
+    [[{ method: "GET", path: 1, command: "deel a" }], /^entry 0 needs a non-empty string path/],
+    [[entry("", "/a", "deel a list")], /^entry 0 needs a non-empty string method/],
+    [[entry("GET /a", "/a", "deel a list")], /^entry 0 has a method that is not an HTTP method name/],
+    [[entry("GET", "a", "deel a list")], /^entry 0 has a path that does not start with \//],
+    [[entry("GET", "/a", "deel a list"), { ...entry("GET", "/b", "deel b list"), api: "SCIM" }], /^entry 1 has an api that is neither "rest" nor "scim"/],
+    [[{ ...entry("GET", "/a", "deel a list"), api: 7 }], /^entry 0 has an api/],
+    [[{ ...entry("GET", "/a", "deel a list"), collapse: 3 }], /^entry 0 has a collapse that is not a non-empty string/],
+    [[{ ...entry("GET", "/a", "deel a list"), collapse: "" }], /^entry 0 has a collapse/],
+    [[{ ...entry("GET", "/a", "deel a list"), colapse: "k" }], /^entry 0 has unknown field\(s\) colapse/],
+  ];
+  for (const [bad, message] of bads) assert.match(mapShapeError(bad) ?? "", message, JSON.stringify(bad));
+});
+
+test("readCommandMap names the file and the entry at fault, for a mistyped field, a missing one, bad JSON and a missing file", () => {
+  const dir = mkdtempSync(join(tmpdir(), "check-command-map-"));
+  const write = (name: string, content: string) => (writeFileSync(join(dir, name), content), join(dir, name));
+  const good = write("good.json", JSON.stringify([entry("GET", "/a", "deel a list")]));
+  assert.deepEqual(readCommandMap(good), [entry("GET", "/a", "deel a list")]);
+  assert.throws(() => readCommandMap(write("paht.json", '[{"method":"GET","paht":"/a","command":"deel a list"}]')), /paht\.json: entry 0 needs a non-empty string path/);
+  assert.throws(() => readCommandMap(write("nometh.json", '[{"path":"/a","command":"deel a list"}]')), /nometh\.json: entry 0 needs a non-empty string method/);
+  assert.throws(() => readCommandMap(write("object.json", "{}")), /object\.json: the command map must be a JSON array/);
+  assert.throws(() => readCommandMap(write("bad.json", "[{")), /bad\.json: /);
+  assert.throws(() => readCommandMap(join(dir, "missing.json")), /missing\.json/);
+});
+
+test("isApi accepts exactly the APIs the type names, and nothing inherited", () => {
+  assert.deepEqual(["rest", "scim"].map(isApi), [true, true]);
+  for (const bad of ["SCIM", "", "constructor", "toString", undefined, null, 1, {}]) assert.equal(isApi(bad), false, String(bad));
 });
