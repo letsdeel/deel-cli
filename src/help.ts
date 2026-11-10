@@ -308,7 +308,9 @@ function groupRows(cmd: CommandDef, path: string[], at: DescriptorsAt): HelpRow[
   for (const [name, child] of Object.entries(subCommandsOf(cmd))) {
     const rel = [name];
     let node = child;
-    while (isGroupCommand(node)) {
+    // Below the root a chain of single children is shown as one command; at the root each line is the domain itself
+    // (`scim`, not `scim users`), the word that `deel <word> --help` opens.
+    while (path.length > 0 && isGroupCommand(node)) {
       const entries = Object.entries(subCommandsOf(node));
       if (entries.length !== 1) break;
       rel.push(entries[0][0]);
@@ -316,8 +318,9 @@ function groupRows(cmd: CommandDef, path: string[], at: DescriptorsAt): HelpRow[
     }
     const words = [...path, ...rel];
     if (isGroupCommand(node)) {
-      const count = `${countCommands(node, words, at)} commands`;
-      const own = path.length === 0 ? domainOf(rel[0])?.description : undefined;
+      const total = countCommands(node, words, at);
+      const count = `${total} ${total === 1 ? "command" : "commands"}`;
+      const own = path.length === 0 ? (domainOf(rel[0])?.description ?? (descriptionOf(node) || undefined)) : undefined;
       rows.push({ name: rel.join(" "), description: own ? `${own} (${count})` : count, kind: "group" });
     } else rows.push(...leafRows(rel.join(" "), words, node, at, rel.length === 1 ? "leaf" : "chain"));
   }
@@ -341,32 +344,25 @@ function rowLines(rows: { name: string; description: string }[], indent = "  "):
   return rows.map((row) => `${indent}${row.name.padEnd(width)}   ${row.description}`.trimEnd() + "\n").join("");
 }
 
-const CLI_SECTION = "CLI";
-const OTHER_SECTION = "Other";
+// The words of a domain.json stage keep the order of the stages, so the setup of an organization comes before paying
+// workers; the static commands (auth, job, commands) come first, and a word domains.json does not know comes last.
+const rootRank = (word: string, staticNames: Set<string>): number => {
+  if (staticNames.has(word)) return -1;
+  const stage = domainOf(word)?.stage;
+  return stage === undefined ? STAGE_ORDER.length : STAGE_ORDER.indexOf(stage);
+};
 
-// `deel --help`: the top-level words under the command map's lifecycle stages, the static commands under CLI.
+// `deel --help`: one line per top-level word, the word you type first, then what it covers.
 export function printRootHelp(root: CommandDef, staticNames: Set<string>, at: DescriptorsAt): void {
   const out = process.stdout.write.bind(process.stdout);
-  const sectionOf = (word: string) => (staticNames.has(word) ? CLI_SECTION : (domainOf(word)?.stage ?? OTHER_SECTION));
-  const grouped = new Map<string, HelpRow[]>();
-  for (const row of groupRows(root, [], at)) {
-    const section = sectionOf(row.name.split(" ")[0]);
-    grouped.set(section, [...(grouped.get(section) ?? []), row]);
-  }
-  const order = (section: string) => (section === CLI_SECTION ? -1 : section === OTHER_SECTION ? STAGE_ORDER.length : STAGE_ORDER.indexOf(section));
-  const sections = [...grouped.keys()].sort((a, b) => order(a) - order(b));
-  const sectionWidth = Math.max(...sections.map((section) => section.length));
-  const width = nameWidth([...grouped.values()].flat());
+  const rows = groupRows(root, [], at).sort((a, b) => rootRank(a.name.split(" ")[0], staticNames) - rootRank(b.name.split(" ")[0], staticNames) || byName(a.name, b.name));
+  const width = nameWidth(rows);
 
   out(`\n${descriptionOf(root)} (deel ${CLI_VERSION})\n\n`);
   out(`USAGE  deel <command> [<subcommand> ...] [arguments] [OPTIONS]\n\n`);
   out(`Commands:\n`);
-  for (const section of sections) {
-    grouped.get(section)!.sort((a, b) => byName(a.name, b.name)).forEach((row, index) => {
-      out(`  ${(index === 0 ? section : "").padEnd(sectionWidth)}   ${row.name.padEnd(width)}   ${row.description}`.trimEnd() + "\n");
-    });
-  }
-  const first = sections.flatMap((section) => grouped.get(section)!).find((row) => !staticNames.has(row.name.split(" ")[0]));
+  for (const row of rows) out(`  ${row.name.padEnd(width)}   ${row.description}`.trimEnd() + "\n");
+  const first = rows.find((row) => !staticNames.has(row.name.split(" ")[0]));
   out(`\nAdd --help to a command to see its commands${first ? ` (e.g. ${exampleLine([], first.name)})` : ""}. Search every command: deel commands --filter TEXT.\n`);
 }
 

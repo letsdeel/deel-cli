@@ -74,7 +74,7 @@ Because Node runs the source via type-stripping (`verbatimModuleSyntax`, `allowI
 ## Layout rules (enforced by `/doctor`, see `.claude/skills/doctor/structure.md`)
 
 - `src/core/` and `src/commands/` are **flat** — one file per concern, no sub-directories.
-- Only `main.ts`, `cli.ts`, `help.ts`, `version.ts`, `types.ts`, `commands.map.ts`, `manifest.generated.ts` live directly under `src/`. `src/public-api/` holds the generated public API commands: `manifest.json` (generated), `commands.json` (the command map), `domains.json` (each domain's lifecycle stage and description, for `deel --help`) and `commands.ts` (loader and endpoint selection).
+- Only `main.ts`, `cli.ts`, `help.ts`, `version.ts`, `types.ts`, `commands.map.ts`, `manifest.generated.ts` live directly under `src/`. `src/public-api/` holds the generated public API commands: `manifest.json` (generated), `commands.json` (the command map), `domains.json` (each domain's description, and the lifecycle stage that orders `deel --help`) and `commands.ts` (loader and endpoint selection).
 - Tests live only in `test/<module>.test.ts`, named after the module they cover (`src/core/http.ts` → `test/http.test.ts`). Behaviour changes need a test; scripts with real logic in `scripts/` are tested from `test/` too. `test/stubs.ts` provides stub-executable/hermetic-PATH helpers for testing the shell scripts.
 - `package.json` version and `src/version.ts` must agree (`check:version`). `package-lock.json` must keep every bun platform binary (`check:lockfile`) — an `npm install` over an existing `node_modules` can drop them; prefer `npm ci`.
 - `packaging/install.sh` is POSIX `sh` (users pipe it into `sh`); `check:shell` runs `sh -n`/`bash -n` + shellcheck.

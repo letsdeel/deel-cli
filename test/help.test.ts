@@ -48,21 +48,26 @@ test("the fixture generates without errors", () => {
   assert.deepEqual(generated.errors, []);
 });
 
-test("root help lists the top-level words under the map's lifecycle stages, the static commands under CLI", async () => {
+// The first word of every line of the root help's command list, in order.
+function rootWords(out: string): string[] {
+  const list = out.slice(out.indexOf("Commands:\n") + "Commands:\n".length, out.indexOf("\nAdd --help to a command"));
+  return list.trimEnd().split("\n").map((line) => line.trim().split(/\s+/)[0]);
+}
+
+test("root help lists one line per top-level word, the word first, with no stage names", async () => {
   for (const argv of [["--help"], []]) {
     const { code, out } = await capture(argv);
     assert.equal(code, EXIT.OK);
-    assert.match(out, /^ {2}CLI {3,}auth {3,}\d+ commands$/m);
-    assert.match(out, /^ {2}People {3,}people list {3,}List of people$/m);
-    assert.match(out, /^ {2}Hiring {3,}contracts {3,}Every working arrangement: .* \(6 commands\)$/m);
-    assert.match(out, /^ {2}Platform {3,}jobs {3,}/m);
-    assert.match(out, /^ {3,}scim users list {3,}List users$/m);
-    // The sections follow STAGE_ORDER, CLI first. Alphabetical order of the words would put `jobs` (Platform) before `people`.
-    const present = ["CLI", ...STAGE_ORDER].filter((stage) => new RegExp(`^ {2}${stage} {3,}`, "m").test(out));
-    assert.ok(present.length >= 4, `only ${present.join(", ")} found`);
-    const positions = present.map((stage) => out.search(new RegExp(`^ {2}${stage} {3,}`, "m")));
-    assert.deepEqual(positions, [...positions].sort((a, b) => a - b), `sections out of order: ${present.join(" < ")}`);
-    assert.ok(out.search(/^ {2}Platform {3,}/m) > out.search(/^ {2}People {3,}/m), "Platform comes after People");
+    assert.match(out, /^ {2}auth {3,}Authentication \(\d+ commands\)$/m);
+    // A domain is its own word, even when it has a single command (`people`, `scim`), never `people list` or `scim users list`.
+    assert.match(out, /^ {2}people {3,}.*\(1 command\)$/m);
+    assert.match(out, /^ {2}contracts {3,}Every working arrangement: .* \(6 commands\)$/m);
+    assert.match(out, /^ {2}scim {3,}.*\(1 command\)$/m);
+    assert.doesNotMatch(out, /^ {2}(people list|scim users)/m);
+    assert.doesNotMatch(out, /^ {2}(CLI|People|Hiring|Platform|Other)\b {2,}/m, "no stage column");
+    // The static commands first, then the lifecycle order of domains.json (People, Hiring, Pay, Platform), by name within a stage.
+    // Alphabetical order of the words alone would put `contracts` before `people`.
+    assert.deepEqual(rootWords(out), ["auth", "commands", "job", "people", "contracts", "adjustments", "jobs", "scim"]);
     assert.match(out, /^GLOBAL OPTIONS/m);
   }
 });
@@ -264,13 +269,12 @@ test("group help orders the rows: verbs in their usual order, then leaves, chain
   assert.deepEqual(rows, ["list", "get <contract>", "get <contract> --worker-type eor", "invite send <contract>", "amendments"]);
 });
 
-test("root help sorts the words of a stage by name, and puts a word domains.json does not know last, under Other", async () => {
-  const { out } = await capture([], [...generated.manifest.descriptors, ...fleet.manifest.descriptors]);
-  const at = (pattern: RegExp) => out.search(pattern);
-  // `ats` was added after `contracts`, so only the sort puts it first.
-  assert.ok(at(/ats jobs list/) !== -1 && at(/ats jobs list/) < at(/contracts {3,}/), "ats before contracts within Hiring");
-  assert.match(out, /^ {2}Other {3,}ships {3,}/m);
-  assert.ok(at(/^ {2}Other {3,}/m) > at(/^ {2}Platform {3,}/m), "Other comes after every stage");
+test("root help sorts the words of a stage by name, and puts a word domains.json does not know last", async () => {
+  const words = rootWords((await capture([], [...generated.manifest.descriptors, ...fleet.manifest.descriptors])).out);
+  // `ats` was added after `contracts`, so only the sort puts it first within Hiring.
+  assert.ok(words.indexOf("ats") !== -1 && words.indexOf("ats") < words.indexOf("contracts"), "ats before contracts");
+  assert.equal(words.at(-1), "ships", "a word domains.json does not know comes last");
+  assert.ok(words.indexOf("scim") < words.indexOf("ships"));
 });
 
 test("--help on a static leaf prints its usage and runs nothing", async () => {
