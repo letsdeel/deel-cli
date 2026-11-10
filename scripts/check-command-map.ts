@@ -117,22 +117,35 @@ function usageOf(entry: MapEntry | undefined, released: Descriptor): string | un
   }
 }
 
+// The domain names domains.json places under a lifecycle stage; a missing or malformed file is a failure, not a crash.
+function readDomainNames(file: string): string[] {
+  let stages: unknown;
+  try {
+    stages = JSON.parse(readFileSync(file, "utf8"));
+  } catch (error) {
+    throw new Error(`cannot read ${file}: ${(error as Error).message}`);
+  }
+  const names = Array.isArray(stages) ? stages.flatMap((stage) => (Array.isArray(stage?.domains) ? stage.domains.map((d: { name?: unknown }) => d?.name) : [])) : [];
+  if (!Array.isArray(stages) || names.some((name) => typeof name !== "string")) throw new Error(`${file} must be a list of stages, each with a domains list of {name}`);
+  return names as string[];
+}
+
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const file = resolve(process.cwd(), process.argv[2] ?? resolve(REPO_ROOT, "src/public-api/commands.json"));
   let map: MapEntry[];
   let released: Descriptor[];
+  let domains: string[];
   try {
     map = readCommandMap(file);
     released = readGeneratedManifest(resolve(REPO_ROOT, "src/public-api/manifest.json")).descriptors;
+    domains = readDomainNames(resolve(REPO_ROOT, "src/public-api/domains.json"));
   } catch (error) {
     process.stderr.write(`FAIL  ${(error as Error).message}\n`);
     process.exit(1);
   }
   const reserved = { commands: handPicked.descriptors, topLevel: RESERVED_COMMANDS };
-  const stages = JSON.parse(readFileSync(resolve(REPO_ROOT, "src/public-api/domains.json"), "utf8")) as { domains: { name: string }[] }[];
-  const domains = stages.flatMap((stage) => stage.domains.map((d) => d.name));
   const { failures, warnings } = checkMap(map, { reserved, released, domains });
   for (const f of failures) process.stderr.write(`FAIL  ${f.message}\n      ${f.entry}\n`);
   for (const w of warnings) process.stderr.write(`warn  ${w.message}\n      ${w.entry}\n`);
