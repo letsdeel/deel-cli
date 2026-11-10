@@ -117,7 +117,7 @@ test("an unknown word suggests the closest commands, at the top level and under 
 });
 
 test("a flag's value before or after the words is not a command word", async () => {
-  for (const argv of [["--env", "demo", "contracts", "--help"], ["contracts", "--env", "demo"], ["--base-url", "https://api.test", "contracts"], ["--debug", "--fields", "id", "contracts"]]) {
+  for (const argv of [["--env", "demo", "contracts", "--help"], ["contracts", "--env", "demo"], ["--base-url", "https://api.test", "contracts"], ["--debug", "--fields", "id", "contracts"], ["contracts", "--worker-type", "eor", "--help"]]) {
     const { code, out } = await capture(argv);
     assert.equal(code, EXIT.OK, argv.join(" "));
     assert.match(out, /^deel contracts — /m, argv.join(" "));
