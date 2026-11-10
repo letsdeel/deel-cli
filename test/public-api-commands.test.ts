@@ -478,6 +478,12 @@ test("--help counts a flag's value as no argument: the words alone list every en
     const bare = await capture(["ships", "get", "s1", ...argv, "--help"], fleet.manifest.descriptors);
     assert.match(bare.out, /USAGE  deel ships get <ship> \[GLOBAL OPTIONS\]/, argv.join(" "));
   }
+  // A switch takes no value, so the word after it is an argument: --beta before the ID still picks the bare endpoint.
+  const switched = await capture(["ships", "get", "--beta", "s1", "--help"], fleet.manifest.descriptors);
+  assert.match(switched.out, /USAGE {2}deel ships get <ship> \[GLOBAL OPTIONS\]/);
+  // And with no ID after it, the switch makes none: the words alone still list every endpoint.
+  const noId = await capture(["ships", "get", "--beta", "--help"], fleet.manifest.descriptors);
+  assert.match(noId.out, /the flags pick the endpoint/);
   // A form's own valued flag is not an argument either.
   const logs = await capture(["ships", "logs", "list", "--since", "d1", "--help"], fleet.manifest.descriptors);
   assert.match(logs.out, /USAGE  deel ships logs list <ship> \[GLOBAL OPTIONS\] --since=<string>/);

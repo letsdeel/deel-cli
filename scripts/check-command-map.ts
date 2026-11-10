@@ -34,6 +34,18 @@ const lineKey = (command: ParsedCommand) =>
     [...command.labels.filter((l) => l.flag).map((l) => `--${l.flag}`), ...command.selectors.map((s) => `--${s.flag}${s.value ? ` ${s.value}` : ""}`)].sort(),
   ]);
 
+// Why a parsed map file can't be checked: it must be an array of entries with string method, path and command.
+export function mapShapeError(value: unknown): string | undefined {
+  if (!Array.isArray(value)) return "the command map must be a JSON array of entries";
+  const optionalString = (field: unknown) => field === undefined || typeof field === "string";
+  const bad = value.findIndex((item) => {
+    const entry = item as Record<string, unknown> | null;
+    return !entry || typeof entry !== "object" || [entry.method, entry.path, entry.command].some((field) => typeof field !== "string") || !optionalString(entry.api) || !optionalString(entry.collapse);
+  });
+  if (bad === -1) return undefined;
+  return `entry ${bad} must be an object with string method, path and command (api and collapse, when present, strings): ${JSON.stringify(value[bad])?.slice(0, 120)}`;
+}
+
 export function checkMap(entries: MapEntry[], options: CheckOptions = {}): { failures: Finding[]; warnings: Finding[] } {
   const failures: Finding[] = [];
   const warnings: Finding[] = [];
@@ -114,7 +126,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const file = resolve(process.cwd(), process.argv[2] ?? resolve(REPO_ROOT, "src/public-api/commands.json"));
   const released = (JSON.parse(readFileSync(resolve(REPO_ROOT, "src/public-api/manifest.json"), "utf8")) as GeneratedManifest).descriptors;
   const reserved = { commands: handPicked.descriptors, topLevel: RESERVED_COMMANDS };
-  const { failures, warnings } = checkMap(JSON.parse(readFileSync(file, "utf8")) as MapEntry[], { reserved, released });
+  const map: unknown = JSON.parse(readFileSync(file, "utf8"));
+  const shapeError = mapShapeError(map);
+  if (shapeError) {
+    process.stderr.write(`FAIL  ${file}: ${shapeError}\n`);
+    process.exit(1);
+  }
+  const { failures, warnings } = checkMap(map as MapEntry[], { reserved, released });
   for (const f of failures) process.stderr.write(`FAIL  ${f.message}\n      ${f.entry}\n`);
   for (const w of warnings) process.stderr.write(`warn  ${w.message}\n      ${w.entry}\n`);
   process.stderr.write(`command map: ${failures.length} failure(s), ${warnings.length} warning(s)\n`);

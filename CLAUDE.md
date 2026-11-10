@@ -15,7 +15,7 @@ npm ci                                  # install deps + husky git hooks
 node src/main.ts --help                 # run from source (or: npm run deel -- <args>)
 npm test                                # node --test test/*.test.ts
 node --test test/executor.test.ts       # a single test file
-node --test --test-name-pattern="reserved" test/public-api-commands.test.ts   # a single test by name
+node --test --test-name-pattern="reserved" test/public-api-generate.test.ts   # a single test by name
 npm run typecheck                       # tsc --noEmit, strict
 npm run check                           # everything CI runs: typecheck, tests + coverage gate, manifest/command-map/lockfile/version/shell checks
 npm run build:smoke                     # bun compile to dist/deel, then --version / --help

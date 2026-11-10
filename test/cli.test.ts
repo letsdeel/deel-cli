@@ -130,6 +130,45 @@ test("a word under a group that names none of its commands fails instead of prin
   for (const argv of [["adjustments"], ["adjustments", "--help"], ["adjustments", "--env", "demo"]]) assert.equal((await capture(argv)).code, EXIT.OK, argv.join(" "));
 });
 
+test("an option before the command's last word is refused, since citty would drop it and the call would go out without it", async () => {
+  const leading = [
+    ["--env=demo", "webhooks", "delete", "abc"],
+    ["--env", "demo", "webhooks", "delete", "abc"],
+    ["--base-url", "https://a.test/rest", "webhooks", "list"],
+    ["--base-url=https://a.test/rest", "webhooks", "list"],
+    ["--beta", "webhooks", "list"],
+    ["--token-stdin", "webhooks", "list"],
+    ["--no-log", "webhooks", "list"],
+    ["--json", "webhooks", "list"],
+    ["--env", "demo", "auth", "status"],
+    ["adjustments", "--no-log", "create"],
+  ];
+  for (const argv of leading) {
+    const refused = await capture(argv);
+    assert.equal(refused.code, EXIT.ERROR, argv.join(" "));
+    assert.equal(refused.error?.code, "usage.command", argv.join(" "));
+    assert.match(refused.err, /^Options go after the command: write 'deel (webhooks (delete|list)|auth status|adjustments create) …' with the options at the end\./, argv.join(" "));
+  }
+  // A flag's value is not the command: the word after `--env demo` is read, and named when it is not one.
+  const unknown = await capture(["--env", "demo", "definitely-not-a-command"]);
+  assert.match(unknown.err, /Unknown command 'definitely-not-a-command'\./);
+  assert.equal(unknown.error?.code, "usage.command");
+  // A single-dash option or a flag the command line doesn't know reads its value as the word, and says options go last.
+  const short = await capture(["-env", "demo", "webhooks", "list"]);
+  assert.match(short.err, /Unknown command 'demo'\./);
+  assert.match(short.error?.next ?? "", /Options go after the command/);
+  // After the last word, before --, or as a help switch anywhere, an option is fine.
+  for (const argv of [["adjustments", "--env", "demo"], ["adjustments", "--", "--env", "demo"], ["--help", "adjustments"], ["--env", "demo", "--help"]]) {
+    assert.equal((await capture(argv)).code, EXIT.OK, argv.join(" "));
+  }
+});
+
+test("a switch before a word is not a flag value: it neither hides the stray word nor makes one", async () => {
+  const stray = await capture(["adjustments", "--json", "nope"]);
+  assert.match(stray.err, /Unknown command 'deel adjustments nope'\./);
+  assert.equal((await capture(["adjustments", "--json"])).code, EXIT.OK);
+});
+
 test("an unknown command reports an error", async () => {
   const { code, err, error } = await capture(["definitely-not-a-command"]);
   assert.equal(code, EXIT.ERROR);

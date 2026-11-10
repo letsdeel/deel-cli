@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { checkMap } from "../scripts/check-command-map.ts";
+import { checkMap, mapShapeError } from "../scripts/check-command-map.ts";
 import type { MapEntry } from "../scripts/public-api/command-map.ts";
 import type { Descriptor } from "../src/types.ts";
 
@@ -28,6 +28,23 @@ test("the check exits 1 and names each failure when the map file it is given has
   assert.equal(run.status, 1, run.stderr);
   assert.match(run.stderr, /^FAIL {2}path param \{a_id\} of \/a\/\{a_id\} has no argument in the command$/m);
   assert.match(run.stderr, /^command map: [1-9]\d* failure\(s\)/m);
+});
+
+test("a map file that isn't an array of entries fails with a clear message instead of a stack trace", () => {
+  assert.equal(mapShapeError([entry("GET", "/a", "deel a list"), { ...entry("GET", "/b", "deel b list"), collapse: "k", api: "scim" }]), undefined);
+  assert.match(mapShapeError({ method: "GET" }) ?? "", /must be a JSON array/);
+  for (const bad of [[null], [{ method: "GET", path: "/a" }], [{ method: "GET", path: 1, command: "deel a" }], [{ ...entry("GET", "/a", "deel a list"), collapse: 3 }], ["deel a list"]]) {
+    assert.match(mapShapeError(bad) ?? "", /^entry 0 must be an object with string method, path and command/, JSON.stringify(bad));
+  }
+  const dir = mkdtempSync(join(tmpdir(), "check-command-map-"));
+  for (const [name, content] of [["object.json", '{"method":"GET"}'], ["missing.json", '[{"method":"GET","path":"/a"}]']]) {
+    const file = join(dir, name);
+    writeFileSync(file, content);
+    const run = spawnSync(process.execPath, ["scripts/check-command-map.ts", file], { cwd: ROOT, encoding: "utf8" });
+    assert.equal(run.status, 1, run.stderr);
+    assert.match(run.stderr, /^FAIL {2}.*check-command-map-.*: (the command map must be a JSON array|entry 0 must be an object)/m);
+    assert.doesNotMatch(run.stderr, /at .*\.ts:\d+/);
+  }
 });
 
 test("a command line must parse, with lowercase kebab-case words", () => {

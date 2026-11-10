@@ -223,24 +223,25 @@ function valuedFlags(args: ArgsDef): string[] {
   return ["base-url", ...Object.entries(args).filter(([, def]) => (def as { type?: string }).type !== "boolean").map(([name]) => name)];
 }
 
-// The words in argv: the tokens that are neither a flag nor the value of one that takes a value (`--env demo`),
-// in order — the command's words, then its arguments. A `--flag=value` carries its own value.
-function wordsOf(argv: string[], valued: string[]): string[] {
+// The words in argv, each with its index: the tokens that are neither a flag nor the value of one that takes a
+// value (`--env demo`), in order — the command's words, then its arguments. A `--flag=value` carries its own value.
+function wordsAt(argv: string[], valued: string[]): Array<{ word: string; index: number }> {
   const takesValue = (token: string | undefined) =>
     token !== undefined && token.startsWith("--") && !token.includes("=") && valued.some((flag) => acceptsFlag(flag, token.slice(2)));
-  return argv.filter((token, index) => !token.startsWith("-") && !takesValue(argv[index - 1]));
+  return argv.flatMap((token, index) => (!token.startsWith("-") && !takesValue(argv[index - 1]) ? [{ word: token, index }] : []));
 }
 
-// The first word after the `matched` command words.
-const strayWord = (options: string[], matched: number): string | undefined => wordsOf(options, valuedFlags(commonArgs))[matched];
+const wordsOf = (argv: string[], valued: string[]): string[] => wordsAt(argv, valued).map(({ word }) => word);
 
-// Walk the tree by the leading positional tokens to find the target command.
-function resolve(root: CommandDef, argv: string[]): { cmd: CommandDef; parent?: CommandDef; matched: number } {
-  const positionals = argv.filter((token) => !token.startsWith("-"));
+// An option other than a help switch: what would be dropped if it stood before a command's last word.
+const isOption = (token: string): boolean => token.startsWith("-") && token !== "--help" && token !== "-h";
+
+// Walk the tree by the command words to find the target command.
+function resolve(root: CommandDef, words: string[]): { cmd: CommandDef; parent?: CommandDef; matched: number } {
   let cmd = root;
   let parent: CommandDef | undefined;
   let matched = 0;
-  for (const token of positionals) {
+  for (const token of words) {
     const subCommands = cmd.subCommands as Record<string, CommandDef> | undefined;
     if (subCommands && Object.hasOwn(subCommands, token)) {
       parent = cmd;
@@ -288,28 +289,37 @@ export async function run(argv: string[]): Promise<number> {
     return EXIT.OK;
   }
 
+  // The command's words, without the values of the flags before them (`--env demo`): every decision below reads these.
+  const found = wordsAt(options, valuedFlags(commonArgs));
+  const words = found.map(({ word }) => word);
+  const first = words[0];
+
   // A static command (auth, job) never needs the generated manifest.
-  const first = options.find((token) => !token.startsWith("-"));
   if (!(first && Object.hasOwn(staticCommands, first))) await loadGeneratedDescriptors();
   const root = buildRoot();
-  const { cmd, parent, matched } = resolve(root, options);
+  const { cmd, parent, matched } = resolve(root, words);
   const wantsHelp = options.includes("--help") || options.includes("-h");
-  const hasPositional = options.some((token) => !token.startsWith("-"));
   const isGroup = typeof cmd.run !== "function";
 
-  if (hasPositional && matched === 0) throw new CliError("usage.command", `Unknown command '${first}'.`, "Run 'deel --help' to see available commands.");
+  if (words.length > 0 && matched === 0) {
+    const before = options.slice(0, found[0].index).some(isOption);
+    throw new CliError("usage.command", `Unknown command '${first}'.`, before ? "Options go after the command: deel <command> … --option." : "Run 'deel --help' to see available commands.");
+  }
+  // citty hands a command only the tokens after its own word, so an option before the last command word (a leading
+  // `--env=demo`, or one between the words) would be dropped and the call would go out without it.
+  const commandWords = words.slice(0, matched);
+  if (matched > 0 && options.slice(0, found[matched - 1].index).some(isOption)) {
+    throw new CliError("usage.command", `Options go after the command: write 'deel ${commandWords.join(" ")} …' with the options at the end.`);
+  }
   // A word after a group that names none of its commands (a removed or mistyped one) fails instead of showing the
   // group's help and exiting 0.
-  const stray = isGroup ? strayWord(options, matched) : undefined;
+  const stray = isGroup ? words[matched] : undefined;
   if (stray !== undefined) {
-    const group = options.filter((token) => !token.startsWith("-")).slice(0, matched).join(" ");
-    const subCommands = cmd.subCommands as Record<string, CommandDef> | undefined;
-    // The word is a command of the group, so an option between the words stopped the walk.
-    if (subCommands && Object.hasOwn(subCommands, stray)) throw new CliError("usage.command", `Options go after the command: write 'deel ${group} ${stray} …' with the options at the end.`);
+    const group = commandWords.join(" ");
     throw new CliError("usage.command", `Unknown command 'deel ${group} ${stray}'.`, `Run 'deel ${group} --help' to see its commands.`);
   }
 
-  const positionals = options.filter((token) => !token.startsWith("-"));
+  const positionals = words;
   const variantCandidates = descriptorsFor(positionals, matched);
   const descriptor = descriptorFor(positionals, matched, options);
 
