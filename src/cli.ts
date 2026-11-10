@@ -13,6 +13,9 @@ export { unknownFlag };
 import { parseInput } from "./core/input.ts";
 import { createContext } from "./core/context.ts";
 import { execute } from "./core/executor.ts";
+import { realIO } from "./core/io.ts";
+import { envelope, render } from "./core/output.ts";
+import { versionListing, versionTable } from "./core/versions.ts";
 import { setLoggingEnabled, setLogBodiesEnabled } from "./core/logging.ts";
 import { EXIT } from "./core/errors.ts";
 import { CliError } from "./core/errors.ts";
@@ -83,10 +86,16 @@ async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<st
     files: gatherFiles(cittyCtx.rawArgs),
     idempotencyKey: args["idempotency-key"] as string | undefined,
   };
-  const config = configFrom(args, cittyCtx.rawArgs);
+  // execute() sends X-Beta itself so it can drop the header on a retry; the transport must not add it back.
+  const config = configFrom({ ...args, beta: false }, cittyCtx.rawArgs);
   const token = commandToken(args, config);
   const ctx = createContext({ config, token });
-  await execute(descriptor, call, ctx, { output: outputOpts(args), debug: Boolean(args.debug), form: Boolean(args.form) });
+  await execute(descriptor, call, ctx, {
+    output: outputOpts(args),
+    debug: Boolean(args.debug),
+    form: Boolean(args.form),
+    version: { apiVersion: args.version as string | undefined, beta: args.beta === true },
+  });
 }
 
 // The command declares the parameters of the endpoint it runs and nothing else, so a flag it doesn't know would be
@@ -293,6 +302,18 @@ function descriptorsFor(positionals: string[], matched: number): Descriptor[] {
   );
 }
 
+async function printVersions(descriptor: Descriptor, argv: string[]): Promise<void> {
+  const listing = versionListing(descriptor, Date.now());
+  const io = realIO();
+  const opts = outputOpts(parseArgs(argv, commonArgs));
+  // The table is the human form: only on a terminal with --no-json, and never when --jq, --fields or --quiet shape the data.
+  if (!opts.json && io.interactive && !opts.jq && !opts.fields && !opts.quiet) {
+    io.out(versionTable(listing));
+    return;
+  }
+  await render(io, envelope(listing), opts);
+}
+
 // Single descriptor for a resolved path. For variant groups, selects by the variant
 // flag present in argv; returns undefined if no unique match (triggers group help).
 function descriptorFor(positionals: string[], matched: number, argv: string[]): Descriptor | undefined {
@@ -314,19 +335,30 @@ function descriptorFor(positionals: string[], matched: number, argv: string[]): 
   return undefined;
 }
 
+// `--version <date>` after a command picks the API version, so only a bare `--version` prints the CLI's, even behind a
+// flag's value (`--env demo --version`), which run()'s first check cannot tell from a command word. (-v is answered there.)
+function wantsCliVersion(argv: string[]): boolean {
+  return argv.includes("--version") && wordsOf(argv, valuedFlags(commonArgs)).length === 0;
+}
+
 export async function run(argv: string[]): Promise<number> {
   // What follows -- is arguments (an ID may start with -), so the CLI's own options are read before it only.
   const end = argv.indexOf("--");
   const options = end === -1 ? argv : argv.slice(0, end);
-  if (options.includes("--version") || options.includes("-v")) {
+  // A bare --version needs nothing loaded; `--version <date>` after a command picks the API version instead.
+  if (options.includes("-v") || (options.includes("--version") && !options.some((token) => !token.startsWith("-")))) {
     printVersion();
     return EXIT.OK;
   }
 
-  // A static command (auth, job) never needs the generated manifest.
+  // A static command (auth, job, commands) never needs the generated manifest.
   const first = wordsOf(options, valuedFlags(commonArgs))[0];
   if (!(first && Object.hasOwn(staticCommands, first))) await loadGeneratedDescriptors();
   const root = buildRoot();
+  if (wantsCliVersion(options)) {
+    printVersion();
+    return EXIT.OK;
+  }
 
   // The command's words, without the values of the flags (`--env demo`, `--worker-type eor`): every decision below reads these.
   const found = wordsAt(options, valueFlags());
@@ -347,6 +379,13 @@ export async function run(argv: string[]): Promise<number> {
     throw new CliError("usage.command", `Unknown command 'deel ${group} ${stray}'.${didYouMean(stray, cmd)}`, `Run 'deel ${group} --help' to see its commands.`);
   }
 
+  // A static command (auth, job, commands) calls no endpoint with a version of its own: refuse the flags that would
+  // pick one instead of accepting and ignoring them. (A --version with no value is refused as such, further on.)
+  const versionFlag = first !== undefined && Object.hasOwn(staticCommands, first) ? ["version", "versions", "beta"].find((flag) => argvMentionsFlag(options, flag) && (flag !== "version" || flagMissingValue(options, [flag]) === undefined)) : undefined;
+  if (versionFlag) {
+    throw new CliError("usage.flag", `'deel ${words.join(" ")}' has no --${versionFlag}.`, "--version, --versions and --beta pick an API version of the commands that call an endpoint; deel --version prints the CLI's.");
+  }
+
   const positionals = words;
   const variantCandidates = descriptorsFor(positionals, matched);
   const descriptor = descriptorFor(positionals, matched, options);
@@ -359,7 +398,16 @@ export async function run(argv: string[]): Promise<number> {
     throw new CliError("usage.variant", `Specify a variant first: ${hint}`);
   }
 
+  if (variantCandidates.length > 1 && !descriptor && argvEnables(options, "versions") && !wantsHelp) {
+    const hint = isForms ? `the flags of one of:\n${variantCandidates.map((c) => `  ${usageOf(c)}`).join("\n")}` : variantCandidates.map((c) => `--${c.variant}`).join(", ");
+    throw new CliError("usage.versions", `'deel ${variantCandidates[0].command.join(" ")}' has several endpoints; pick one with ${hint}`);
+  }
+
   // Offline discovery — handled here so citty's required-arg enforcement is bypassed.
+  if (descriptor && argvEnables(options, "versions") && !wantsHelp) {
+    await printVersions(descriptor, options);
+    return EXIT.OK;
+  }
   if (descriptor && argvEnables(options, "generate-input")) {
     printSkeleton(descriptor);
     return EXIT.OK;

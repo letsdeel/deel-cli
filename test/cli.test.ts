@@ -284,8 +284,8 @@ test("-v and --version after -- are arguments, not a version request", async () 
     assert.equal(code, EXIT.OK, argv.join(" "));
     assert.doesNotMatch(out, /^deel \d+\.\d+\.\d+\n?$/, argv.join(" "));
   }
-  // Before --, both spellings are the version request.
-  for (const argv of [["-v"], ["--version"], ["adjustments", "--version", "--", "x"]]) assert.match((await capture(argv)).out, /^deel \d+\.\d+\.\d+/, argv.join(" "));
+  // Before --, a bare --version or -v is the version request; after a command word --version names an API version.
+  for (const argv of [["-v"], ["--version"]]) assert.match((await capture(argv)).out, /^deel \d+\.\d+\.\d+/, argv.join(" "));
 });
 
 test("a variant selector written --invoice=true selects it, and --invoice=false does not", async () => {
