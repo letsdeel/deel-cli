@@ -221,9 +221,8 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   }
 
   if (response.status >= 400) {
-    // `true`: the hint below knows better than the default one whether --beta can be added, and keeps the API's own.
-    const error = errorFromResponse(response.status, response.json, requestId, true);
-    if (error.code === BETA_ERROR.required && !choice.beta) error.next ??= opts.version?.apiVersion === API_VERSION_NONE ? BETA_ACCESS_HINT_NONE : BETA_ACCESS_HINT;
+    const error = errorFromResponse(response.status, response.json, requestId);
+    if (error.code === BETA_ERROR.required && !choice.beta) error.next ??= opts.version?.apiVersion?.trim() === API_VERSION_NONE ? BETA_ACCESS_HINT_NONE : BETA_ACCESS_HINT;
     throw error;
   }
 
@@ -317,8 +316,7 @@ function errorCode(json: unknown): string | undefined {
 // `{ errors: [{ code, message, field }] }` array (per the API style guide). We
 // surface the field-level messages from the array so validation failures are
 // actionable instead of a generic "Request failed with status 400".
-// `betaSent`: the request already carried X-Beta, so a BETA_ACCESS_REQUIRED answer must not tell the user to add --beta.
-export function errorFromResponse(status: number, json: unknown, requestId: string, betaSent = false): CliError {
+export function errorFromResponse(status: number, json: unknown, requestId: string): CliError {
   const body = json as any;
   // Most services answer { errors: [...] } or { error: {...} }; some nest the list ({ errors: { errors: [...] } })
   // or the message ({ responseMessage: { message } }), and those messages are still the user's best hint.
@@ -341,8 +339,6 @@ export function errorFromResponse(status: number, json: unknown, requestId: stri
     message = payload.message ?? payload.responseMessage?.message ?? `Request failed with status ${status}`;
     next = payload.next;
   }
-
-  if (code === BETA_ERROR.required && !betaSent) next = next ?? "This endpoint is in beta. Re-run with --beta.";
 
   const error = new CliError(code, message, next);
   error.requestId = requestId;

@@ -291,6 +291,23 @@ test("BETA_ACCESS_REQUIRED keeps the hint the API gives, and after --version non
   assert.doesNotMatch(none.error.next, /add --beta/);
 });
 
+test("--version \" none \" is read as none, here and in the hint after BETA_ACCESS_REQUIRED", async () => {
+  const { error } = await call(descriptor(), [fail(400, { error: { code: "BETA_ACCESS_REQUIRED", message: "Beta access required" } })], { apiVersion: " none " });
+  assert.match(error.next, /--version <YYYY-MM-DD> --beta/);
+});
+
+test("a static command refuses --version, --versions and --beta instead of ignoring them", async () => {
+  const seen: Headers[] = [];
+  for (const [argv, flag] of [[["job", "status", "abc", "--version", "2026-01-01"], "version"], [["auth", "status", "--beta"], "beta"], [["commands", "--versions"], "versions"]] as const) {
+    const { error } = await cli([...argv, ...BASE], recordingFetch(seen));
+    assert.equal(error?.code, "usage.flag", argv.join(" "));
+    assert.match(error.message, new RegExp(`has no --${flag}\\.`), argv.join(" "));
+  }
+  assert.equal(seen.length, 0);
+  // A bare --version still prints the CLI's own.
+  assert.match((await cli(["--version"])).out, /^deel \d+\.\d+\.\d+/);
+});
+
 test("a beta error in the nested { errors: { errors: [...] } } shape is retried like the others", async () => {
   const nested = fail(400, { errors: { errors: [{ code: "INVALID_VERSION_BETA", message: "Version is not in beta" }] } });
   const { seen, error } = await call(descriptor({ version: "2026-09-15", beta: true }), [nested, ok()]);
@@ -414,8 +431,8 @@ test("--versions prints the version list without a request (JSON, --jq, table)",
   const jq = await cli(["widgets", "reports", "list", "--versions", "--jq", ".versions[].version", "--raw"]);
   assert.equal(jq.out, "2026-01-01\n2026-06-01\n");
 
-  const fields = await cli(["widgets", "reports", "list", "--versions", "--fields", "version,beta"]);
-  assert.deepEqual(JSON.parse(fields.out).data, { version: "2026-01-01", beta: false });
+  const projected = await cli(["widgets", "reports", "list", "--versions", "--fields", "version,beta"]);
+  assert.deepEqual(JSON.parse(projected.out).data, { version: "2026-01-01", beta: false });
 
   // The table is the human form: on a terminal with --no-json. Piped, or shaped by --jq/--fields, it stays data.
   const table = await onTerminal(() => cli(["widgets", "reports", "list", "--versions", "--no-json"]));
@@ -424,6 +441,13 @@ test("--versions prints the version list without a request (JSON, --jq, table)",
   assert.equal(JSON.parse(piped.out).data.version, "2026-01-01");
   const shaped = await onTerminal(() => cli(["widgets", "reports", "list", "--versions", "--no-json", "--jq", ".version"]));
   assert.equal(shaped.out, JSON.stringify("2026-01-01") + "\n");
+  const fields = await onTerminal(() => cli(["widgets", "reports", "list", "--versions", "--no-json", "--fields", "version,beta"]));
+  assert.doesNotMatch(fields.out, /STATUS/);
+  assert.deepEqual(JSON.parse(fields.out), { version: "2026-01-01", beta: false });
+  const quiet = await onTerminal(() => cli(["widgets", "reports", "list", "--versions", "--no-json", "--quiet"]));
+  assert.doesNotMatch(quiet.out, /STATUS|2026-06-01\s+beta/);
+  const plain = await onTerminal(() => cli(["widgets", "reports", "list", "--versions"]));
+  assert.equal(JSON.parse(plain.out).data.version, "2026-01-01");
 
   const get = await cli(["widgets", "get", "--versions"]);
   assert.equal(get.code, EXIT.OK);
