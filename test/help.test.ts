@@ -189,6 +189,7 @@ const fleetEndpoints: Array<[string, string, string]> = [
   ["POST", "/fleet/{ship_id}/reviews", "deel ships reviews create <ship>"],
   ["GET", "/gp/crews/{crew_id}/ships", "deel ships list --crew <crew> [--worker-type gp]"],
   ["POST", "/fleet/notes", "deel ships notes create [--bulk]"],
+  ["GET", "/eor/workers/fleet/{ship_id}/pdf", "deel ships get <ship> --file-format pdf --worker-type eor --as worker"],
   ["GET", "/ats/jobs", "deel ats jobs list"],
 ];
 const fleetDefinitions = parseDefinitions(
@@ -292,4 +293,18 @@ test("--help on a static leaf prints its usage and runs nothing", async () => {
   } finally {
     globalThis.fetch = realFetch;
   }
+});
+
+test("a name longer than the name column overflows it; the shorter lines keep one description column", async () => {
+  const { out } = await capture(["ships", "--help"], fleet.manifest.descriptors);
+  const lines = out.split("\n");
+  const long = lines.find((line) => line.includes("--file-format pdf --worker-type eor --as worker"))!;
+  const short = lines.find((line) => line.includes("list [--worker-type gp] --crew <crew>"))!;
+  const get = lines.find((line) => /^ {2}get <ship> {3,}GET /.test(line))!;
+  // The column is 44 wide (2 for the indent, 3 between name and description); the long name is not cut or wrapped.
+  const column = 2 + 44 + 3;
+  assert.equal(short.indexOf("GET /gp/crews"), column);
+  assert.equal(get.indexOf("GET /fleet"), column);
+  assert.equal(long.indexOf("GET /eor/workers"), long.indexOf("--as worker") + "--as worker".length + 3);
+  assert.ok(long.indexOf("GET /eor/workers") > column, "the long line's description starts after the column");
 });

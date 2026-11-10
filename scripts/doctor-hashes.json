@@ -101,7 +101,7 @@
   "test/flags.test.ts": "474f9cd7693dc9ec17ffe9f7afdd65fbfc943e7df9035732be1baf7b420541ed",
   "test/generate-public-api.test.ts": "e32e8b6313554c55987d1e99b04ee401743e3237bfa305947ce6490ba9a36c7e",
   "test/help-picking.test.ts": "3530643a943148bbeb2ac0b28a7303fdf9d4f0569c938a13975fba0327714b22",
-  "test/help.test.ts": "461395aed4df86b4f8dd1e79a112befb974660ecc63c34823a90f0d3ef29f178",
+  "test/help.test.ts": "b9583fd4970ba5886aff309a60dae561e49b981a3bd5b7ee22e7a558d56793e2",
   "test/http.test.ts": "03130df44d7889de137a719c02ad702dd66e76860ece4506b9419b524245b208",
   "test/idempotency.test.ts": "82ff10c19c9979ce27839c1fd25a503c6695e622cf630bacc5783c15951d1de3",
   "test/input.test.ts": "7df58c54b10328faa956c8f4819966006ec356348c47f6508ec188529ddf498d",
