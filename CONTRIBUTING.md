@@ -74,7 +74,7 @@ Each entry in `src/public-api/commands.json` names one endpoint:
 A command line is `deel <domain> <resources…> <verb>`, then one `<param>` per path ID in path order, named as the API path names it, then
 any flags that pick this endpoint among those sharing the words: a scope flag with a label
 (`--contract <contract_id>`), a fixed selector (`--worker-type eor`, `--as worker`), or an optional one in
-brackets (`[--worker-type eor]`). Two more keys are allowed:
+brackets (`[--worker-type eor]`, or a switch, `[--bulk]`): the command picks the endpoint with or without it. Two more keys are allowed:
 
 | Key | Meaning |
 |-----|---------|

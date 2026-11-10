@@ -51,7 +51,8 @@ function pickingOf(form: CommandForm): Picking[] {
 function matches(form: CommandForm, argv: string[], foreign: Picking[]): boolean {
   for (const selector of form.selectors) {
     if (selector.value === undefined) {
-      if (!argvEnables(argv, selector.flag)) return false;
+      // A switch must be on, unless the line writes it in brackets: then the bare command is that endpoint too.
+      if (!selector.optional && !argvEnables(argv, selector.flag)) return false;
       continue;
     }
     const value = argvFlagValue(argv, selector.flag);

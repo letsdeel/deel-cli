@@ -18,6 +18,9 @@ export const SENSITIVE_LOG_KEYS = new Set([
   "phone", "mobile", "dob", "birth", "address", "bank", "card",
   "cvv", "cvc", "pin", "passport", "national_id", "routing", "account_number",
   "signing_key",
+  // Links that sign the holder in or fetch a file without further auth (magic and pre-signed links), and the
+  // government, tax and bank identifiers of the generated commands that the names above don't contain.
+  "magic_link", "download_link", "upload_url", "pdf_url", "identity_document", "vat_id", "sort_code", "branch_code",
 ]);
 
 // --- Executor: withheld fields and one-shot endpoints ---

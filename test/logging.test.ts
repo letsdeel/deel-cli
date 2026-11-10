@@ -50,3 +50,36 @@ test("the default sink redacts sensitive keys by substring (access_token, email,
   assert.equal(parsed.response.nested.refresh_token, "***");
   delete process.env.DEEL_LOG_DIR;
 });
+
+test("the logged body masks login links, pre-signed links and government, tax and bank identifiers of the generated commands", () => {
+  const dir = mkdtempSync(join(tmpdir(), "deel-log-"));
+  process.env.DEEL_LOG_DIR = dir;
+  setLoggingEnabled(true);
+  const secrets = ["magic_link", "download_link", "upload_url", "pdf_url", "identity_document_number", "vat_id", "sort_code", "branch_code"];
+  const body = Object.fromEntries(secrets.map((key) => [key, `value-of-${key}`]));
+  log({ kind: "request", response: { ...body, nested: { items: [{ ...body }] }, vat_percentage: 21, url: "https://example.test/hook", country_code: "DE" } });
+  const parsed = JSON.parse(readFileSync(join(dir, "deel.log"), "utf8").trim().split("\n").pop()!);
+  for (const key of secrets) {
+    assert.equal(parsed.response[key], "***", key);
+    assert.equal(parsed.response.nested.items[0][key], "***", `nested ${key}`);
+  }
+  // Fields that only look similar keep their value.
+  assert.deepEqual([parsed.response.vat_percentage, parsed.response.url, parsed.response.country_code], [21, "https://example.test/hook", "DE"]);
+  delete process.env.DEEL_LOG_DIR;
+});
+
+test("a --log-bodies run of a generated command logs a magic link as ***", async () => {
+  setLogBodiesEnabled(true);
+  const c = captured();
+  const next: Transport = async () => res({ data: { magic_link: "https://app.example.test/login?t=abc", expires_at: "2026-11-10T00:00:00Z" } });
+  await withLogging(c.logger, () => 0)(next)(req({ method: "POST", url: "https://x/rest/access/magic-links" }));
+  setLogBodiesEnabled(false);
+  const dir = mkdtempSync(join(tmpdir(), "deel-log-"));
+  process.env.DEEL_LOG_DIR = dir;
+  setLoggingEnabled(true);
+  log(c.entries[0]);
+  const logged = readFileSync(join(dir, "deel.log"), "utf8");
+  assert.doesNotMatch(logged, /app\.example\.test\/login/);
+  assert.equal(JSON.parse(logged.trim().split("\n").pop()!).response.data.magic_link, "***");
+  delete process.env.DEEL_LOG_DIR;
+});

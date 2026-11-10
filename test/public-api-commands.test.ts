@@ -554,3 +554,63 @@ test("endpoints that differ only by a scope flag are told apart by it, in every 
     assert.equal(refused.sent.length, 0, argv.join(" "));
   }
 });
+
+// ---------------- selector forms ----------------
+
+const purge = generate(
+  parseDefinitions([{ api: "rest", method: "POST", path: "/fleet/purge", version: "2026-01-01", beta_until: null, sunset_at: null, operation: { summary: "Purge", parameters: [], responses: { "200": { description: "ok" } } } }]),
+  { reserved: { commands: [], topLevel: new Set() }, now: new Date("2026-10-30T00:00:00Z"), map: [{ method: "POST", path: "/fleet/purge", command: "deel ships purge [--bulk]" }] },
+);
+
+test("an optional switch in brackets is optional: the bare command, --bulk and --no-bulk all call the endpoint", async () => {
+  assert.deepEqual(purge.errors, []);
+  for (const argv of [[], ["--bulk"], ["--no-bulk"], ["--bulk=false"]]) {
+    const called = await callApi(["ships", "purge", ...argv], purge.manifest.descriptors);
+    assert.equal(called.code, EXIT.OK, `${argv.join(" ")}: ${called.err}`);
+    assert.deepEqual(called.sent.map((s) => s.url.pathname), ["/rest/fleet/purge"], argv.join(" "));
+  }
+  const help = await capture(["ships", "purge", "--help"], purge.manifest.descriptors);
+  assert.match(help.out, /USAGE {2}deel ships purge \[--bulk\] \[GLOBAL OPTIONS\]/);
+});
+
+// The argv that spells a form: its required selectors and scope flags, with the optional selectors left out (the
+// bare command) or written out.
+function spellings(form: NonNullable<Descriptor["form"]>) {
+  const argvOf = (selectors: typeof form.selectors) => [
+    ...selectors.flatMap((s) => (s.value === undefined ? [`--${s.flag}`] : [`--${s.flag}`, s.value])),
+    ...form.scopes.flatMap((s) => [`--${s.flag}`, "x"]),
+  ];
+  return { bare: argvOf(form.selectors.filter((s) => !s.optional)), written: argvOf(form.selectors) };
+}
+
+test("every form of every command in the committed manifest is reachable: bare, and with its optional selectors written out", async () => {
+  const committed = await loadGeneratedDescriptors();
+  const groups = new Map<string, Descriptor[]>();
+  for (const descriptor of committed) groups.set(descriptor.command.join(" "), [...(groups.get(descriptor.command.join(" ")) ?? []), descriptor]);
+  const unreachable: string[] = [];
+  for (const [words, group] of groups) {
+    if (group.length < 2) continue;
+    for (const descriptor of group) {
+      const { bare, written } = spellings(descriptor.form!);
+      for (const argv of [bare, written]) {
+        const found = matchForm(group, argv);
+        if (found !== descriptor) unreachable.push(`${words} ${argv.join(" ")} -> ${found ? `${found.method} ${found.path}` : "nothing"} (wanted ${descriptor.method} ${descriptor.path})`);
+      }
+    }
+  }
+  assert.deepEqual(unreachable, []);
+});
+
+test("an optional selector of the committed map works bare and written out, through run()", async () => {
+  const committed = await loadGeneratedDescriptors();
+  for (const argv of [[], ["--worker-type", "eor"], ["--worker-type=eor"]]) {
+    const called = await callApi(["contracts", "amendments", "get", "c1", "a1", ...argv], committed);
+    assert.equal(called.code, EXIT.OK, `${argv.join(" ")}: ${called.err}`);
+    assert.deepEqual(called.sent.map((s) => s.url.pathname), ["/rest/eor/contracts/c1/amendments/a1"], argv.join(" "));
+  }
+  // The pdf line of the same words is picked by its required selector, bare or with the optional one.
+  for (const argv of [["--file-format", "pdf"], ["--file-format", "pdf", "--worker-type", "eor"]]) {
+    const called = await callApi(["contracts", "amendments", "get", "c1", "a1", ...argv], committed);
+    assert.deepEqual(called.sent.map((s) => s.url.pathname), ["/rest/eor/contracts/c1/amendments/a1/pdf"], argv.join(" "));
+  }
+});
