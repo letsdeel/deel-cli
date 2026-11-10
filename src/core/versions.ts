@@ -87,13 +87,16 @@ export function chooseVersion(descriptor: Descriptor, flags: VersionFlags, now: 
   return { version: descriptor.version, beta: Boolean(descriptor.beta) };
 }
 
-export function betaFallback(sent: VersionChoice, errorCode: string | undefined, versions: VersionInfo[] | undefined, now: number, pinned: boolean): { choice: VersionChoice; reason: string } | undefined {
+// `advised` is the stable version the gateway names in a NO_BETA_VERSION error (details.latest_stable_version); it is
+// current where the manifest may be stale, so it wins when it is a valid date.
+export function betaFallback(sent: VersionChoice, errorCode: string | undefined, versions: VersionInfo[] | undefined, now: number, pinned: boolean, advised?: unknown): { choice: VersionChoice; reason: string } | undefined {
   if (!sent.beta) return undefined;
   if (errorCode === BETA_ERROR.graduated) {
     return { choice: { version: sent.version, beta: false }, reason: `${sent.version ?? "the requested version"} is no longer in beta` };
   }
   if (errorCode === BETA_ERROR.noBeta && !pinned) {
-    const stable = versions ? newestStable(versions, now) : undefined;
+    const fromGateway = typeof advised === "string" && isValidDate(advised) ? advised : undefined;
+    const stable = fromGateway ?? (versions ? newestStable(versions, now) : undefined);
     if (!stable) return undefined;
     return { choice: { version: stable, beta: false }, reason: `nothing is in beta; using the newest stable version ${stable}` };
   }

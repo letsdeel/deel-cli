@@ -280,6 +280,13 @@ function wordsAt(argv: string[], valued: string[]): Array<{ word: string; index:
 
 const wordsOf = (argv: string[], valued: string[]): string[] => wordsAt(argv, valued).map(({ word }) => word);
 
+// The flags that take a value: the global ones, and those that pick among the endpoints sharing a command's words
+// (`--worker-type eor`, `--as worker`, `--contract <id>`), so `deel contracts --worker-type eor --help` reads `eor` as a value.
+function valueFlags(): string[] {
+  const picking = allDescriptors().flatMap((d) => (d.form ? [...d.form.selectors.filter((s) => s.value !== undefined).map((s) => s.flag), ...d.form.scopes.map((s) => s.flag)] : []));
+  return [...new Set([...valuedFlags(commonArgs), ...picking])];
+}
+
 // An option other than a help switch: what citty would drop if it stood before a command's last word. (Help is
 // answered by run() itself, so it is never dropped.)
 const isOption = (token: string): boolean => token.startsWith("-") && token !== "--help" && token !== "-h";
@@ -354,18 +361,18 @@ export async function run(argv: string[]): Promise<number> {
     return EXIT.OK;
   }
 
-  // The command's words, without the values of the flags before them (`--env demo`): every decision below reads these.
-  const found = wordsAt(options, valuedFlags(commonArgs));
-  const words = found.map(({ word }) => word);
-  const first = words[0];
-
   // A static command (auth, job, commands) never needs the generated manifest.
+  const first = wordsOf(options, valuedFlags(commonArgs))[0];
   if (!(first && Object.hasOwn(staticCommands, first))) await loadGeneratedDescriptors();
   const root = buildRoot();
   if (wantsCliVersion(options)) {
     printVersion();
     return EXIT.OK;
   }
+
+  // The command's words, without the values of the flags (`--env demo`, `--worker-type eor`): every decision below reads these.
+  const found = wordsAt(options, valueFlags());
+  const words = found.map(({ word }) => word);
   const { cmd, parent, matched } = resolve(root, words);
   const wantsHelp = options.includes("--help") || options.includes("-h");
   const isGroup = typeof cmd.run !== "function";

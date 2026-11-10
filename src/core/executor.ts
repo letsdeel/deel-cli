@@ -208,7 +208,7 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   // A beta that graduated (or vanished) since the manifest was generated: the API rejects the request
   // before any service runs, so one retry is safe even for a POST. It keeps the idempotency key.
   const code = response.status >= 400 ? errorCode(response.json) : undefined;
-  const fallback = betaFallback(choice, code, descriptor.versions, ctx.clock(), opts.version?.apiVersion !== undefined);
+  const fallback = betaFallback(choice, code, descriptor.versions, ctx.clock(), opts.version?.apiVersion !== undefined, firstError(response.json)?.details?.latest_stable_version);
   if (fallback) {
     if (opts.debug) ctx.io.err(`[debug] ${code}: ${fallback.reason}; retrying once without x-beta\n`);
     choice = fallback.choice;
@@ -296,9 +296,12 @@ function errorCodeOf(item: any): string | undefined {
   return typeof code === "string" && code ? code : undefined;
 }
 
-function errorCode(json: unknown): string | undefined {
+function firstError(json: unknown): any {
   const body = json as any;
-  return errorCodeOf(Array.isArray(body?.errors) ? body.errors[0] : (body?.error ?? body));
+  return Array.isArray(body?.errors) ? body.errors[0] : (body?.error ?? body);
+}
+function errorCode(json: unknown): string | undefined {
+  return errorCodeOf(firstError(json));
 }
 
 // Map an error response to a CliError. Deel returns errors in one of two shapes:

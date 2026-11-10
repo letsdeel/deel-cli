@@ -47,7 +47,7 @@ Coverage floor over `src/**` (in `test:coverage`): lines ≥ 80 %, branches ≥ 
 
 `src/main.ts` (top-level error → JSON error envelope on stderr, exit 1) → `src/cli.ts run()`:
 - Builds a nested citty tree from manifest descriptors' multi-token command paths, merged with static commands.
-- Handles **offline** paths itself before citty runs (so required-arg enforcement is bypassed): `--version`, `--generate-input` (body skeleton), action `--help` (human, or `--help --json` for the machine-readable contract) — rendered by `src/help.ts`.
+- Handles **offline** paths itself before citty runs (so required-arg enforcement is bypassed): a bare `--version` (the CLI's), `--versions` (an endpoint's API versions), `--generate-input` (body skeleton), action `--help` (human, or `--help --json` for the machine-readable contract) — rendered by `src/help.ts`.
 - Otherwise citty dispatches; generated actions go through `runDescriptor` → `parseInput` (`core/input.ts`: `--input` as `key=value` shorthand / JSON / `file://` / `-` stdin, coerced and enum-validated against `bodyProps`) → `resolveToken` (`--token-stdin` > `DEEL_TOKEN` > OS keychain) → `createContext` → `execute` (`core/executor.ts`).
 
 ### Context and transport (dependency injection)

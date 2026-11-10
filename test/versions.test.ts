@@ -211,6 +211,31 @@ test("NO_BETA_VERSION ({ errors: [...] } shape): retries once with the newest st
   assert.equal(seen[1].headers["idempotency-key"], seen[0].headers["idempotency-key"]);
 });
 
+test("NO_BETA_VERSION retries with the stable version the gateway names, not the manifest's older one", async () => {
+  const body = { errors: [{ code: "NO_BETA_VERSION", message: "No beta version", details: { latest_stable_version: "2026-06-01", available_versions: ["2026-06-01"] } }] };
+  const { seen, error } = await call(descriptor(), [fail(404, body), ok()], { beta: true });
+  assert.equal(error, undefined);
+  assert.equal(seen.length, 2);
+  assert.equal(seen[1].headers["x-version"], "2026-06-01");
+  assert.equal("x-beta" in seen[1].headers, false);
+});
+
+test("NO_BETA_VERSION on a beta-only manifest retries with the version the gateway names", async () => {
+  const onlyBeta = [{ version: "2026-09-15", beta_until: "2027-01-01", sunset_at: null }];
+  const body = { error: { code: "NO_BETA_VERSION", message: "No beta version", details: { latest_stable_version: "2026-01-01" } } };
+  const { seen, error } = await call(descriptor({ version: "2026-09-15", beta: true, versions: onlyBeta }), [fail(404, body), ok()]);
+  assert.equal(error, undefined);
+  assert.equal(seen.length, 2);
+  assert.equal(seen[1].headers["x-version"], "2026-01-01");
+});
+
+test("NO_BETA_VERSION ignores a version the gateway names that is not a date", async () => {
+  const body = { errors: [{ code: "NO_BETA_VERSION", message: "No beta version", details: { latest_stable_version: "latest" } }] };
+  const { seen, error } = await call(descriptor(), [fail(404, body), ok()], { beta: true });
+  assert.equal(error, undefined);
+  assert.equal(seen[1].headers["x-version"], "2026-04-01");
+});
+
 test("NO_BETA_VERSION never swaps a pinned --version for another one", async () => {
   const { seen, error } = await call(descriptor(), [fail(404, { errors: [{ code: "NO_BETA_VERSION", message: "No beta version" }] }), ok()], { apiVersion: "2026-09-15", beta: true });
   assert.equal(seen.length, 1);
