@@ -520,3 +520,23 @@ test("--help --json describes a form's arguments, scopes and selectors, and give
   // Each form carries its full contract, as a picked one does.
   for (const form of forms.forms) assert.deepEqual(Object.keys(form).filter((k) => ["arguments", "params", "body", "response", "method", "path"].includes(k)).sort(), ["arguments", "body", "method", "params", "path", "response"]);
 });
+
+test("endpoints that differ only by a scope flag are told apart by it, in every spelling of its value", async () => {
+  const bare = await callApi(["widgets", "notes", "list"]);
+  assert.equal(bare.code, EXIT.OK, bare.err);
+  assert.deepEqual(bare.sent.map((s) => s.url.pathname), ["/rest/widgets/notes"]);
+  for (const argv of [["--widget", "w1"], ["--widget=w1"]]) {
+    const scoped = await callApi(["widgets", "notes", "list", ...argv]);
+    assert.equal(scoped.code, EXIT.OK, scoped.err);
+    assert.deepEqual(scoped.sent.map((s) => s.url.pathname), ["/rest/widgets/w1/notes"], argv.join(" "));
+  }
+  // The flag may come first among the options, and a value that starts with - is the value when attached.
+  const dashed = await callApi(["widgets", "notes", "list", "--widget=-w1"]);
+  assert.deepEqual(dashed.sent.map((s) => s.url.pathname), ["/rest/widgets/-w1/notes"]);
+  // Typed without its value, or with the next flag in its place, it sends nothing rather than calling the bare endpoint.
+  for (const argv of [["--widget"], ["--widget", "--beta"], ["--widget", "-w1"], ["--widget="]]) {
+    const refused = await callApi(["widgets", "notes", "list", ...argv]);
+    assert.notEqual(refused.code, EXIT.OK, argv.join(" "));
+    assert.equal(refused.sent.length, 0, argv.join(" "));
+  }
+});

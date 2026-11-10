@@ -233,7 +233,8 @@ function wordsAt(argv: string[], valued: string[]): Array<{ word: string; index:
 
 const wordsOf = (argv: string[], valued: string[]): string[] => wordsAt(argv, valued).map(({ word }) => word);
 
-// An option other than a help switch: what would be dropped if it stood before a command's last word.
+// An option other than a help switch: what citty would drop if it stood before a command's last word. (Help is
+// answered by run() itself, so it is never dropped.)
 const isOption = (token: string): boolean => token.startsWith("-") && token !== "--help" && token !== "-h";
 
 // Walk the tree by the command words to find the target command.
@@ -305,17 +306,11 @@ export async function run(argv: string[]): Promise<number> {
     const before = options.slice(0, found[0].index).some(isOption);
     throw new CliError("usage.command", `Unknown command '${first}'.`, before ? "Options go after the command: deel <command> … --option." : "Run 'deel --help' to see available commands.");
   }
-  // citty hands a command only the tokens after its own word, so an option before the last command word (a leading
-  // `--env=demo`, or one between the words) would be dropped and the call would go out without it.
-  const commandWords = words.slice(0, matched);
-  if (matched > 0 && options.slice(0, found[matched - 1].index).some(isOption)) {
-    throw new CliError("usage.command", `Options go after the command: write 'deel ${commandWords.join(" ")} …' with the options at the end.`);
-  }
   // A word after a group that names none of its commands (a removed or mistyped one) fails instead of showing the
   // group's help and exiting 0.
   const stray = isGroup ? words[matched] : undefined;
   if (stray !== undefined) {
-    const group = commandWords.join(" ");
+    const group = words.slice(0, matched).join(" ");
     throw new CliError("usage.command", `Unknown command 'deel ${group} ${stray}'.`, `Run 'deel ${group} --help' to see its commands.`);
   }
 
@@ -362,6 +357,13 @@ export async function run(argv: string[]): Promise<number> {
     return EXIT.OK;
   }
 
+  // Everything run() answers itself (--version, --help, --generate-input, --json with help) has returned above, so
+  // the options still unread are the ones citty is about to take: it hands a command only the tokens after its own
+  // word, so one before the command's last word (a leading `--env=demo`, or one between the words) would be dropped
+  // and the call would go out without it.
+  if (matched > 0 && options.slice(0, found[matched - 1].index).some(isOption)) {
+    throw new CliError("usage.command", `Options go after the command: write 'deel ${words.slice(0, matched).join(" ")} …' with the options at the end.`);
+  }
   await runCommand(root, { rawArgs: argv });
   return EXIT.OK;
 }

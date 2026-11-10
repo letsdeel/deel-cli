@@ -33,16 +33,29 @@ test("the check exits 1 and names each failure when the map file it is given has
 test("a map file that isn't an array of entries fails with a clear message instead of a stack trace", () => {
   assert.equal(mapShapeError([entry("GET", "/a", "deel a list"), { ...entry("GET", "/b", "deel b list"), collapse: "k", api: "scim" }]), undefined);
   assert.match(mapShapeError({ method: "GET" }) ?? "", /must be a JSON array/);
-  for (const bad of [[null], [{ method: "GET", path: "/a" }], [{ method: "GET", path: 1, command: "deel a" }], [{ ...entry("GET", "/a", "deel a list"), collapse: 3 }], ["deel a list"]]) {
-    assert.match(mapShapeError(bad) ?? "", /^entry 0 must be an object with string method, path and command/, JSON.stringify(bad));
-  }
+  const bads: Array<[unknown[], RegExp]> = [
+    [[null], /^entry 0 must be an object/],
+    [["deel a list"], /^entry 0 must be an object/],
+    [[[]], /^entry 0 must be an object/],
+    [[{ method: "GET", path: "/a" }], /^entry 0 needs a non-empty string command/],
+    [[{ method: "GET", path: 1, command: "deel a" }], /^entry 0 needs a non-empty string path/],
+    [[entry("", "/a", "deel a list")], /^entry 0 needs a non-empty string method/],
+    [[entry("GET /a", "/a", "deel a list")], /^entry 0 has a method that is not an HTTP method name/],
+    [[entry("GET", "a", "deel a list")], /^entry 0 has a path that does not start with \//],
+    [[entry("GET", "/a", "deel a list"), { ...entry("GET", "/b", "deel b list"), api: "SCIM" }], /^entry 1 has an api that is neither "rest" nor "scim"/],
+    [[{ ...entry("GET", "/a", "deel a list"), api: 7 }], /^entry 0 has an api/],
+    [[{ ...entry("GET", "/a", "deel a list"), collapse: 3 }], /^entry 0 has a collapse that is not a non-empty string/],
+    [[{ ...entry("GET", "/a", "deel a list"), collapse: "" }], /^entry 0 has a collapse/],
+    [[{ ...entry("GET", "/a", "deel a list"), colapse: "k" }], /^entry 0 has unknown field\(s\) colapse/],
+  ];
+  for (const [bad, message] of bads) assert.match(mapShapeError(bad) ?? "", message, JSON.stringify(bad));
   const dir = mkdtempSync(join(tmpdir(), "check-command-map-"));
   for (const [name, content] of [["object.json", '{"method":"GET"}'], ["missing.json", '[{"method":"GET","path":"/a"}]']]) {
     const file = join(dir, name);
     writeFileSync(file, content);
     const run = spawnSync(process.execPath, ["scripts/check-command-map.ts", file], { cwd: ROOT, encoding: "utf8" });
     assert.equal(run.status, 1, run.stderr);
-    assert.match(run.stderr, /^FAIL {2}.*check-command-map-.*: (the command map must be a JSON array|entry 0 must be an object)/m);
+    assert.match(run.stderr, /^FAIL {2}.*check-command-map-.*: (the command map must be a JSON array|entry 0 needs a non-empty string command)/m);
     assert.doesNotMatch(run.stderr, /at .*\.ts:\d+/);
   }
 });

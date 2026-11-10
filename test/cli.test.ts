@@ -163,6 +163,29 @@ test("an option before the command's last word is refused, since citty would dro
   }
 });
 
+test("what run() answers itself is answered wherever its option stands, and only the rest is refused", async () => {
+  // --generate-input and --json with help are read from the whole command line, so a leading one is not dropped.
+  const skeleton = await capture(["--generate-input", "adjustments", "create", "--invoice"]);
+  assert.equal(skeleton.code, EXIT.OK);
+  assert.ok("contract_id" in JSON.parse(skeleton.out));
+  assert.equal((await capture(["--env", "demo", "--generate-input", "adjustments", "create", "--invoice"])).code, EXIT.OK);
+  const variant = await capture(["--generate-input", "adjustments", "create"]);
+  assert.match(variant.err, /Specify a variant first/);
+  const contract = await capture(["--json", "adjustments", "create", "--invoice", "--help"]);
+  assert.equal(contract.code, EXIT.OK);
+  assert.equal(typeof JSON.parse(contract.out), "object");
+  const forms = await capture(["--env", "demo", "adjustments", "create", "--help"]);
+  assert.equal(forms.code, EXIT.OK);
+  // Help in any position, short or long, passes the option guard.
+  for (const argv of [["-h", "adjustments"], ["--help", "adjustments", "create"], ["adjustments", "-h", "create"], ["adjustments", "--help", "create"], ["--env", "demo", "-h"], ["--no-log", "-h", "adjustments", "create"]]) {
+    assert.equal((await capture(argv)).code, EXIT.OK, argv.join(" "));
+  }
+  // Nothing answers --generate-input on a command with no body (a static one), so a leading one would be dropped.
+  const dropped = await capture(["--generate-input", "auth", "status"]);
+  assert.equal(dropped.error?.code, "usage.command");
+  assert.match(dropped.err, /^Options go after the command: write 'deel auth status …'/);
+});
+
 test("a switch before a word is not a flag value: it neither hides the stray word nor makes one", async () => {
   const stray = await capture(["adjustments", "--json", "nope"]);
   assert.match(stray.err, /Unknown command 'deel adjustments nope'\./);

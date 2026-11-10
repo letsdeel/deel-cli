@@ -34,16 +34,29 @@ const lineKey = (command: ParsedCommand) =>
     [...command.labels.filter((l) => l.flag).map((l) => `--${l.flag}`), ...command.selectors.map((s) => `--${s.flag}${s.value ? ` ${s.value}` : ""}`)].sort(),
   ]);
 
-// Why a parsed map file can't be checked: it must be an array of entries with string method, path and command.
+const ENTRY_FIELDS = new Set(["method", "path", "command", "api", "collapse"]);
+
+// Why one parsed map entry can't be checked, or undefined: the fields MapEntry types, each as the generator reads it.
+function entryShapeError(item: unknown): string | undefined {
+  if (!item || typeof item !== "object" || Array.isArray(item)) return "must be an object";
+  const entry = item as Record<string, unknown>;
+  for (const field of ["method", "path", "command"]) if (typeof entry[field] !== "string" || !entry[field]) return `needs a non-empty string ${field}`;
+  if (!/^[A-Za-z]+$/.test(entry.method as string)) return "has a method that is not an HTTP method name";
+  if (!(entry.path as string).startsWith("/")) return "has a path that does not start with /";
+  if (entry.api !== undefined && entry.api !== "rest" && entry.api !== "scim") return 'has an api that is neither "rest" nor "scim"';
+  if (entry.collapse !== undefined && (typeof entry.collapse !== "string" || !entry.collapse)) return "has a collapse that is not a non-empty string";
+  const unknown = Object.keys(entry).filter((field) => !ENTRY_FIELDS.has(field));
+  return unknown.length > 0 ? `has unknown field(s) ${unknown.join(", ")} (a mistyped name would be ignored)` : undefined;
+}
+
+// Why a parsed map file can't be checked: it must be an array of entries MapEntry describes.
 export function mapShapeError(value: unknown): string | undefined {
   if (!Array.isArray(value)) return "the command map must be a JSON array of entries";
-  const optionalString = (field: unknown) => field === undefined || typeof field === "string";
-  const bad = value.findIndex((item) => {
-    const entry = item as Record<string, unknown> | null;
-    return !entry || typeof entry !== "object" || [entry.method, entry.path, entry.command].some((field) => typeof field !== "string") || !optionalString(entry.api) || !optionalString(entry.collapse);
-  });
-  if (bad === -1) return undefined;
-  return `entry ${bad} must be an object with string method, path and command (api and collapse, when present, strings): ${JSON.stringify(value[bad])?.slice(0, 120)}`;
+  for (const [index, item] of value.entries()) {
+    const problem = entryShapeError(item);
+    if (problem) return `entry ${index} ${problem}: ${JSON.stringify(item)?.slice(0, 120)}`;
+  }
+  return undefined;
 }
 
 export function checkMap(entries: MapEntry[], options: CheckOptions = {}): { failures: Finding[]; warnings: Finding[] } {
