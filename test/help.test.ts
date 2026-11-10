@@ -97,7 +97,11 @@ test("help examples keep only the words, so they paste into a shell", async () =
 test("a static group uses its own description and the static footer", async () => {
   const { code, out } = await capture(["auth", "--help"]);
   assert.equal(code, EXIT.OK);
+  assert.match(out, /^Authentication$/m);
+  assert.match(out, /^ {2}login {3,}Sign in through your browser/m);
+  assert.match(out, /^ {2}status {3,}Validate the current token$/m);
   assert.match(out, /^Add --help to a line's words for its flags \(e\.g\. deel auth login --help\)\.$/m);
+  assert.doesNotMatch(out, /Flags that pick the endpoint/);
 });
 
 // run() throws a usage error; main.ts turns it into the exit code and the printed error.

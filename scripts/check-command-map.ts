@@ -87,6 +87,11 @@ export function checkMap(entries: MapEntry[], options: CheckOptions = {}): { fai
     for (const domain of new Set(parsed.map((p) => p.words[0]))) {
       if (!known.has(domain)) failures.push({ entry: domain, message: `'${domain}' is not in src/public-api/domains.json, which gives every domain its stage and description` });
     }
+    // A domain is in use through the map, a hand-picked command or a static one.
+    const used = new Set([...parsed.map((p) => p.words[0]), ...(options.reserved?.commands ?? []).map((d) => d.command[0])]);
+    for (const domain of known) {
+      if (!used.has(domain) && !options.reserved?.topLevel.has(domain)) warnings.push({ entry: domain, message: `'${domain}' is in src/public-api/domains.json but no command of the map starts with it` });
+    }
   }
 
   // Hand-picked and static names stay theirs, and a released command line never changes.
@@ -117,17 +122,26 @@ function usageOf(entry: MapEntry | undefined, released: Descriptor): string | un
   }
 }
 
-// The domain names domains.json places under a lifecycle stage; a missing or malformed file is a failure, not a crash.
-function readDomainNames(file: string): string[] {
+// The domain names domains.json places under a lifecycle stage. A missing or malformed file is a failure, not a crash,
+// and so is a stage or domain without the text `deel --help` prints for it.
+export function readDomainNames(file: string): string[] {
   let stages: unknown;
   try {
     stages = JSON.parse(readFileSync(file, "utf8"));
   } catch (error) {
     throw new Error(`cannot read ${file}: ${(error as Error).message}`);
   }
-  const names = Array.isArray(stages) ? stages.flatMap((stage) => (Array.isArray(stage?.domains) ? stage.domains.map((d: { name?: unknown }) => d?.name) : [])) : [];
-  if (!Array.isArray(stages) || names.some((name) => typeof name !== "string")) throw new Error(`${file} must be a list of stages, each with a domains list of {name}`);
-  return names as string[];
+  const text = (value: unknown): value is string => typeof value === "string" && value.trim() !== "";
+  if (!Array.isArray(stages)) throw new Error(`${file} must be a list of stages, each with a stage name and a domains list`);
+  const names: string[] = [];
+  for (const [index, stage] of stages.entries()) {
+    if (!text(stage?.stage) || !Array.isArray(stage?.domains)) throw new Error(`${file}: stage ${index} needs a non-empty "stage" and a "domains" list`);
+    for (const domain of stage.domains) {
+      if (!text(domain?.name) || !text(domain?.description)) throw new Error(`${file}: a domain of stage "${stage.stage}" needs a non-empty "name" and "description"`);
+      names.push(domain.name);
+    }
+  }
+  return names;
 }
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
