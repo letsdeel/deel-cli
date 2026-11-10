@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { run } from "../src/cli.ts";
-import { EXIT } from "../src/core/errors.ts";
+import { CliError, EXIT } from "../src/core/errors.ts";
 import { printContract, printContractJson } from "../src/help.ts";
 import type { Descriptor } from "../src/types.ts";
 
@@ -260,4 +260,18 @@ test("--help --json carries nullable on the fields that have it", () => {
   const fields = JSON.parse(out).body.fields;
   assert.equal(fields.find((f: { name: string }) => f.name === "note").nullable, true);
   assert.equal("nullable" in fields.find((f: { name: string }) => f.name === "title"), false);
+});
+
+test("an option before the last command word is refused, because citty would drop it and run the command without it", async () => {
+  const refused = (error: unknown) => error instanceof CliError && error.code === "usage.command" && /Options go after the command/.test(error.message);
+  // `--dry-run` ahead of `run` never reaches it: the write would be sent.
+  for (const argv of [["--dry-run", "app", "run", "approve_widget"], ["app", "--dry-run", "run", "approve_widget"], ["--env=demo", "app", "search", "x"], ["--json", "adjustments", "create", "--invoice"]]) {
+    await assert.rejects(() => run(argv), refused, argv.join(" "));
+  }
+  const hint = await run(["--beta", "app", "search", "x"]).catch((error: CliError) => error.next);
+  assert.match(String(hint), /'deel app search \.\.\.' with the options at the end/);
+  // Help and version, which run() answers itself, and options after the words are not refused.
+  assert.equal((await capture(["--help"])).code, EXIT.OK);
+  assert.equal((await capture(["-h", "adjustments", "create", "--invoice"])).code, EXIT.OK);
+  assert.equal((await capture(["adjustments", "create", "--invoice", "--generate-input"])).code, EXIT.OK);
 });

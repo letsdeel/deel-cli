@@ -34,6 +34,11 @@ export type CallToolOpts = {
 
 type RpcMessage = { jsonrpc?: string; id?: unknown; result?: unknown; error?: { code?: unknown; message?: unknown } };
 
+// A JSON-RPC message is an object: `null`, a list or a bare value in a reply is not one.
+function asMessage(value: unknown): RpcMessage | null {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as RpcMessage) : null;
+}
+
 // A Streamable HTTP response is either one JSON body or an SSE stream whose `data:` lines carry the messages.
 export function parseRpcBody(text: string, contentType: string | undefined, id: number): RpcMessage | null {
   if (contentType?.includes("text/event-stream")) {
@@ -41,7 +46,8 @@ export function parseRpcBody(text: string, contentType: string | undefined, id: 
     // server that skips the blank lines is read line by line.
     const parse = (data: string) => {
       try {
-        return [JSON.parse(data) as RpcMessage];
+        const message = asMessage(JSON.parse(data));
+        return message ? [message] : [];
       } catch {
         return [];
       }
@@ -57,11 +63,9 @@ export function parseRpcBody(text: string, contentType: string | undefined, id: 
     return messages.find((message) => message.id === id) ?? null;
   }
   try {
-    const message: unknown = JSON.parse(text);
-    if (!message || typeof message !== "object" || Array.isArray(message)) return null;
+    const message = asMessage(JSON.parse(text));
     // A reply to another request is not ours; one without an id is taken as ours.
-    const replyId = (message as RpcMessage).id;
-    return replyId === undefined || replyId === id ? (message as RpcMessage) : null;
+    return message && (message.id === undefined || message.id === id) ? message : null;
   } catch {
     return null;
   }

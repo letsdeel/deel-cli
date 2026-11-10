@@ -54,6 +54,15 @@ test("an SSE message split over several data lines is joined, and a reply to ano
   assert.deepEqual(parseRpcBody(JSON.stringify({ result: { a: 2 } }), "application/json", 1)?.result, { a: 2 });
 });
 
+test("an SSE or JSON body that isn't a message object is not a reply", () => {
+  for (const data of ["null", "[]", "7", '"x"', "true"]) {
+    assert.equal(parseRpcBody(`data: ${data}\n\n`, "text/event-stream", 1), null, data);
+    assert.equal(parseRpcBody(data, "application/json", 1), null, data);
+  }
+  // A null event next to the real one doesn't hide it.
+  assert.deepEqual(parseRpcBody(`data: null\n\ndata: ${JSON.stringify({ jsonrpc: "2.0", id: 1, result: { ok: 1 } })}\n\n`, "text/event-stream", 1)?.result, { ok: 1 });
+});
+
 test("parseRpcBody picks the SSE message with the call's id and skips bad lines", () => {
   const text = ["data: not json", `data: ${JSON.stringify({ jsonrpc: "2.0", id: 9, result: {} })}`, `data: ${JSON.stringify({ jsonrpc: "2.0", id: 1, result: { x: 1 } })}`].join("\n");
   assert.deepEqual(parseRpcBody(text, "text/event-stream", 1)?.result, { x: 1 });

@@ -119,6 +119,20 @@ test("search and describe take --fields and --quiet like any list", async (t) =>
   assert.deepEqual((await run(runDescribe, { _: ["a"], fields: "name,method" })).json().data, [{ name: "a", method: "GET" }]);
 });
 
+test("--jq filters search and describe output and wins over --quiet", async (t) => {
+  isolated(t);
+  const { transport } = server((tool, args) => ({ texts: [tool === "get_action" ? JSON.stringify({ ...LIST, name: args.name }) : JSON.stringify({ actions: [{ name: "list_widgets", title: "List widgets" }, { name: "approve_widget", title: "Approve" }] })] }));
+  const run = async (fn: typeof runSearch, args: Record<string, unknown>) => {
+    const io = captureIO();
+    await fn({ ...ARGS, ...args }, [], deps(transport, loggedIn(), io.io));
+    return io.out();
+  };
+  assert.equal(await run(runSearch, { _: ["x"], jq: ".[0].name", raw: true }), "list_widgets\n");
+  assert.equal(await run(runSearch, { _: ["x"], jq: ".[1].title", raw: true, quiet: true }), "Approve\n");
+  assert.equal(await run(runDescribe, { _: ["a", "b"], jq: ".[1].name", raw: true, quiet: true }), "b\n");
+  assert.equal(await run(runSearch, { _: ["x"], jq: "length" }), "2\n");
+});
+
 test("search without words is a usage error, before any call", async (t) => {
   isolated(t);
   const { transport, requests } = server(() => assert.fail("no call expected"));
