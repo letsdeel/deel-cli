@@ -244,6 +244,18 @@ export async function run(argv: string[]): Promise<number> {
     return EXIT.OK;
   }
 
+  // citty hands a command only the tokens after its own name, so an option written before the last command word is
+  // dropped: `deel --dry-run app run ...` would run the write, `deel --env demo ...` would call prod.
+  let words = 0;
+  const lastWordAt = argv.findIndex((token) => !token.startsWith("-") && ++words === matched);
+  if (argv.slice(0, Math.max(lastWordAt, 0)).some((token) => token.startsWith("-"))) {
+    throw new CliError(
+      "usage.command",
+      "Options go after the command.",
+      `Write 'deel ${positionals.slice(0, matched).join(" ")} ...' with the options at the end. Nothing was run.`,
+    );
+  }
+
   await runCommand(root, { rawArgs: argv });
   return EXIT.OK;
 }

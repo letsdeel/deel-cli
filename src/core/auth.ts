@@ -128,15 +128,22 @@ export function redactHeaders(headers: Record<string, string>): Record<string, s
   return redacted;
 }
 
-// The scope claim of an access token, for display only (`deel auth status`). The payload is decoded without
-// verifying the signature: the server verifies the token, the CLI never relies on this value.
-export function accessTokenScope(token: string): string | null {
+// The payload of a JWT, decoded without verifying the signature: the server verifies the token, so the CLI only
+// uses claims to display them or to give a better error before a call. Null when the token is not a JWT.
+export function accessTokenClaims(token: string): Record<string, unknown> | null {
   try {
-    const claims = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8")) as { scope?: unknown };
-    if (typeof claims.scope === "string") return claims.scope;
-    if (Array.isArray(claims.scope) && claims.scope.every((item) => typeof item === "string")) return claims.scope.join(" ");
+    const claims: unknown = JSON.parse(Buffer.from(token.split(".")[1] ?? "", "base64url").toString("utf8"));
+    if (claims && typeof claims === "object" && !Array.isArray(claims)) return claims as Record<string, unknown>;
   } catch {
     /* not a JWT */
   }
+  return null;
+}
+
+// The scope claim of an access token, for display only (`deel auth status`).
+export function accessTokenScope(token: string): string | null {
+  const scope = accessTokenClaims(token)?.scope;
+  if (typeof scope === "string") return scope;
+  if (Array.isArray(scope) && scope.every((item) => typeof item === "string")) return scope.join(" ");
   return null;
 }

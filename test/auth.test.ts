@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import type { TestContext } from "node:test";
-import { resolveToken, requireToken, authFor, accessTokenScope, maskToken, redactHeaders, baseUrlRefused } from "../src/core/auth.ts";
+import { resolveToken, requireToken, authFor, accessTokenClaims, accessTokenScope, maskToken, redactHeaders, baseUrlRefused } from "../src/core/auth.ts";
 import { resolveConfig } from "../src/core/config.ts";
 import { CliError } from "../src/core/errors.ts";
 import type { HttpResponse, Transport } from "../src/core/http.ts";
@@ -251,6 +251,13 @@ function jwt(claims: unknown): string {
 test("accessTokenScope reads the scope claim without verifying the token", () => {
   assert.equal(accessTokenScope(jwt({ scope: "people:read contracts:read" })), "people:read contracts:read");
   assert.equal(accessTokenScope(jwt({ scope: ["a", "b"] })), "a b");
+});
+
+test("accessTokenClaims decodes a JWT payload object, and gives null otherwise", () => {
+  assert.deepEqual(accessTokenClaims(jwt({ client_id: "c", hide_pii_data: true })), { client_id: "c", hide_pii_data: true });
+  assert.equal(accessTokenClaims("opaque-token"), null);
+  assert.equal(accessTokenClaims(`h.${Buffer.from("[1]").toString("base64url")}.s`), null);
+  assert.equal(accessTokenClaims(`h.${Buffer.from("null").toString("base64url")}.s`), null);
 });
 
 test("accessTokenScope gives null when the token cannot be decoded or has no scope", () => {

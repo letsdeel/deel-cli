@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resolveConfig, requireIssuer, ENVIRONMENTS } from "../src/core/config.ts";
+import { resolveConfig, resolveMcpUrl, requireIssuer, ENVIRONMENTS } from "../src/core/config.ts";
 import { configFrom } from "../src/commands/shared.ts";
 import type { CliError } from "../src/core/errors.ts";
 
@@ -142,4 +142,34 @@ test("--beta sets config.beta, and it is unset otherwise", () => {
 test("configFrom wires the --beta flag into the config", () => {
   assert.equal(configFrom({ beta: true }, []).beta, true);
   assert.equal(configFrom({}, []).beta, undefined);
+});
+
+test("the MCP URL is /mcp on the API host, or DEEL_MCP_URL", () => {
+  withEnvVars({ DEEL_MCP_URL: undefined }, () => {
+    assert.equal(resolveMcpUrl(resolveConfig({ env: "prod" })), "https://api.letsdeel.com/mcp");
+    assert.equal(resolveMcpUrl(resolveConfig({ env: "demo" })), "https://api-staging.letsdeel.com/mcp");
+  });
+  withEnvVars({ DEEL_MCP_URL: "https://mcp.example.test/mcp/" }, () => {
+    assert.equal(resolveMcpUrl(resolveConfig({ env: "prod" })), "https://mcp.example.test/mcp");
+  });
+  withEnvVars({ DEEL_MCP_URL: "http://mcp.example.test/mcp" }, () => {
+    assert.throws(() => resolveMcpUrl(resolveConfig({ env: "prod" })), (error: CliError) => error.code === "config.mcp");
+  });
+});
+
+test("a stored OAuth login is only sent to DEEL_MCP_URL on the API host or the issuer's host", () => {
+  withEnvVars({ DEEL_MCP_URL: "https://attacker.example.test/mcp", DEEL_OAUTH_ISSUER: undefined }, () => {
+    const config = resolveConfig({ env: "prod" });
+    assert.throws(
+      () => resolveMcpUrl(config, { oauth: true }),
+      (error: CliError) => error.code === "auth.base_url" && /attacker\.example\.test/.test(error.message) && /DEEL_TOKEN/.test(error.next ?? ""),
+    );
+    assert.equal(resolveMcpUrl(config, { oauth: false }), "https://attacker.example.test/mcp"); // DEEL_TOKEN / --token-stdin: the user's choice
+  });
+  withEnvVars({ DEEL_MCP_URL: "https://api.letsdeel.com/other/mcp", DEEL_OAUTH_ISSUER: undefined }, () => {
+    assert.equal(resolveMcpUrl(resolveConfig({ env: "prod" }), { oauth: true }), "https://api.letsdeel.com/other/mcp");
+  });
+  withEnvVars({ DEEL_MCP_URL: "https://dev.example.test/mcp", DEEL_OAUTH_ISSUER: "https://dev.example.test" }, () => {
+    assert.equal(resolveMcpUrl(resolveConfig({ env: "nope", baseUrl: "https://dev.example.test/rest" }), { oauth: true }), "https://dev.example.test/mcp");
+  });
 });

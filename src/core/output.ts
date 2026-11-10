@@ -18,7 +18,8 @@ export type OutputOpts = {
 async function runJq(data: unknown, filter: string): Promise<unknown[]> {
   try {
     const { json } = await import("jq-wasm");
-    return await json(data as any, filter);
+    // jq-wasm parses a string input as JSON text; quote it so a text payload reaches the filter as a string.
+    return await json((typeof data === "string" ? JSON.stringify(data) : data) as any, filter);
   } catch (error) {
     throw new CliError("jq.error", `--jq filter failed: ${(error as Error).message}`);
   }

@@ -6,6 +6,13 @@ export const HTTP_TIMEOUT_MS = 30_000;
 export const RETRY_MAX_ATTEMPTS = 3;
 export const RETRY_BASE_DELAY_MS = 200;
 
+// --- Process exit ---
+// How long a process with nothing left to write may stay up before it is forced to exit.
+export const FORCED_EXIT_MS = 5_000;
+
+// --- MCP ---
+export const MCP_ACCEPT = "application/json, text/event-stream";
+
 // --- Local logging ---
 export const LOG_MAX_BYTES_DEFAULT = 10 * 1024 * 1024;
 export const LOG_MAX_FILES_DEFAULT = 5;
@@ -29,7 +36,7 @@ export const IDEMPOTENCY_NAMESPACE = "8f4b6c1e-3d2a-4f9c-9a1b-7e5d0c2a1f00";
 export const AGENT_ENV_SIGNALS = ["CI", "CLAUDE_CODE", "CURSOR", "CODEX"] as const;
 
 // --- Command resolver vocabulary ---
-export const RESERVED_COMMANDS = new Set(["job", "auth", "webhooks", "tokens"]);
+export const RESERVED_COMMANDS = new Set(["job", "auth", "webhooks", "tokens", "app"]);
 export const COMMAND_SUFFIX_MODIFIERS = ["-bulk", "-async"];
 
 // --- Header names (lowercase; fetch normalizes) ---

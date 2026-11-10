@@ -4,7 +4,7 @@ import { spawnSync } from "node:child_process";
 import { chmodSync, existsSync, mkdtempSync, readFileSync, readdirSync, utimesSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { CHUNK_SIZE, DEFAULT_TOKEN_LIFETIME_MS, LOCK_MAX_AGE_MS, discover, entryFromTokenResponse, isFresh, postForm, readOAuthEntry, removeStaleLock, withLock, writeOAuthEntry } from "../src/core/oauth.ts";
+import { CHUNK_SIZE, DEFAULT_TOKEN_LIFETIME_MS, LOCK_MAX_AGE_MS, createOAuthSource, discover, entryFromTokenResponse, isFresh, postForm, readOAuthEntry, removeStaleLock, withLock, writeOAuthEntry } from "../src/core/oauth.ts";
 import type { HttpRequest, HttpResponse, Transport } from "../src/core/http.ts";
 import { tempDir } from "./stubs.ts";
 import type { CliError } from "../src/core/errors.ts";
@@ -236,4 +236,36 @@ test("a login too large for the keychain is not written at all", () => {
   const before = new Map(store.items);
   assert.equal(writeOAuthEntry(store, ISSUER, { ...stored, access_token: "a".repeat(CHUNK_SIZE * 65) }), false);
   assert.deepEqual(store.items, before);
+});
+
+// A token endpoint that hands out "at2", counting the refreshes.
+function refreshing() {
+  const refreshes: string[] = [];
+  const transport: Transport = async (request) => {
+    if (request.url.endsWith("/.well-known/oauth-authorization-server")) return { status: 200, headers: {}, text: "", json: METADATA } as HttpResponse;
+    refreshes.push(String(request.body));
+    return { status: 200, headers: {}, text: "", json: { access_token: "at2", refresh_token: "rt2", expires_in: 3600 } } as HttpResponse;
+  };
+  return { transport, refreshes };
+}
+
+test("renew refreshes a token the server rejected before its expiry", async () => {
+  const store = memoryStore();
+  writeOAuthEntry(store, ISSUER, stored);
+  const { transport, refreshes } = refreshing();
+  const source = createOAuthSource({ store, issuer: ISSUER, clientId: "c", entry: stored, transport });
+  assert.equal(await source.token(), "at"); // still fresh: no refresh
+  assert.equal(await source.renew("at"), "at2");
+  assert.equal(refreshes.length, 1);
+  assert.equal(source.current().access_token, "at2");
+  assert.equal(readOAuthEntry(store, ISSUER)?.refresh_token, "rt2");
+});
+
+test("renew keeps a token another process already stored instead of refreshing again", async () => {
+  const store = memoryStore();
+  writeOAuthEntry(store, ISSUER, { ...stored, access_token: "at_other" });
+  const { transport, refreshes } = refreshing();
+  const source = createOAuthSource({ store, issuer: ISSUER, clientId: "c", entry: stored, transport });
+  assert.equal(await source.renew("at"), "at_other");
+  assert.equal(refreshes.length, 0);
 });

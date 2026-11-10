@@ -100,6 +100,28 @@ export function resolveConfig(opts: { env?: string; baseUrl?: string; beta?: boo
   return config;
 }
 
+// The MCP endpoint the `deel app` commands call: `/mcp` on the API host, or DEEL_MCP_URL (https) for a test
+// environment that serves it on its own host. A stored OAuth login only travels to the environment that issued
+// it, so with one the override must sit on the API host or the issuer's host; any other host needs DEEL_TOKEN
+// or --token-stdin, which are the user's explicit choice of where that token goes.
+export function resolveMcpUrl(config: Config, opts: { oauth?: boolean } = {}): string {
+  const override = httpsOverride("DEEL_MCP_URL");
+  if (override.error) throw new CliError("config.mcp", override.error);
+  if (override.value === undefined) return `${new URL(config.baseUrl).origin}/mcp`;
+  if (opts.oauth) {
+    const trusted = [originOf(config.baseUrl), config.issuer ? originOf(config.issuer) : null];
+    const origin = originOf(override.value);
+    if (!origin || !trusted.includes(origin)) {
+      throw new CliError(
+        "auth.base_url",
+        `DEEL_MCP_URL points at ${new URL(override.value).host}, which is not the server your saved login belongs to.`,
+        "Unset DEEL_MCP_URL, or use DEEL_TOKEN or --token-stdin with an OAuth access token for that server.",
+      );
+    }
+  }
+  return override.value;
+}
+
 // The legacy PAT stored under the bare env name belongs to the environment's own server. Talking to another
 // server (an issuer override or a different API host) must never read or touch it.
 export function ownsLegacyPat(config: Config): boolean {
