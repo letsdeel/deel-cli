@@ -16,7 +16,7 @@ import { envelope, render } from "../core/output.ts";
 import { setLoggingEnabled, setLogBodiesEnabled } from "../core/logging.ts";
 import { CliError } from "../core/errors.ts";
 import { HEADER } from "../core/constants.ts";
-import { commonArgs, configFrom, outputOpts, refuseMissingGlobalValues } from "./shared.ts";
+import { commonArgs, configFrom, outputOpts, refuseMissingValues } from "./shared.ts";
 import type { Args } from "./shared.ts";
 import { assertIssuerOverride } from "../core/config.ts";
 import type { Config } from "../core/config.ts";
@@ -139,7 +139,7 @@ export const authCommand = defineCommand({
       args: loginArgs,
       async run(cittyCtx) {
         const args = cittyCtx.args as Args;
-        refuseMissingGlobalValues(cittyCtx.rawArgs, loginArgs); // a bare --scopes would otherwise be read as `true`
+        refuseMissingValues(cittyCtx.rawArgs, loginArgs); // a bare --scopes would otherwise be read as `true`
         setLoggingEnabled(args.log !== false);
         await authLogin(args, configFrom(args, cittyCtx.rawArgs), realDeps());
       },

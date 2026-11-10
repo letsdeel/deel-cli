@@ -1,7 +1,7 @@
 // The shared vocabulary in src/core/constants.ts: the routes and fields it names must exist where it says.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CREDENTIAL_LOG_KEYS, CREDENTIAL_LOG_WORDS, OUTCOME_ROUTES, SEND_ONCE_ROUTES, SENSITIVE_LOG_KEYS, WITHHELD_RESPONSE_FIELDS } from "../src/core/constants.ts";
+import { CREDENTIAL_LOG_KEYS, CREDENTIAL_LOG_WORDS, OUTCOME_ROUTES, SEND_ONCE_ROUTES, SENSITIVE_LOG_KEYS, WITHHELD_RESPONSE_FIELDS, withheldFieldFor } from "../src/core/constants.ts";
 import { isSensitiveKey, keyWords } from "../src/core/logging.ts";
 import { loadGeneratedDescriptors } from "../src/public-api/commands.ts";
 import type { CliParam } from "../src/types.ts";
@@ -63,4 +63,10 @@ test("every credential-looking response field of the manifest is withheld or rev
   for (const name of [...Object.keys(PRINTED_ON_PURPOSE), ...NOT_CREDENTIALS, ...Object.keys(WITHHELD_RESPONSE_FIELDS)]) assert.ok(names.has(name), `${name} is no longer a response field of the manifest`);
   // What is printed on purpose is still masked in the local log.
   for (const name of Object.keys(PRINTED_ON_PURPOSE)) assert.ok(isSensitiveKey(name), `${name} is printed but must stay masked in the log`);
+});
+
+test("withheldFieldFor names the withheld field by any spelling of it, and nothing inherited or similar", () => {
+  for (const key of ["signing_key", "signingKey", "SigningKey", "Signing_Key", "signing-key", "SIGNING_KEY", "signing.key"]) assert.equal(withheldFieldFor(key), "signing_key", key);
+  for (const key of ["signing", "key", "signing_keys", "constructor", "__proto__", "toString", ""]) assert.equal(withheldFieldFor(key), undefined, key);
+  assert.deepEqual(Object.keys(WITHHELD_RESPONSE_FIELDS).every((name) => withheldFieldFor(name) === name), true);
 });

@@ -36,7 +36,7 @@ export const commonArgs: ArgsDef = {
   "generate-input": { type: "boolean", description: "Print a JSON body skeleton and exit" },
 };
 
-// --fields and --jq are text. A bare one reaches here as `true`; it is refused before the request (refuseMissingGlobalValues),
+// --fields and --jq are text. A bare one reaches here as `true`; it is refused before the request (refuseMissingValues),
 // and again here so that nothing renders a response with a filter that isn't one.
 function textFlag(args: Args, name: "fields" | "jq"): string | undefined {
   const value = args[name];
@@ -101,13 +101,13 @@ export function valuedFlags(defs: ArgsDef = commonArgs): string[] {
 // A flag that takes a value, typed with none (`--base-url=`, as the last word, or followed by another flag), must stop
 // the command before anything is sent: citty reads it as `true` or as nothing, so the call would go to prod, carry a
 // made-up key, or fail on `--fields`/`--jq` only after the request has been made (and a write has happened).
-export function refuseMissingGlobalValues(rawArgs: string[], defs: ArgsDef = commonArgs): void {
+export function refuseMissingValues(rawArgs: string[], defs: ArgsDef = commonArgs): void {
   const missing = flagMissingValue(rawArgs, valuedFlags(defs));
   if (missing) throw new CliError("usage.flag_value", `--${missing} needs a value.`, `Write --${missing}=<value>. Nothing was sent.`);
 }
 
 export function configFrom(args: Args, rawArgs: string[]): Config {
-  refuseMissingGlobalValues(rawArgs);
+  refuseMissingValues(rawArgs);
   return resolveConfig({ env: args.env as string | undefined, baseUrl: readHidden(rawArgs, "base-url"), beta: Boolean(args.beta) });
 }
 

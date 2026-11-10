@@ -13,7 +13,7 @@ import { flagOf } from "./flags.ts";
 import { apiBaseUrl } from "./config.ts";
 import { maskUrlQuery } from "./logging.ts";
 import { envelope, render } from "./output.ts";
-import { HEADER, OUTCOME_ROUTES, SEND_ONCE_ROUTES, WITHHELD_RESPONSE_FIELDS } from "./constants.ts";
+import { HEADER, OUTCOME_ROUTES, SEND_ONCE_ROUTES, WITHHELD_RESPONSE_FIELDS, withheldFieldFor } from "./constants.ts";
 
 export type ParsedCall = {
   flags: Record<string, string | string[]>; // path + query values (arrays for repeatable query params)
@@ -223,9 +223,9 @@ export function withholdSecrets(data: unknown): { kept: unknown; withheld: strin
   const withheld = new Set<string>();
   const strip = (item: unknown): unknown => {
     if (!isPlainObject(item)) return item;
-    const secrets = Object.keys(item).filter((key) => Object.hasOwn(WITHHELD_RESPONSE_FIELDS, key));
+    const secrets = Object.keys(item).filter((key) => withheldFieldFor(key) !== undefined);
     if (!secrets.length) return item;
-    for (const key of secrets) withheld.add(key);
+    for (const key of secrets) withheld.add(withheldFieldFor(key)!);
     return Object.fromEntries(Object.entries(item).filter(([key]) => !secrets.includes(key)));
   };
   return { kept: Array.isArray(data) ? data.map(strip) : strip(data), withheld: [...withheld] };

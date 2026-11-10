@@ -534,6 +534,13 @@ test("withholdSecrets reads only its own keys, so a field named like an Object m
   assert.deepEqual(withheld, ["signing_key"]);
 });
 
+test("a withheld field is withheld in every spelling of its name, and reported under the name the constant gives", () => {
+  const data = [{ id: "a", signingKey: "1" }, { id: "b", Signing_Key: "2" }, { id: "c", "signing-key": "3", SIGNING_KEY: "4" }, { id: "d", signing_key: "5", signingkeys: "keep" }];
+  const { kept, withheld } = withholdSecrets(data);
+  assert.deepEqual(kept, [{ id: "a" }, { id: "b" }, { id: "c" }, { id: "d", signingkeys: "keep" }]);
+  assert.deepEqual(withheld, ["signing_key"]);
+});
+
 const simulateDescriptor: Descriptor = {
   ...createDescriptor,
   command: ["webhooks", "test"],

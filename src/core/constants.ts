@@ -64,6 +64,18 @@ export const WITHHELD_RESPONSE_FIELDS: Record<string, string> = {
   signing_key: "reveal the signing key in Developer Center → Webhooks",
 };
 
+// A key's words: `download_url`, `downloadUrl` and `download-url` are all download + url.
+export function keyWords(key: string): string[] {
+  return key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+}
+
+// The withheld field a response key names, whatever its spelling (`signing_key`, `signingKey`, `Signing-Key`), or
+// undefined. Matched by name only: an inherited property such as `constructor` is not a field.
+const WITHHELD_BY_SPELLING = new Map(Object.keys(WITHHELD_RESPONSE_FIELDS).map((name) => [keyWords(name).join("_"), name]));
+export function withheldFieldFor(key: string): string | undefined {
+  return WITHHELD_BY_SPELLING.get(keyWords(key).join("_"));
+}
+
 // Endpoints whose every call acts again (a test delivery): sent once, with no retry and no derived Idempotency-Key,
 // so running the command again sends a new one. Keyed "METHOD /path" with the path params as {}.
 export const SEND_ONCE_ROUTES = new Set(["POST /webhooks/{}/simulate"]);

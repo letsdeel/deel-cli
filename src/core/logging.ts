@@ -4,7 +4,9 @@
 import { appendFileSync, mkdirSync, statSync, renameSync, existsSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
-import { LOG_DIR_MODE, LOG_FILE_MODE, LOG_MAX_BYTES_DEFAULT, LOG_MAX_FILES_DEFAULT, LINK_KEY_WORDS, SENSITIVE_LOG_KEYS, SENSITIVE_LOG_WORDS } from "./constants.ts";
+import { LOG_DIR_MODE, LOG_FILE_MODE, LOG_MAX_BYTES_DEFAULT, LOG_MAX_FILES_DEFAULT, LINK_KEY_WORDS, SENSITIVE_LOG_KEYS, SENSITIVE_LOG_WORDS, keyWords } from "./constants.ts";
+
+export { keyWords };
 
 // A logger is any sink for structured entries; the default writes bounded NDJSON.
 export type Logger = (entry: Record<string, unknown>) => void;
@@ -34,17 +36,20 @@ function logDir(): string {
   return join(process.env.XDG_STATE_HOME ?? join(home, ".local", "state"), "deel", "logs");
 }
 
-// Match by substring so variants (access_token, tax_id, …) are caught, not just exact keys; the short names that
-// would match inside other words are matched as whole words of the key.
+// The needles with an underscore (`account_number`), as one run of letters (`accountnumber`), for a key written
+// with no separator at all.
+const RUN_TOGETHER_KEYS = [...SENSITIVE_LOG_KEYS].filter((needle) => needle.includes("_")).map((needle) => needle.replaceAll("_", ""));
+
+// Match by substring so variants (access_token, tax_id, …) are caught, not just exact keys, whichever way the key is
+// spelled: `taxId`, `tax-id`, `TAX_ID` and `taxid` are one name. The short names that would match inside other words
+// are matched as whole words of the key.
 export function isSensitiveKey(key: string): boolean {
+  const words = keyWords(key);
   const lower = key.toLowerCase();
   for (const needle of SENSITIVE_LOG_KEYS) if (lower.includes(needle)) return true;
-  return keyWords(key).some((word) => SENSITIVE_LOG_WORDS.has(word));
-}
-
-// A key's words: `download_url`, `downloadUrl` and `download-url` are all download + url.
-export function keyWords(key: string): string[] {
-  return key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  const run = words.join("");
+  if (RUN_TOGETHER_KEYS.some((needle) => run.includes(needle))) return true;
+  return words.some((word) => SENSITIVE_LOG_WORDS.has(word));
 }
 
 // Whether a key names a link (a url, uri, link or href), whose value may be signed in its query or fragment.

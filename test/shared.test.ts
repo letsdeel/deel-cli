@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { configFrom, gatherFlagValues, gatherFiles, outputOpts, readHidden, refuseMissingGlobalValues } from "../src/commands/shared.ts";
+import { configFrom, gatherFlagValues, gatherFiles, outputOpts, readHidden, refuseMissingValues } from "../src/commands/shared.ts";
 
 test("gatherFlagValues reads a repeatable flag in every spelling the parser accepts, in the order typed", () => {
   assert.deepEqual(gatherFlagValues(["--job-ids", "a", "--job-ids=b"], "job_ids"), ["a", "b"]);
@@ -59,7 +59,7 @@ test("a global flag typed without its value stops the command before anything is
   refused(["--idempotency-key="], "idempotency-key");
   refused(["--idempotency-key", "--json"], "idempotency-key");
   for (const argv of [["--base-url", "https://a.test/rest"], ["--base-url=https://a.test/rest"], ["--baseUrl", "https://a.test/rest"], ["--env", "demo"], ["--env=demo"], ["--idempotency-key=k"], ["--ca-cert", "root.pem"], ["list", "--", "--base-url"], []]) {
-    assert.doesNotThrow(() => refuseMissingGlobalValues(argv), argv.join(" "));
+    assert.doesNotThrow(() => refuseMissingValues(argv), argv.join(" "));
   }
   assert.equal(configFrom({ json: true }, ["--base-url", "https://a.test/rest"]).baseUrl, "https://a.test/rest");
 });
@@ -67,12 +67,12 @@ test("a global flag typed without its value stops the command before anything is
 test("every string flag of the command set is refused with no value, not only the ones that pick the environment", () => {
   for (const flag of ["fields", "jq", "input", "file"]) {
     for (const argv of [[`--${flag}`], [`--${flag}=`], [`--${flag}`, "--json"], ["list", `--${flag}`]]) {
-      assert.throws(() => refuseMissingGlobalValues(argv), (err: any) => err.code === "usage.flag_value" && err.message === `--${flag} needs a value.`, argv.join(" "));
+      assert.throws(() => refuseMissingValues(argv), (err: any) => err.code === "usage.flag_value" && err.message === `--${flag} needs a value.`, argv.join(" "));
     }
   }
   // A value that starts with - is attached; a lone - (stdin) and a negative number are values; a boolean flag takes none.
   for (const argv of [["--jq=-.a"], ["--input", "-"], ["--fields", "id,name"], ["--jq", ".data[]"], ["--jq", "-1"], ["--json"], ["--raw", "--quiet"], ["--fields=a", "--jq=.a", "--input=a=1"]]) {
-    assert.doesNotThrow(() => refuseMissingGlobalValues(argv), argv.join(" "));
+    assert.doesNotThrow(() => refuseMissingValues(argv), argv.join(" "));
   }
 });
 

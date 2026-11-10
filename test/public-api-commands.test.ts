@@ -9,6 +9,7 @@ import { captureIO } from "../src/core/io.ts";
 import { execute } from "../src/core/executor.ts";
 import type { Descriptor } from "../src/types.ts";
 import { EXIT } from "../src/core/errors.ts";
+import { flagOf } from "../src/core/flags.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
 import { manifest as handPicked } from "../src/manifest.generated.ts";
 import { generatedDescriptors, loadGeneratedDescriptors, matchForm, selectForm, setGeneratedDescriptorsForTests } from "../src/public-api/commands.ts";
@@ -492,11 +493,11 @@ test("--help counts a flag's value as no argument: the words alone list every en
 test("--help never lists a response field the CLI withholds", async () => {
   const webhook = thing([{ name: "id", in: "path", type: "string", required: true }], {
     command: ["hooks", "get"], path: "/hooks/{id}", responseKind: "object",
-    responseFields: [{ name: "id", in: "body", type: "string", required: false }, { name: "signing_key", in: "body", type: "string", required: false, description: "Secret" }],
+    responseFields: [{ name: "id", in: "body", type: "string", required: false }, { name: "signing_key", in: "body", type: "string", required: false, description: "Secret" }, { name: "signingKey", in: "body", type: "string", required: false }],
   });
   const human = await capture(["hooks", "get", "--help"], [webhook]);
   assert.match(human.out, /^ {2}id /m);
-  assert.doesNotMatch(human.out, /signing_key/);
+  assert.doesNotMatch(human.out, /signing_?key/i);
   const json = JSON.parse((await capture(["hooks", "get", "--help", "--json"], [webhook])).out);
   assert.deepEqual(json.response.fields.map((field: { name: string }) => field.name), ["id"]);
 });
@@ -616,6 +617,44 @@ test("an optional selector of the committed map works bare and written out, thro
 });
 
 // ---------------- boolean and other flag values of a committed command ----------------
+
+// The flags of an endpoint that take a value, as a user types them: its own parameters (not a switch, and not an
+// argument the form fills) and the scope flags of its form.
+function valuedFlagsOf(descriptor: Descriptor): string[] {
+  const scopes = descriptor.form?.scopes ?? [];
+  const own = descriptor.params.filter((param) => param.type !== "boolean" && !(descriptor.form && (param.in === "path" || scopes.some((s) => s.param === param.name))));
+  return [...own.map(flagOf), ...scopes.map((s) => s.flag)];
+}
+
+// The words of a command, with its variant selector and its other required selectors and scope flags, so only the
+// flag under test is missing a value.
+function argvFor(descriptor: Descriptor, flag: string): string[] {
+  const form = descriptor.form;
+  const given = form ? spellings(form).bare.filter((_, index, all) => !all.slice(index - 1, index + 1).includes(`--${flag}`)) : [];
+  return [...descriptor.command, ...(descriptor.variant ? [`--${descriptor.variant}`] : []), ...given];
+}
+
+test("every value flag of every generated command stops before any request when it is typed with no value", async () => {
+  // The hand-picked commands (jobs, adjustments) are always registered, so nothing is generated beside them.
+  const lists: Array<{ walk: Descriptor[]; generated: Descriptor[] }> = [{ walk: handPicked.descriptors, generated: [] }, { walk: await loadGeneratedDescriptors(), generated: await loadGeneratedDescriptors() }];
+  let tried = 0;
+  for (const { walk, generated } of lists) {
+    for (const descriptor of walk) {
+      const flags = valuedFlagsOf(descriptor);
+      for (const flag of new Set(flags)) {
+        for (const typed of [[`--${flag}`], [`--${flag}=`]]) {
+          const called = await callApi([...argvFor(descriptor, flag), ...typed], generated);
+          const where = `${descriptor.command.join(" ")} ${descriptor.variant ? `--${descriptor.variant} ` : ""}${typed.join(" ")}`;
+          assert.equal(called.sent.length, 0, `${where} sent a request`);
+          assert.equal(called.code, EXIT.ERROR, where);
+          assert.match(called.err, /needs a value/, where);
+          tried++;
+        }
+      }
+    }
+  }
+  assert.ok(tried > 1400, `only ${tried} flags tried`);
+});
 
 test("a boolean query flag of a committed command reads true and false in every spelling, and the value is never an argument", async () => {
   const committed = await loadGeneratedDescriptors();

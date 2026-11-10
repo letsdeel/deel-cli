@@ -7,7 +7,7 @@ import type { CliParam, Descriptor } from "./types.ts";
 import { CLI_VERSION } from "./version.ts";
 import { commonArgs } from "./commands/shared.ts";
 import { flagOf } from "./core/flags.ts";
-import { WITHHELD_RESPONSE_FIELDS } from "./core/constants.ts";
+import { withheldFieldFor } from "./core/constants.ts";
 import { usageOf } from "./public-api/commands.ts";
 
 // Flattens nested object fields into dotted paths (request.amount, ...) so every
@@ -21,7 +21,7 @@ function flattenFields(fields: CliParam[], prefix = ""): CliParam[] {
 }
 
 // The response fields a caller can read: the secrets the CLI withholds (see execute) are never printed, so they aren't listed.
-const shownResponseFields = (descriptor: Descriptor): CliParam[] => descriptor.responseFields.filter((field) => !Object.hasOwn(WITHHELD_RESPONSE_FIELDS, field.name));
+const shownResponseFields = (descriptor: Descriptor): CliParam[] => descriptor.responseFields.filter((field) => withheldFieldFor(field.name) === undefined);
 
 export function printVersion(): void {
   process.stdout.write(`deel ${CLI_VERSION}\n`);

@@ -17,7 +17,7 @@ import { setLoggingEnabled, setLogBodiesEnabled } from "./core/logging.ts";
 import { EXIT } from "./core/errors.ts";
 import { CliError } from "./core/errors.ts";
 import { CLI_VERSION } from "./version.ts";
-import { commandToken, commonArgs, configFrom, gatherFiles, gatherFlagValues, outputOpts, refuseMissingGlobalValues } from "./commands/shared.ts";
+import { commandToken, commonArgs, configFrom, gatherFiles, gatherFlagValues, outputOpts, refuseMissingValues, valuedFlags } from "./commands/shared.ts";
 import type { Args } from "./commands/shared.ts";
 import { staticCommands } from "./commands/index.ts";
 import { printActionHelp, printFormsHelp, printFormsJson, printContractJson, printGlobalOptions, printSkeleton, printVariantGroupHelp, printVersion } from "./help.ts";
@@ -50,7 +50,9 @@ function argsForDescriptor(descriptor: Descriptor): ArgsDef {
 // params a form fills itself: its positional IDs and its scope flags, whether the param sits in the path or the query.
 async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<string, unknown>; rawArgs: string[] }, formValues: Record<string, string> = {}): Promise<void> {
   const args = cittyCtx.args as Args;
-  refuseMissingGlobalValues(cittyCtx.rawArgs); // before --input, --file or anything else reads its value, and before any request
+  // Every flag of this endpoint that takes a value (its own parameters as well as the global ones), before --input, --file
+  // or anything else reads a value, and before any request: citty reads a bare one as `true` or as the next flag.
+  refuseMissingValues(cittyCtx.rawArgs, argsForDescriptor(descriptor));
   setLoggingEnabled(args.log !== false);
   setLogBodiesEnabled(args["log-bodies"] === true);
 
@@ -249,11 +251,6 @@ function buildRoot(): CommandDef {
     meta: { name: "deel", version: CLI_VERSION, description: "Deel CLI — spec-driven client for the Deel Public API" },
     subCommands,
   });
-}
-
-// The names of the flags that take a value, as `args` declares them (a switch takes none), the hidden --base-url included.
-function valuedFlags(args: ArgsDef): string[] {
-  return ["base-url", ...Object.entries(args).filter(([, def]) => (def as { type?: string }).type !== "boolean").map(([name]) => name)];
 }
 
 // The words in argv, each with its index: the tokens that are neither a flag nor the value of one that takes a

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { withLogging } from "../src/core/http.ts";
 import type { HttpRequest, HttpResponse, Transport } from "../src/core/http.ts";
+import { SENSITIVE_LOG_KEYS } from "../src/core/constants.ts";
 import { isLinkKey, isSensitiveKey, keyWords, log, looksPersonal, maskLink, maskUrlQuery, setLoggingEnabled, setLogBodiesEnabled } from "../src/core/logging.ts";
 import { loadGeneratedDescriptors } from "../src/public-api/commands.ts";
 import type { CliParam } from "../src/types.ts";
@@ -316,4 +317,29 @@ test("an email or a JWT is found as a token, with its edges, and nothing else is
   ];
   for (const [text, personal] of cases) assert.equal(looksPersonal(text), personal, text);
   assert.equal(maskUrlQuery("https://x/y?q=<ana@example.com>,bob@example.org;ok"), "https://x/y?q=%3C***%3E%2C***%3Bok");
+});
+
+test("every needle of SENSITIVE_LOG_KEYS is masked in every spelling of a key: snake, camel, Pascal, kebab, UPPER_SNAKE, dotted, run together", () => {
+  const missed: string[] = [];
+  for (const needle of SENSITIVE_LOG_KEYS) {
+    const words = needle.split("_");
+    const capital = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
+    const spellings = [
+      needle,
+      words[0] + words.slice(1).map(capital).join(""),
+      words.map(capital).join(""),
+      words.join("-"),
+      words.join("_").toUpperCase(),
+      words.join("."),
+      words.join(""),
+      `user_${needle}`,
+      `user${words.map(capital).join("")}`,
+      `${needle}_value`,
+    ];
+    for (const spelling of spellings) if (!isSensitiveKey(spelling)) missed.push(`${needle} -> ${spelling}`);
+  }
+  assert.deepEqual(missed, []);
+  // The camelCase and kebab-case forms the reviewer named, and the ordinary names that must stay readable.
+  for (const key of ["accountNumber", "account-number", "ribNumber", "taxId", "idNumber", "personalId", "SigningKey", "x-api-key"]) assert.equal(isSensitiveKey(key), true, key);
+  for (const key of ["id", "name", "status", "created_at", "company_id", "contractId", "workerType", "planning", "setting"]) assert.equal(isSensitiveKey(key), false, key);
 });
