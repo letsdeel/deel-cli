@@ -194,9 +194,9 @@ function printFormSection(descriptor: Descriptor): void {
   if (options.length) {
     out(`\nOPTIONS\n`);
     for (const param of options) {
-      const options = param.enum ? `  [${param.enum.join(" | ")}]` : "";
+      const choices = param.enum ? `  [${param.enum.join(" | ")}]` : "";
       const requiredTag = param.required ? "  (required)" : "";
-      out(`  --${flagOf(param)}=<${param.type}>${requiredTag}${options}${param.description ? `   ${param.description}` : ""}\n`);
+      out(`  --${flagOf(param)}=<${param.type}>${requiredTag}${choices}${param.description ? `   ${param.description}` : ""}\n`);
     }
     if (options.some((param) => param.type === "boolean")) out(`  A boolean is on with --<flag>, --<flag>=true or --<flag> true, and off with --no-<flag>, --<flag>=false or --<flag> false.\n`);
   }

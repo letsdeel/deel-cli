@@ -275,3 +275,45 @@ test("a body string that holds an email or a JWT is masked even under an ordinar
   assert.deepEqual(parsed.response.items, [{ memo: "token ***" }, { memo: "plain" }]);
   delete process.env.DEEL_LOG_DIR;
 });
+
+test("masking personal text is linear: long unspaced runs of email- and JWT-like text finish at once", () => {
+  const n = 1_000_000;
+  const shapes = ["a", "a@", "a@a.", "@@@@", ".....", "a@a.a.a.a.", "eyJ.eyJ.", "eyJa.b.", "a.@", "==&&??//", " a@ "];
+  for (const shape of shapes) {
+    const text = shape.repeat(Math.ceil(n / shape.length));
+    const startedAt = performance.now();
+    looksPersonal(text);
+    const masked = maskUrlQuery(`https://x/y?q=${text}&k=${text.slice(0, 1000)}`);
+    assert.equal(typeof masked, "string");
+    const took = performance.now() - startedAt;
+    assert.ok(took < 2000, `${JSON.stringify(shape)} took ${Math.round(took)} ms`);
+  }
+  // A very long key goes through the key policy just as fast.
+  const key = "a_".repeat(500_000);
+  const startedAt = performance.now();
+  isSensitiveKey(key);
+  isLinkKey(key);
+  keyWords(key);
+  assert.ok(performance.now() - startedAt < 2000);
+});
+
+test("an email or a JWT is found as a token, with its edges, and nothing else is", () => {
+  const cases: Array<[string, boolean]> = [
+    ["ana@example.com", true],
+    ["Ana.Lopez+tag@mail.example.co.uk", true],
+    ["ana@example", false],
+    ["@example.com", false],
+    ["ana@.com", false],
+    ["ana@example.", false],
+    ["ana@a..b", false],
+    ["a@b.c", true],
+    ["eyJhbGciOi.eyJzdWIiOi.c2ln", true],
+    ["eyJhbGciOi.eyJzdWIiOi.", true],
+    ["eyJhbGciOi.eyJzdWIiOi", false],
+    ["eyJhbGciOi.e yJ.x", false],
+    ["notajwt.eyJa.b", false],
+    ["plain text with a.dot and 5 @ signs", false],
+  ];
+  for (const [text, personal] of cases) assert.equal(looksPersonal(text), personal, text);
+  assert.equal(maskUrlQuery("https://x/y?q=<ana@example.com>,bob@example.org;ok"), "https://x/y?q=%3C***%3E%2C***%3Bok");
+});

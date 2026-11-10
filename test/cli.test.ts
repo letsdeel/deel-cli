@@ -299,3 +299,9 @@ test("a variant selector written --invoice=true selects it, and --invoice=false 
   const no = await capture(["adjustments", "create", "--no-invoice", "--generate-input"]);
   assert.equal(no.code, EXIT.ERROR);
 });
+
+test("a --base-url with no value fails before any request, on a generated command and on a static one", async () => {
+  for (const argv of [["contracts", "list", "--base-url"], ["contracts", "list", "--base-url="], ["contracts", "list", "--base-url", "--json"], ["job", "status", "j1", "--base-url="]]) {
+    await assert.rejects(() => run(argv), (error: unknown) => error instanceof CliError && error.code === "usage.flag_value" && /--base-url needs a value/.test(error.message), argv.join(" "));
+  }
+});

@@ -76,7 +76,7 @@ test("execute() drives the injected transport + IOStreams (DI)", async () => {
   assert.equal(req.headers["x-version"], createDescriptor.version);
 
   // Output went through IOStreams, not process.stdout.
-  const parsed = JSON.parse((io as any).stdout.join(""));
+  const parsed = JSON.parse(io.stdout.join(""));
   assert.equal(parsed.data.id, "adj_1");
   assert.ok(!("kind" in parsed));
 });
@@ -155,7 +155,7 @@ test("execute() renders a 202 response body directly (no polling)", async () => 
     { output: { json: true, quiet: false, raw: false }, debug: false, form: false },
   );
 
-  const parsed = JSON.parse((io as any).stdout.join(""));
+  const parsed = JSON.parse(io.stdout.join(""));
   assert.equal(parsed.data.batch_id, "batch_1");
   assert.equal(parsed.data.items[0].status, "PENDING");
 });
@@ -494,7 +494,7 @@ test("a SCIM command calls the /scim base path and renders the unwrapped SCIM bo
   await execute(scimDescriptor, { flags: {}, body: undefined, files: {} }, ctx, { output: { json: true, quiet: false, raw: false }, debug: false, form: false });
 
   assert.equal(seen[0].url, "https://example.test/scim/Users");
-  const parsed = JSON.parse((io as any).stdout.join(""));
+  const parsed = JSON.parse(io.stdout.join(""));
   assert.equal(parsed.data.Resources[0].id, "u1");
 });
 
@@ -502,10 +502,10 @@ test("a webhook's signing key is never printed, from one webhook or a list, and 
   for (const json of [{ data: { id: "w1", signing_key: "sk_secret" } }, { data: [{ id: "w1", signing_key: "sk_secret" }, { id: "w2" }] }]) {
     const { ctx, io } = ctxWith(() => ({ status: 200, headers: {}, text: "", json }));
     await execute(logsGetDescriptor, { flags: { request_id: "w1" }, files: {} }, ctx, JSON_OUT);
-    const out = (io as any).stdout.join("");
+    const out = io.stdout.join("");
     assert.ok(!out.includes("sk_secret"), out);
     assert.match(out, /"w1"/);
-    assert.match((io as any).stderr.join(""), /signing_key is not printed: reveal the signing key in Developer Center/);
+    assert.match(io.stderr.join(""), /signing_key is not printed: reveal the signing key in Developer Center/);
   }
 });
 
@@ -559,7 +559,7 @@ test("a send-once call goes out once, with no derived Idempotency-Key, so a repe
 test("a 2xx whose response reports is_success: false prints the response, then fails", async () => {
   const { ctx, io } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { is_success: false, delivery: { response_status_code: 500 } } } }));
   await assert.rejects(execute(simulateDescriptor, simulateCall, ctx, quiet), (err: any) => err.code === "api.unsuccessful" && /is_success: false/.test(err.message) && err.requestId === "req-fixed-id");
-  assert.equal(JSON.parse((io as any).stdout.join("")).data.delivery.response_status_code, 500);
+  assert.equal(JSON.parse(io.stdout.join("")).data.delivery.response_status_code, 500);
   const ok = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { is_success: true } } }));
   await execute(simulateDescriptor, simulateCall, ok.ctx, quiet);
   const list = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: [{ is_success: false }] } }));

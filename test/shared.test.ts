@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { gatherFlagValues, gatherFiles, readHidden } from "../src/commands/shared.ts";
+import { configFrom, gatherFlagValues, gatherFiles, readHidden, refuseMissingGlobalValues } from "../src/commands/shared.ts";
 
 test("gatherFlagValues reads a repeatable flag in every spelling the parser accepts, in the order typed", () => {
   assert.deepEqual(gatherFlagValues(["--job-ids", "a", "--job-ids=b"], "job_ids"), ["a", "b"]);
@@ -9,7 +9,7 @@ test("gatherFlagValues reads a repeatable flag in every spelling the parser acce
   assert.deepEqual(gatherFlagValues(["--job-ids", "a"], "job-ids"), ["a"]);
   assert.deepEqual(gatherFlagValues(["--job_idsx", "a", "--job-ids-x=b"], "job_ids"), []);
   assert.deepEqual(gatherFlagValues(["--user-i-ds", "a", "--userIDs=b"], "userIDs"), ["a", "b"]);
-  assert.deepEqual(gatherFlagValues(["--job_ids"], "job_ids"), []);
+  assert.throws(() => gatherFlagValues(["--job_ids"], "job_ids"), (err: any) => err.code === "usage.flag_value" && /last argument/.test(err.message));
   assert.deepEqual(gatherFlagValues(["--description", "xxevent", "a"], "event"), []);
   assert.throws(() => gatherFlagValues(["--job-ids", "--x"], "job_ids"), (err: any) => err.code === "usage.flag_value" && /--job-ids needs a value/.test(err.message));
 });
@@ -35,4 +35,31 @@ test("readHidden reads --base-url in every spelling the parser accepts (kebab an
   }
   assert.equal(readHidden(["--", "--base-url", "https://a.test"], "base-url"), undefined);
   assert.equal(readHidden(["--base-urls", "https://a.test"], "base-url"), undefined);
+});
+
+test("a --file with nothing after it is a usage error, not a request sent without the file", () => {
+  assert.throws(() => gatherFiles(["--file"]), (err: any) => err.code === "usage.file" && /last argument/.test(err.message));
+  assert.throws(() => gatherFiles(["--file", "cv=@a.pdf", "--file"]), (err: any) => err.code === "usage.file");
+  assert.deepEqual(gatherFiles(["--other", "--file", "cv=@a.pdf"]), { cv: ["a.pdf"] });
+});
+
+test("a global flag typed without its value stops the command before anything is sent, instead of defaulting to prod", () => {
+  const refused = (argv: string[], flag: string) =>
+    assert.throws(() => configFrom({ json: true }, argv), (err: any) => err.code === "usage.flag_value" && err.message === `--${flag} needs a value.` && /Nothing was sent/.test(err.next), argv.join(" "));
+  refused(["--base-url="], "base-url");
+  refused(["--base-url"], "base-url");
+  refused(["list", "--base-url"], "base-url");
+  refused(["--base-url", "--json"], "base-url");
+  refused(["--baseUrl="], "baseUrl");
+  refused(["--baseUrl", "--beta"], "baseUrl");
+  refused(["--env="], "env");
+  refused(["--env"], "env");
+  refused(["--env", "--json"], "env");
+  refused(["--ca-cert"], "ca-cert");
+  refused(["--idempotency-key="], "idempotency-key");
+  refused(["--idempotency-key", "--json"], "idempotency-key");
+  for (const argv of [["--base-url", "https://a.test/rest"], ["--base-url=https://a.test/rest"], ["--baseUrl", "https://a.test/rest"], ["--env", "demo"], ["--env=demo"], ["--idempotency-key=k"], ["--ca-cert", "root.pem"], ["list", "--", "--base-url"], []]) {
+    assert.doesNotThrow(() => refuseMissingGlobalValues(argv), argv.join(" "));
+  }
+  assert.equal(configFrom({ json: true }, ["--base-url", "https://a.test/rest"]).baseUrl, "https://a.test/rest");
 });

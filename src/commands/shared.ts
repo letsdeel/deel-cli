@@ -7,7 +7,7 @@ import type { OutputOpts } from "../core/output.ts";
 import { resolveConfig } from "../core/config.ts";
 import type { Config } from "../core/config.ts";
 import { CliError } from "../core/errors.ts";
-import { acceptsFlag } from "../core/flags.ts";
+import { acceptsFlag, flagMissingValue } from "../core/flags.ts";
 import { authFor, resolveToken } from "../core/auth.ts";
 import type { TokenProvider } from "../core/http.ts";
 import type { CredentialStore } from "../core/keychain.ts";
@@ -71,7 +71,8 @@ export function gatherFiles(rawArgs: string[]): Record<string, string[]> {
     let spec: string | undefined;
     if (token === "--file") spec = rawArgs[++index];
     else if (token.startsWith("--file=")) spec = token.slice("--file=".length);
-    if (spec === undefined) continue;
+    else continue;
+    if (spec === undefined) throw new CliError("usage.file", "--file expects field=@path, but it is the last argument.", "Write --file field=@path.");
     const equalsIndex = spec.indexOf("=");
     if (equalsIndex < 0) throw new CliError("usage.file", `--file expects field=@path, got "${spec}"`);
     const field = spec.slice(0, equalsIndex);
@@ -82,7 +83,18 @@ export function gatherFiles(rawArgs: string[]): Record<string, string[]> {
   return files;
 }
 
+// Global flags whose value picks where a call goes or how it is sent. One typed with no value (`--base-url=`, as the
+// last word, or followed by another flag) must stop the command: citty reads it as `true` or as nothing, and the call
+// would go to prod, or carry a made-up key, though the user pointed it elsewhere.
+const VALUED_GLOBAL_FLAGS = ["base-url", "env", "ca-cert", "idempotency-key"];
+
+export function refuseMissingGlobalValues(rawArgs: string[]): void {
+  const missing = flagMissingValue(rawArgs, VALUED_GLOBAL_FLAGS);
+  if (missing) throw new CliError("usage.flag_value", `--${missing} needs a value.`, `Write --${missing}=<value>. Nothing was sent.`);
+}
+
 export function configFrom(args: Args, rawArgs: string[]): Config {
+  refuseMissingGlobalValues(rawArgs);
   return resolveConfig({ env: args.env as string | undefined, baseUrl: readHidden(rawArgs, "base-url"), beta: Boolean(args.beta) });
 }
 
@@ -103,8 +115,9 @@ export function gatherFlagValues(rawArgs: string[], name: string): string[] {
     const flag = equals === -1 ? token : token.slice(0, equals);
     if (!acceptsFlag(name, flag.slice(2))) continue;
     if (equals !== -1) values.push(token.slice(equals + 1));
-    else if (rawArgs[index + 1] !== undefined) {
+    else {
       const value = rawArgs[++index];
+      if (value === undefined) throw new CliError("usage.flag_value", `${flag} needs a value, but it is the last argument.`, `Write ${flag}=<value>.`);
       // A flag in the value position means the value is missing; --name=--x still passes one that starts with --.
       if (value.startsWith("--")) throw new CliError("usage.flag_value", `${flag} needs a value, but the next argument is ${value}.`, `Write ${flag}=${value} if the value really starts with --.`);
       values.push(value);

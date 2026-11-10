@@ -67,16 +67,55 @@ function decoded(text: string): string {
   }
 }
 
+// A value that is personal data whatever key carries it: an email address (`?q=ana@example.com`, a free-text `note`) or
+// a JWT-shaped token. Key names can't catch a search or filter parameter, or a note, that holds one. Read as a single
+// pass over the text, split into tokens at whitespace and URL or punctuation delimiters, with plain checks on each
+// token (no regular expression over unbounded input, so a long run of `a@a.` can't make it quadratic).
+const TOKEN_DELIMITERS = new Set("/?&=,;<>()[]{}\"'");
+const BASE64URL = /^[\w-]+$/;
+const isDelimiter = (char: string): boolean => TOKEN_DELIMITERS.has(char) || /\s/.test(char);
+
+function isEmail(token: string): boolean {
+  const at = token.indexOf("@");
+  if (at < 1) return false;
+  const domain = token.slice(at + 1);
+  for (let index = 1; index < domain.length - 1; index++) if (domain[index] === "." && domain[index - 1] !== "." && domain[index + 1] !== "." && domain[index + 1] !== "@") return true;
+  return false;
+}
+
+function isJwt(token: string): boolean {
+  if (!token.startsWith("eyJ")) return false;
+  const parts = token.split(".");
+  return parts.length === 3 && BASE64URL.test(parts[0]) && BASE64URL.test(parts[1]) && (parts[2] === "" || BASE64URL.test(parts[2]));
+}
+
+const isPersonalToken = (token: string): boolean => isEmail(token) || isJwt(token);
+
+function scanPersonal(text: string, mask: boolean): { found: boolean; text: string } {
+  const out: string[] = [];
+  let found = false;
+  let start = 0;
+  for (let index = 0; index <= text.length; index++) {
+    if (index < text.length && !isDelimiter(text[index])) continue;
+    const token = text.slice(start, index);
+    if (token && isPersonalToken(token)) {
+      found = true;
+      if (!mask) return { found, text };
+      out.push("***");
+    } else out.push(token);
+    if (index < text.length) out.push(text[index]);
+    start = index + 1;
+  }
+  return { found, text: out.join("") };
+}
+
+export const looksPersonal = (text: string): boolean => scanPersonal(text, false).found;
+const maskPersonalText = (text: string): string => scanPersonal(text, true).text;
+
 // A request URL with the values of its sensitive query parameters masked, by the same key policy as a body field
 // (`?email=...`, `?personalId=...`, `?ids[]=...`, a repeated key, an encoded key); the other parameters, the path and the
 // host stay readable. The fragment is never sent to a server and may hold a token, so it is cut. A value under a link key
 // (`?redirect_url=...`) loses its own query like a link in a body. Text that isn't a URL passes unchanged.
-// A value that is personal data whatever key carries it: an email address (`?q=ana@example.com`, a free-text `note`) or
-// a JWT-shaped token. Key names can't catch a search or filter parameter, or a note, that holds one.
-const PERSONAL_TEXT = "[^\\s@/?&=]+@[^\\s@/?&=]+\\.[^\\s@/?&=]+|\\beyJ[\\w-]+\\.[\\w-]+\\.[\\w-]*";
-export const looksPersonal = (text: string): boolean => new RegExp(PERSONAL_TEXT).test(text);
-const maskPersonalText = (text: string): string => text.replace(new RegExp(PERSONAL_TEXT, "g"), "***");
-
 export function maskUrlQuery(url: string): string {
   const hash = url.indexOf("#");
   const withoutFragment = hash === -1 ? url : url.slice(0, hash);
