@@ -308,6 +308,30 @@ test("a static command refuses --version, --versions and --beta instead of ignor
   assert.match((await cli(["--version"])).out, /^deel \d+\.\d+\.\d+/);
 });
 
+test("BETA_ACCESS_REQUIRED after X-Beta was sent gets no hint to add --beta, and keeps the API's own", async () => {
+  const body = { error: { code: "BETA_ACCESS_REQUIRED", message: "Beta access required" } };
+  const sent = await call(descriptor({ version: "2026-09-15", beta: true }), [fail(400, body)]);
+  assert.equal(sent.seen[0].headers["x-beta"], "true");
+  assert.equal(sent.error.code, "BETA_ACCESS_REQUIRED");
+  assert.equal(sent.error.next, undefined);
+  const given = await call(descriptor({ version: "2026-09-15", beta: true }), [fail(400, { error: { ...body.error, next: "Ask your admin." } })]);
+  assert.equal(given.error.next, "Ask your admin.");
+});
+
+test("--help wins over --versions: it prints the help, even where --versions alone would be refused", async () => {
+  const help = await cli(["widgets", "reports", "list", "--versions", "--help"]);
+  assert.equal(help.code, EXIT.OK);
+  assert.match(help.out, /USAGE/);
+  assert.doesNotMatch(help.out, /"default": true/, "not the versions listing");
+  // A hand-picked command has no versions to list (usage.versions), a variant group needs a variant first.
+  const handPicked = await cli(["adjustments", "create", "--invoice", "--versions", "--help"]);
+  assert.equal(handPicked.code, EXIT.OK);
+  assert.match(handPicked.out, /USAGE/);
+  const group = await cli(["adjustments", "create", "--versions", "--help"]);
+  assert.equal(group.code, EXIT.OK, group.error?.message);
+  assert.doesNotMatch(group.out, /"default": true/);
+});
+
 test("a beta error in the nested { errors: { errors: [...] } } shape is retried like the others", async () => {
   const nested = fail(400, { errors: { errors: [{ code: "INVALID_VERSION_BETA", message: "Version is not in beta" }] } });
   const { seen, error } = await call(descriptor({ version: "2026-09-15", beta: true }), [nested, ok()]);

@@ -121,7 +121,7 @@
   "test/stubs.ts": "dcbf3fd49a134bebf2282a5f43f56954ce3bf4f6b3806fb126ed7e288da15121",
   "test/tls.test.ts": "4e6633bb1f770384994d307b45a8539caf0e640ea077d743766894ee0c89acdf",
   "test/tokens.test.ts": "__deleted__",
-  "test/versions.test.ts": "989c26d3d3e41625b7d36d74b7d793b9dbda3dffbf9992bbe87492cabb7b1e79",
+  "test/versions.test.ts": "e8c6af094fc78261a33132bed264054b654aad88c9ed09b78b7f382f92b79bfd",
   "test/webhooks-simulate.test.ts": "__deleted__",
   "test/webhooks-write.test.ts": "__deleted__",
   "test/webhooks.test.ts": "__deleted__",
