@@ -101,7 +101,7 @@ export function selectForm(candidates: Descriptor[], argv: string[]): Descriptor
   throw new CliError("usage.variant", `The flags given match no single form of 'deel ${words}'.`, `Use one of:\n${lines}`);
 }
 
-// ---------------- domains: the lifecycle stage and description of each top-level word ----------------
+// ---------------- domains: the description, and the lifecycle stage that orders `deel --help`, of each top-level word ----------------
 
 type DomainStage = { stage: string; domains: { name: string; description: string }[] };
 const stages = domainStages as DomainStage[];

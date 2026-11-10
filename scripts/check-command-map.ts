@@ -23,7 +23,7 @@ export type Finding = { entry: string; message: string };
 export type CheckOptions = {
   reserved?: Reserved; // hand-picked and static command names, which the map may not take
   released?: Descriptor[]; // the committed manifest: a released command line never changes
-  domains?: string[]; // the top-level words src/public-api/domains.json places under a lifecycle stage in deel --help
+  domains?: string[]; // the top-level words src/public-api/domains.json describes (and orders by stage) for deel --help
 };
 
 const routeOf = (method: string, path: string, api = "rest") => `${api === "scim" ? "scim " : ""}${method.toUpperCase()} ${path.replace(/\{[^}]+\}/g, "{}")}`;
@@ -81,7 +81,7 @@ export function checkMap(entries: MapEntry[], options: CheckOptions = {}): { fai
     else fail(`same command line as ${before.path}`);
   }
 
-  // Every domain is placed under a lifecycle stage in deel --help.
+  // Every domain has a stage and a description in domains.json, which deel --help lists it by.
   if (options.domains) {
     const known = new Set(options.domains);
     for (const domain of new Set(parsed.map((p) => p.words[0]))) {
@@ -122,7 +122,7 @@ function usageOf(entry: MapEntry | undefined, released: Descriptor): string | un
   }
 }
 
-// The domain names domains.json places under a lifecycle stage. A missing or malformed file is a failure, not a crash,
+// The domain names domains.json lists, under their lifecycle stages. A missing or malformed file is a failure, not a crash,
 // and so is a stage or domain without the text `deel --help` prints for it.
 export function readDomainNames(file: string): string[] {
   let stages: unknown;
