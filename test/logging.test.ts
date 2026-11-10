@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { withLogging } from "../src/core/http.ts";
 import type { HttpRequest, HttpResponse, Transport } from "../src/core/http.ts";
-import { isLinkKey, isSensitiveKey, keyWords, log, maskLink, setLoggingEnabled, setLogBodiesEnabled } from "../src/core/logging.ts";
+import { isLinkKey, isSensitiveKey, keyWords, log, maskLink, maskUrlQuery, setLoggingEnabled, setLogBodiesEnabled } from "../src/core/logging.ts";
 import { loadGeneratedDescriptors } from "../src/public-api/commands.ts";
 import type { CliParam } from "../src/types.ts";
 
@@ -120,6 +120,43 @@ test("keyWords and isLinkKey read snake, kebab and camel case; maskLink only cut
   assert.equal(maskLink("https://a.test/p?x=1#y"), "https://a.test/p?***");
   assert.equal(maskLink("https://a.test/p#y"), "https://a.test/p?***");
   assert.equal(maskLink("not a link?x"), "not a link?***");
+});
+
+test("a logged request URL masks the values of sensitive query parameters like a body field, and keeps the rest readable", () => {
+  const mask = maskUrlQuery;
+  assert.equal(mask("https://x/rest/people?email=a%40b.co&page=2&personal_id=P123&limit=5"), "https://x/rest/people?email=***&page=2&personal_id=***&limit=5");
+  // Any spelling of the key, as the body policy reads it: case, camel case, an encoded key, a list key, a repeated key.
+  assert.equal(mask("https://x/p?Token=a&personalId=b&PERSONAL-ID=c&ids%5B%5D=1&access%5Ftoken=d&tax_id=e&tax_id=f&ids=9"), "https://x/p?Token=***&personalId=***&PERSONAL-ID=***&ids%5B%5D=1&access%5Ftoken=***&tax_id=***&tax_id=***&ids=9");
+  assert.equal(mask("https://x/p?ssn[]=1&ssn[]=2&iban=GB00"), "https://x/p?ssn[]=***&ssn[]=***&iban=***");
+  // A key with a plus or an empty value, a parameter with no value, no query, an empty query.
+  assert.equal(mask("https://x/p?email=&flag&page=1"), "https://x/p?email=***&flag&page=1");
+  assert.equal(mask("https://x/p"), "https://x/p");
+  assert.equal(mask("https://x/p?"), "https://x/p?");
+  assert.equal(mask("/rest/p?token=a"), "/rest/p?token=***");
+  // A link-valued parameter loses the query of its own link; the fragment, which a server never sees, is cut.
+  assert.equal(mask("https://x/p?redirect_url=https%3A%2F%2Fy.co%2Fcb%3Fsig%3Dabc&page=1"), "https://x/p?redirect_url=https%3A%2F%2Fy.co%2Fcb%3F***&page=1");
+  assert.equal(mask("https://x/p?page=1#access_token=abc"), "https://x/p?page=1#***");
+  assert.equal(mask("https://x/p#frag"), "https://x/p#***");
+  // A key that doesn't decode is read as written.
+  assert.equal(mask("https://x/p?%E0%A4%A=1&email=a"), "https://x/p?%E0%A4%A=1&email=***");
+  // The path and the host are not parameters: they stay.
+  assert.equal(mask("https://token.example.co/rest/tokens/abc?page=2"), "https://token.example.co/rest/tokens/abc?page=2");
+});
+
+test("--log-bodies logs the request URL with its sensitive query values masked; the default log keeps no query at all", async () => {
+  const url = "https://x/rest/people?email=a%40b.co&personal_id=P123&page=2";
+  const run = async (bodies: boolean) => {
+    setLogBodiesEnabled(bodies);
+    const c = captured();
+    await withLogging(c.logger, () => 0)(async () => res({ ok: true }))(req({ url }));
+    return c.entries[0].url;
+  };
+  try {
+    assert.equal(await run(true), "https://x/rest/people?email=***&personal_id=***&page=2");
+    assert.equal(await run(false), "https://x/rest/people");
+  } finally {
+    setLogBodiesEnabled(false);
+  }
 });
 
 // ---- the masking policy against the generated manifest ----

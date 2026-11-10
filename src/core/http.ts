@@ -6,7 +6,7 @@ import { CliError } from "./errors.ts";
 import { redactHeaders } from "./auth.ts";
 import { isCertError, TLS_HINT, installCaTrust } from "./tls.ts";
 import type { Logger } from "./logging.ts";
-import { bodyLoggingEnabled } from "./logging.ts";
+import { bodyLoggingEnabled, maskUrlQuery } from "./logging.ts";
 import { HEADER, HTTP_TIMEOUT_MS, RETRY_MAX_ATTEMPTS, RETRY_BASE_DELAY_MS } from "./constants.ts";
 
 export type HttpRequest = {
@@ -59,8 +59,8 @@ export const fetchTransport: Transport = async (request) => {
     return { status: response.status, headers: headersToObject(response.headers), text, json };
   } catch (error) {
     const failure = error as Error;
-    if (failure.name === "AbortError") throw new CliError("network.timeout", `Request timed out: ${request.method} ${request.url}`);
-    if (isCertError(error)) throw new CliError("network.tls", `TLS verification failed: ${request.url}`, TLS_HINT);
+    if (failure.name === "AbortError") throw new CliError("network.timeout", `Request timed out: ${request.method} ${maskUrlQuery(request.url)}`);
+    if (isCertError(error)) throw new CliError("network.tls", `TLS verification failed: ${maskUrlQuery(request.url)}`, TLS_HINT);
     throw new CliError("network.error", `Network error: ${failure.message}`);
   } finally {
     clearTimeout(timer);
@@ -88,7 +88,7 @@ export function withAuth(token: string | TokenProvider | null): Middleware {
     const hasHeader = Boolean(request.headers[HEADER.authorization]);
     const willSendCredential = Boolean(token) || hasHeader;
     if (willSendCredential && !isHttps(request.url)) {
-      throw new CliError("network.insecure", `Refusing to send credentials over a non-https URL: ${request.url}`, "Only https endpoints are supported.");
+      throw new CliError("network.insecure", `Refusing to send credentials over a non-https URL: ${maskUrlQuery(request.url)}`, "Only https endpoints are supported.");
     }
     if (token && !hasHeader) {
       const value = typeof token === "function" ? await token() : token;
@@ -154,7 +154,7 @@ export function withLogging(logger: Logger, clock: () => number): Middleware {
       kind: "request",
       ...(request.meta ?? {}),
       method: request.method,
-      url: withBodies ? request.url : urlPath(request.url),
+      url: withBodies ? maskUrlQuery(request.url) : urlPath(request.url),
       request_id: request.headers[HEADER.requestId],
       status: response.status,
       duration_ms: clock() - startedAt,

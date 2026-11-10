@@ -47,6 +47,14 @@ const createDescriptor: Descriptor = {
   responseFields: [],
 };
 
+test("--debug prints the request line with its sensitive query values masked", async () => {
+  const { ctx, io } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: [] } }));
+  const lookup: Descriptor = { ...createDescriptor, method: "GET", bodyKind: "none", bodyProps: [], params: [{ name: "email", in: "query", type: "string", required: false }, { name: "page", in: "query", type: "string", required: false }] };
+  await execute(lookup, { flags: { email: "a@b.co", page: "2" }, files: {} }, ctx, { output: { json: true, quiet: false, raw: false }, debug: true, form: false });
+  const line = io.stderr.join("").split("\n").find((text) => text.startsWith("[debug] GET"));
+  assert.match(line ?? "", /^\[debug\] GET https:\/\/example\.test\/rest\/adjustments\?email=\*\*\*&page=2 -> 200/);
+});
+
 test("execute() drives the injected transport + IOStreams (DI)", async () => {
   const { ctx, io, seen } = ctxWith(() => ({ status: 201, headers: {}, text: "", json: { data: { id: "adj_1", amount: 5000 } } }));
 

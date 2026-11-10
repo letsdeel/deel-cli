@@ -46,15 +46,16 @@ function argsForDescriptor(descriptor: Descriptor): ArgsDef {
   return args;
 }
 
-// Shared execution body extracted so both actionCommand and variantCommand can delegate to it.
-async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<string, unknown>; rawArgs: string[] }, pathValues: Record<string, string> = {}): Promise<void> {
+// Shared execution body extracted so both actionCommand and variantCommand can delegate to it. `formValues` are the
+// params a form fills itself: its positional IDs and its scope flags, whether the param sits in the path or the query.
+async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<string, unknown>; rawArgs: string[] }, formValues: Record<string, string> = {}): Promise<void> {
   const args = cittyCtx.args as Args;
   setLoggingEnabled(args.log !== false);
   setLogBodiesEnabled(args["log-bodies"] === true);
 
-  const flags: Record<string, string | string[]> = { ...pathValues };
+  const flags: Record<string, string | string[]> = { ...formValues };
   for (const param of descriptor.params) {
-    if (param.name in pathValues) continue;
+    if (param.name in formValues) continue;
     if (param.type === "array") {
       const values = gatherFlagValues(cittyCtx.rawArgs, flagOf(param));
       if (values.length) flags[param.name] = values;
@@ -195,10 +196,10 @@ function formCommand(descriptors: Descriptor[]): CommandDef {
         const count = form.positionals.length;
         throw new CliError("usage.params", `'${usageOf(descriptor)}' takes ${count} argument${count === 1 ? "" : "s"}, not ${given.length}.`, "Run it with --help to see the arguments.");
       }
-      const pathValues: Record<string, string> = {};
-      form.positionals.forEach((positional, index) => (pathValues[positional.param] = given[index]));
-      for (const scope of form.scopes) pathValues[scope.param] = String(args[scope.flag]);
-      await runDescriptor(descriptor, { ...cittyCtx, rawArgs, args }, pathValues);
+      const formValues: Record<string, string> = {};
+      form.positionals.forEach((positional, index) => (formValues[positional.param] = given[index]));
+      for (const scope of form.scopes) formValues[scope.param] = String(args[scope.flag]);
+      await runDescriptor(descriptor, { ...cittyCtx, rawArgs, args }, formValues);
     },
   });
 }

@@ -154,7 +154,7 @@ test("a missing required query param is reported under the flag the user types",
     config: { env: "demo", baseUrl: "https://example.test/rest", issuer: null, clientId: "test-client", oauthBaseUrlOk: false }, token: "tok_test", io: captureIO({}), logger: () => {},
     baseTransport: async () => { throw new Error("no request expected"); },
   });
-  await assert.rejects(execute(descriptor, { flags: {}, files: {} }, ctx, { output: {} as any, debug: false, form: false }), /--fields-param/);
+  await assert.rejects(execute(descriptor, { flags: {}, files: {} }, ctx, { output: { json: true, raw: false, quiet: false }, debug: false, form: false }), /--fields-param/);
 });
 
 const thing = (params: Descriptor["params"], extra: Partial<Descriptor> = {}): Descriptor => ({
@@ -206,7 +206,7 @@ test("a missing path param names the flag the user types, including the -param r
     baseTransport: async () => { throw new Error("no request expected"); },
   });
   await assert.rejects(
-    execute(descriptor, { flags: {}, files: {} }, ctx, { output: {} as any, debug: false, form: false }),
+    execute(descriptor, { flags: {}, files: {} }, ctx, { output: { json: true, raw: false, quiet: false }, debug: false, form: false }),
     (error: any) => error.code === "usage.path_param" && /Missing required path parameter --file-param$/.test(error.message),
   );
 });
@@ -733,11 +733,9 @@ test("a flag of another endpoint of the same words is refused for a selector swi
 });
 
 test("a variant command refuses a flag only another variant takes, instead of dropping it from the request", async () => {
-  const base = { command: ["gadgets", "create"], async: false, bodyKind: "none", supportsMultipart: false, bodyWrapper: "none", bodyProps: [], fileFields: [], responseKind: "none", responseFields: [] } as const;
-  const gadgets = [
-    { ...base, variant: "red", method: "POST", path: "/gadgets/red", params: [{ name: "shade", in: "query", type: "string", required: false }] },
-    { ...base, variant: "blue", method: "POST", path: "/gadgets/blue", params: [{ name: "tint", in: "query", type: "string", required: false }] },
-  ] as unknown as Descriptor[];
+  const gadget = (variant: string, flag: string) =>
+    thing([{ name: flag, in: "query", type: "string", required: false }], { command: ["gadgets", "create"], method: "POST", path: `/gadgets/${variant}`, variant });
+  const gadgets = [gadget("red", "shade"), gadget("blue", "tint")];
   const ok = await callApi(["gadgets", "create", "--red", "--shade", "dark"], gadgets);
   assert.equal(ok.code, EXIT.OK, ok.err);
   assert.equal(ok.sent[0].url.search.slice(1), "shade=dark");
@@ -748,7 +746,7 @@ test("a variant command refuses a flag only another variant takes, instead of dr
 });
 
 test("a command of a single endpoint refuses a flag it doesn't have instead of running without it", async () => {
-  const gizmo = { command: ["gizmos", "list"], method: "GET", path: "/gizmos", async: false, bodyKind: "none", supportsMultipart: false, bodyWrapper: "none", params: [{ name: "limit", in: "query", type: "string", required: false }], bodyProps: [], fileFields: [], responseKind: "none", responseFields: [] } as unknown as Descriptor;
+  const gizmo = thing([{ name: "limit", in: "query", type: "string", required: false }], { command: ["gizmos", "list"], path: "/gizmos" });
   const ok = await callApi(["gizmos", "list", "--limit", "5"], [gizmo]);
   assert.equal(ok.code, EXIT.OK, ok.err);
   assert.equal(ok.sent[0].url.search.slice(1), "limit=5");

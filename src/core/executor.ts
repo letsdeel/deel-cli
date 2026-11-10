@@ -11,6 +11,7 @@ import { deriveIdempotencyKey } from "./idempotency.ts";
 import { CliError } from "./errors.ts";
 import { flagOf } from "./flags.ts";
 import { apiBaseUrl } from "./config.ts";
+import { maskUrlQuery } from "./logging.ts";
 import { envelope, render } from "./output.ts";
 import { HEADER, OUTCOME_ROUTES, SEND_ONCE_ROUTES, WITHHELD_RESPONSE_FIELDS } from "./constants.ts";
 
@@ -190,7 +191,7 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
     meta: { command: descriptor.command.join(" "), idempotency_key: idempotencyKey },
   });
 
-  if (opts.debug) ctx.io.err(`[debug] ${descriptor.method} ${url} -> ${response.status}  x-request-id=${requestId}\n`);
+  if (opts.debug) ctx.io.err(`[debug] ${descriptor.method} ${maskUrlQuery(String(url))} -> ${response.status}  x-request-id=${requestId}\n`);
 
   if (response.status >= 400) throw errorFromResponse(response.status, response.json, requestId, ctx.config.beta === true);
 

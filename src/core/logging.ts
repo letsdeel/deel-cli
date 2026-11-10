@@ -59,6 +59,37 @@ export function maskLink(value: string): string {
   return cut === -1 ? value : `${value.slice(0, cut)}?***`;
 }
 
+function decoded(text: string): string {
+  try {
+    return decodeURIComponent(text.replace(/\+/g, " "));
+  } catch {
+    return text;
+  }
+}
+
+// A request URL with the values of its sensitive query parameters masked, by the same key policy as a body field
+// (`?email=...`, `?personalId=...`, `?ids[]=...`, a repeated key, an encoded key); the other parameters, the path and the
+// host stay readable. The fragment is never sent to a server and may hold a token, so it is cut. A value under a link key
+// (`?redirect_url=...`) loses its own query like a link in a body. Text that isn't a URL passes unchanged.
+export function maskUrlQuery(url: string): string {
+  const hash = url.indexOf("#");
+  const withoutFragment = hash === -1 ? url : url.slice(0, hash);
+  const cut = withoutFragment.indexOf("?");
+  if (cut === -1) return hash === -1 ? url : `${withoutFragment}#***`;
+  const params = withoutFragment
+    .slice(cut + 1)
+    .split("&")
+    .map((pair) => {
+      const equals = pair.indexOf("=");
+      if (equals === -1) return pair;
+      const key = decoded(pair.slice(0, equals)).replace(/\[\]$/, "");
+      const value = pair.slice(equals + 1);
+      if (isSensitiveKey(key)) return `${pair.slice(0, equals)}=***`;
+      return isLinkKey(key) ? `${pair.slice(0, equals)}=${encodeURIComponent(maskLink(decoded(value)))}` : pair;
+    });
+  return `${withoutFragment.slice(0, cut)}?${params.join("&")}${hash === -1 ? "" : "#***"}`;
+}
+
 // `link` is true under a link key, which masks the query of the strings it holds (or lists). The entry's own top-level
 // keys are not redacted this way: its `url` is the request URL, kept whole under --log-bodies.
 function redact(value: unknown, link = false): unknown {
