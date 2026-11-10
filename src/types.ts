@@ -57,7 +57,7 @@ export type CommandForm = {
 export type FormSelector = {
   flag: string; // e.g. "worker-type", "as", "bulk"
   value?: string; // e.g. "eor"; absent for a switch such as --bulk
-  optional?: true; // written [--worker-type eor]: the only endpoint with these words, so the flag may be left out
+  optional?: true; // written [--worker-type eor]: the flag may be left out, and the command without it calls this endpoint (others sharing the words are picked by their own flags)
 };
 
 export type VersionInfo = {

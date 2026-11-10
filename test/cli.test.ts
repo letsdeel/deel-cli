@@ -278,3 +278,24 @@ test("--version and the static commands never load the generated manifest; a gen
     setGeneratedDescriptorsForTests(undefined);
   }
 });
+
+test("-v and --version after -- are arguments, not a version request", async () => {
+  for (const argv of [["--help", "--", "-v"], ["--help", "--", "--version"], ["adjustments", "create", "--invoice", "--generate-input", "--", "--version"]]) {
+    const { code, out } = await capture(argv);
+    assert.equal(code, EXIT.OK, argv.join(" "));
+    assert.doesNotMatch(out, /^deel \d+\.\d+\.\d+\n?$/, argv.join(" "));
+  }
+  // Before --, both spellings are the version request.
+  for (const argv of [["-v"], ["--version"], ["adjustments", "--version", "--", "x"]]) assert.match((await capture(argv)).out, /^deel \d+\.\d+\.\d+/, argv.join(" "));
+});
+
+test("a variant selector written --invoice=true selects it, and --invoice=false does not", async () => {
+  const on = await capture(["adjustments", "create", "--invoice=true", "--generate-input"]);
+  assert.equal(on.code, EXIT.OK);
+  assert.ok("contract_id" in JSON.parse(on.out));
+  const off = await capture(["adjustments", "create", "--invoice=false", "--generate-input"]);
+  assert.equal(off.code, EXIT.ERROR);
+  assert.match(off.err, /Specify a variant first/);
+  const no = await capture(["adjustments", "create", "--no-invoice", "--generate-input"]);
+  assert.equal(no.code, EXIT.ERROR);
+});

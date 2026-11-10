@@ -614,3 +614,78 @@ test("an optional selector of the committed map works bare and written out, thro
     assert.deepEqual(called.sent.map((s) => s.url.pathname), ["/rest/eor/contracts/c1/amendments/a1/pdf"], argv.join(" "));
   }
 });
+
+// ---------------- boolean and other flag values of a committed command ----------------
+
+test("a boolean query flag of a committed command reads true and false in every spelling, and the value is never an argument", async () => {
+  const committed = await loadGeneratedDescriptors();
+  const queryOf = async (...argv: string[]) => {
+    const called = await callApi(["legal-entities", "list", ...argv], committed);
+    return { ...called, query: called.sent[0]?.url.searchParams.get("include_archived") ?? null };
+  };
+  for (const [argv, expected] of [
+    [["--include-archived"], "true"],
+    [["--include-archived", "true"], "true"],
+    [["--include-archived=true"], "true"],
+    [["--include-archived", "false"], "false"],
+    [["--include-archived=false"], "false"],
+    [["--no-include-archived"], "false"],
+    [["--include_archived", "false"], "false"],
+    [["--includeArchived", "false"], "false"],
+    [[], null],
+  ] as Array<[string[], string | null]>) {
+    const called = await queryOf(...argv);
+    assert.equal(called.code, EXIT.OK, `${argv.join(" ")}: ${called.err}`);
+    assert.equal(called.query, expected, argv.join(" "));
+    assert.equal(called.sent.length, 1, argv.join(" "));
+  }
+  // The value belongs to the flag next to it: a second switch and an ordinary word after it are still themselves.
+  const two = await callApi(["legal-entities", "list", "--include-archived", "false", "--global-payroll", "true"], committed);
+  assert.deepEqual([two.sent[0].url.searchParams.get("include_archived"), two.sent[0].url.searchParams.get("global_payroll")], ["false", "true"]);
+  // A word that is not true or false is still an argument, and this command takes none.
+  const stray = await callApi(["legal-entities", "list", "--include-archived", "maybe"], committed);
+  assert.notEqual(stray.code, EXIT.OK);
+  assert.equal(stray.sent.length, 0);
+  assert.match(stray.err, /takes 0 arguments, not 1/);
+});
+
+test("--help says how a boolean flag is turned on and off", async () => {
+  const committed = await loadGeneratedDescriptors();
+  const { code, out } = await capture(["legal-entities", "list", "--help"], committed);
+  assert.equal(code, EXIT.OK);
+  assert.match(out, /--include_archived=<boolean>/);
+  assert.match(out, /on with --<flag>, --<flag>=true or --<flag> true, and off with --no-<flag>, --<flag>=false or --<flag> false/);
+  const plain = await capture(["contracts", "get", "--help"], committed);
+  assert.doesNotMatch(plain.out, /A boolean is on with/);
+});
+
+test("a flag that takes a value must be given one: bare, empty or followed by another flag sends nothing", async () => {
+  const committed = await loadGeneratedDescriptors();
+  const managers = ["access", "managers", "list"];
+  for (const argv of [[...managers, "--limit"], [...managers, "--limit="], [...managers, "--limit", "--json"], [...managers, "--limit", "--no-log"],
+    ["adjustments", "categories", "list", "--contract-types"], ["adjustments", "categories", "list", "--contract-types="],
+    ["ats", "applications", "list", "--sort-order"], ["ats", "applications", "list", "--sort-order="], ["ats", "applications", "list", "--sort-order", "--json"]]) {
+    const called = await callApi(argv, committed);
+    assert.notEqual(called.code, EXIT.OK, argv.join(" "));
+    assert.match(called.err, /--[a-z-]+ needs a value/, argv.join(" "));
+    assert.equal(called.sent.length, 0, argv.join(" "));
+  }
+  // The flag is named as the user typed it, not by the API's spelling.
+  assert.match((await callApi(["adjustments", "categories", "list", "--contract-types"], committed)).err, /--contract-types needs a value/);
+  // Values that look like flags but are not: a negative number, attached or separate, and a repeated array flag.
+  for (const [argv, query] of [
+    [[...managers, "--limit", "-1"], "limit=-1"],
+    [[...managers, "--limit=-1"], "limit=-1"],
+    [[...managers, "--limit", "5"], "limit=5"],
+    [["adjustments", "categories", "list", "--contract-types", "a", "--contract-types=b"], "contract_types=a&contract_types=b"],
+    [["ats", "applications", "list", "--sort-order=DESC"], "sort_order=DESC"],
+  ] as Array<[string[], string]>) {
+    const called = await callApi(argv, committed);
+    assert.equal(called.code, EXIT.OK, `${argv.join(" ")}: ${called.err}`);
+    assert.equal(called.sent[0].url.search.slice(1), query, argv.join(" "));
+  }
+  // A wrong enum value is still the parser's own refusal, before any request.
+  const wrong = await callApi(["ats", "applications", "list", "--sort-order=BAD"], committed);
+  assert.notEqual(wrong.code, EXIT.OK);
+  assert.equal(wrong.sent.length, 0);
+});

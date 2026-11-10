@@ -9,7 +9,7 @@ import type { ArgsDef, CommandDef } from "citty";
 import type { Descriptor } from "./types.ts";
 import { manifest } from "./manifest.generated.ts";
 import { generatedDescriptors, loadGeneratedDescriptors, matchForm, pickingFlags, selectForm, usageOf } from "./public-api/commands.ts";
-import { acceptsFlag, argvEnables, argvMentionsFlag, flagOf, joinSwitchValues } from "./core/flags.ts";
+import { acceptsFlag, argvEnables, argvMentionsFlag, flagMissingValue, flagOf, joinSwitchValues } from "./core/flags.ts";
 import { parseInput } from "./core/input.ts";
 import { createContext } from "./core/context.ts";
 import { execute } from "./core/executor.ts";
@@ -121,10 +121,12 @@ function variantCommand(descriptors: Descriptor[]): CommandDef {
   });
 }
 
-// The switches a group's flags may carry: its switch selectors and the boolean global flags.
+// The switches a group's flags may carry: the boolean global flags, its endpoints' own boolean parameters and its
+// switch selectors. `--flag false` is read as `--flag=false` for each of them, so a stray `false` is never an argument.
 function switchesOf(descriptors: Descriptor[]): string[] {
   const globals = Object.entries(commonArgs).filter(([, def]) => (def as { type?: string }).type === "boolean").map(([name]) => name);
-  return [...globals, ...descriptors.flatMap((d) => d.form!.selectors.filter((s) => s.value === undefined).map((s) => s.flag))];
+  const own = descriptors.flatMap((d) => d.params.filter((param) => param.type === "boolean").map(flagOf));
+  return [...globals, ...own, ...descriptors.flatMap((d) => (d.form?.selectors ?? []).filter((s) => s.value === undefined).map((s) => s.flag))];
 }
 
 // The first flag in argv, as typed, that none of `known` accepts in any spelling the parser reads (--a-b, --aB, --no-a).
@@ -158,6 +160,9 @@ function formCommand(descriptors: Descriptor[]): CommandDef {
       // A sibling's switch typed off (--no-bulk) is known too: it is how the form without it is picked.
       const unknown = unknownFlag(rawArgs, [...Object.keys(defs), ...switchesOf(descriptors)]);
       if (unknown) throw new CliError("usage.flag", `'${usageOf(descriptor)}' has no flag ${unknown}.`, "Run it with --help to see its flags.");
+      // A flag that takes a value and has none would swallow the next flag as its value (or send it empty).
+      const missing = flagMissingValue(rawArgs, [...descriptor.params.filter((param) => param.type !== "boolean").map(flagOf), ...form.scopes.map((scope) => scope.flag), ...form.selectors.filter((s) => s.value !== undefined).map((s) => s.flag)]);
+      if (missing) throw new CliError("usage.flag_value", `--${missing} needs a value.`, `Write --${missing}=<value>; run it with --help to see the values.`);
       const args = parseArgs(rawArgs, defs) as Args & { _: string[] };
       const given = args._.map(String);
       if (given.length !== form.positionals.length) {

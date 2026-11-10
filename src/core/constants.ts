@@ -11,17 +11,23 @@ export const LOG_MAX_BYTES_DEFAULT = 10 * 1024 * 1024;
 export const LOG_MAX_FILES_DEFAULT = 5;
 export const LOG_DIR_MODE = 0o700;  // owner read/write/enter; no group or other access
 export const LOG_FILE_MODE = 0o600; // owner read/write only
-// Substrings matched (case-insensitive) against keys; a match masks the value.
+// Substrings matched (case-insensitive) against keys; a match masks the value. The policy: credentials, financial and
+// government identifiers, and personal data that identifies a person. test/logging.test.ts walks every field name
+// of the generated manifest against it, so a new endpoint's sensitive-looking name fails CI until it is added here
+// or reviewed as safe there.
 export const SENSITIVE_LOG_KEYS = new Set([
   "token", "password", "secret", "authorization", "credential",
-  "api_key", "apikey", "ssn", "tax", "iban", "swift", "email",
-  "phone", "mobile", "dob", "birth", "address", "bank", "card",
-  "cvv", "cvc", "pin", "passport", "national_id", "routing", "account_number",
-  "signing_key",
+  "api_key", "apikey", "private_key", "access_key", "signing_key",
+  "ssn", "tax", "iban", "swift", "email", "phone", "mobile", "dob", "birth", "address", "bank", "card",
+  "cvv", "cvc", "pin", "passport", "national_id", "routing", "account_number", "salary", "gender", "nationalit",
   // Links that sign the holder in or fetch a file without further auth (magic and pre-signed links), and the
   // government, tax and bank identifiers of the generated commands that the names above don't contain.
-  "magic_link", "download_link", "upload_url", "pdf_url", "identity_document", "vat_id", "sort_code", "branch_code",
+  "magic_link", "download_link", "upload_url", "pdf_url", "identity_document", "id_number", "vat_id", "vat_number",
+  "sort_code", "branch_code", "rib_number", "ifsc", "bsb", "signature", "account_holder",
 ]);
+// Words of a key (`download_url`, `downloadUrl`) that name a link. A link in a response body is logged without its
+// query string and fragment, where a pre-signed link keeps its signature.
+export const LINK_KEY_WORDS = new Set(["url", "urls", "uri", "uris", "link", "links", "href", "hrefs"]);
 
 // --- Executor: withheld fields and one-shot endpoints ---
 // Response fields that are secrets the CLI never prints: a webhook's signing key comes back on every webhook read

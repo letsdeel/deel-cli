@@ -56,3 +56,21 @@ export function joinSwitchValues(argv: string[], switches: string[]): string[] {
   }
   return out;
 }
+
+// The first of `flags` (which take a value) that argv types without one, as it was typed: as the last token, followed by another
+// flag, or as an empty `--flag=`. A lone `-` (stdin) and a negative number are values; any other value starting
+// with - has to be attached (--flag=-x), since a separate one reads as the next flag. Tokens after `--` are arguments.
+export function flagMissingValue(argv: string[], flags: string[]): string | undefined {
+  for (let index = 0; index < argv.length; index++) {
+    const token = argv[index];
+    if (token === "--") return undefined;
+    if (!token.startsWith("--")) continue;
+    const at = token.indexOf("=");
+    const typed = at === -1 ? token.slice(2) : token.slice(2, at);
+    if (!flags.some((candidate) => acceptsFlag(candidate, typed))) continue;
+    const value = at === -1 ? argv[index + 1] : token.slice(at + 1);
+    const isValue = value !== undefined && value !== "" && (at !== -1 || !value.startsWith("-") || value === "-" || /^-\d+(\.\d+)?$/.test(value));
+    if (!isValue) return typed;
+  }
+  return undefined;
+}

@@ -61,7 +61,7 @@ Coverage floor over `src/**` (in `test:coverage`): lines ≥ 80 %, branches ≥ 
 - Output is always a JSON envelope `{ data, meta: { request_id }, page? }` by default; `--fields`, `--jq`, `--raw`, `--quiet`, `--no-json` in `core/output.ts`.
 - **Exit codes are binary (0/1).** Failure detail lives in the stderr envelope `{ error: { code, message, next, request_id } }`; throw `CliError(code, message, next?)` (`core/errors.ts`) with a dotted code like `usage.variant`, `auth.missing`, `http.<status>`.
 - TLS trusts bundled Mozilla + `NODE_EXTRA_CA_CERTS` + OS store (`core/tls.ts`), installed lazily in the transport so offline commands stay fast; on a Bun-binary TLS failure `main.ts` re-execs once.
-- Local NDJSON logging (`core/logging.ts`) logs metadata only by default; sensitive keys are masked via `SENSITIVE_LOG_KEYS`.
+- Local NDJSON logging (`core/logging.ts`) logs metadata only by default; sensitive keys are masked via `SENSITIVE_LOG_KEYS`, and a link's query string and fragment (where a pre-signed link keeps its signature) are cut in logged bodies. `test/logging.test.ts` walks every field name of the generated manifest, so a new endpoint's sensitive-looking name must be masked or reviewed as safe there; `test/constants.test.ts` does the same for credential-looking response fields against `WITHHELD_RESPONSE_FIELDS`.
 - Tunables and header names live in `core/constants.ts`.
 - Base URLs (`core/config.ts`, `--env prod|demo`) end in `/rest`; every REST endpoint, including jobs, goes through that prefix — a base URL without it 404s on every call. SCIM commands swap it for `/scim` (`apiBaseUrl`).
 - Secret response fields (`WITHHELD_RESPONSE_FIELDS` in `core/constants.ts`, e.g. a webhook's `signing_key`) are never printed by generated commands.

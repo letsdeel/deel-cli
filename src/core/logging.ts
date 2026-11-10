@@ -4,7 +4,7 @@
 import { appendFileSync, mkdirSync, statSync, renameSync, existsSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
-import { LOG_DIR_MODE, LOG_FILE_MODE, LOG_MAX_BYTES_DEFAULT, LOG_MAX_FILES_DEFAULT, SENSITIVE_LOG_KEYS } from "./constants.ts";
+import { LOG_DIR_MODE, LOG_FILE_MODE, LOG_MAX_BYTES_DEFAULT, LOG_MAX_FILES_DEFAULT, LINK_KEY_WORDS, SENSITIVE_LOG_KEYS } from "./constants.ts";
 
 // A logger is any sink for structured entries; the default writes bounded NDJSON.
 export type Logger = (entry: Record<string, unknown>) => void;
@@ -35,22 +35,48 @@ function logDir(): string {
 }
 
 // Match by substring so variants (access_token, tax_id, …) are caught, not just exact keys.
-function isSensitiveKey(key: string): boolean {
+export function isSensitiveKey(key: string): boolean {
   const lower = key.toLowerCase();
   for (const needle of SENSITIVE_LOG_KEYS) if (lower.includes(needle)) return true;
   return false;
 }
 
-function redact(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(redact);
+// A key's words: `download_url`, `downloadUrl` and `download-url` are all download + url.
+export function keyWords(key: string): string[] {
+  return key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+}
+
+// Whether a key names a link (a url, uri, link or href), whose value may be signed in its query or fragment.
+export function isLinkKey(key: string): boolean {
+  return keyWords(key).some((word) => LINK_KEY_WORDS.has(word));
+}
+
+// A pre-signed link works for whoever holds it, and the signature sits in its query string or fragment, so those
+// are cut; the scheme, host and path stay for debugging.
+export function maskLink(value: string): string {
+  const cut = value.search(/[?#]/);
+  return cut === -1 ? value : `${value.slice(0, cut)}?***`;
+}
+
+// `link` is true under a link key, which masks the query of the strings it holds (or lists). The entry's own top-level
+// keys are not redacted this way: its `url` is the request URL, kept whole under --log-bodies.
+function redact(value: unknown, link = false): unknown {
+  if (typeof value === "string") return link ? maskLink(value) : value;
+  if (Array.isArray(value)) return value.map((item) => redact(item, link));
   if (value && typeof value === "object") {
     const redacted: Record<string, unknown> = {};
     for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
-      redacted[key] = isSensitiveKey(key) ? "***" : redact(nested);
+      redacted[key] = isSensitiveKey(key) ? "***" : redact(nested, isLinkKey(key));
     }
     return redacted;
   }
   return value;
+}
+
+function redactEntry(entry: Record<string, unknown>): Record<string, unknown> {
+  const redacted: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(entry)) redacted[key] = isSensitiveKey(key) ? "***" : redact(value);
+  return redacted;
 }
 
 function rotate(file: string) {
@@ -74,7 +100,7 @@ export function log(entry: Record<string, unknown>): void {
     mkdirSync(dir, { recursive: true, mode: LOG_DIR_MODE });
     const file = join(dir, "deel.log");
     rotate(file);
-    const line = JSON.stringify({ ts: new Date().toISOString(), ...(redact(entry) as object) }) + "\n";
+    const line = JSON.stringify({ ts: new Date().toISOString(), ...redactEntry(entry) }) + "\n";
     appendFileSync(file, line, { mode: LOG_FILE_MODE });
   } catch {
     /* fail-open: logging must never break a command */
