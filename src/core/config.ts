@@ -2,6 +2,7 @@
 // Precedence: --base-url > --env > DEEL_ENV > default (prod). --base-url alone names its own environment after its host.
 
 import { CliError } from "./errors.ts";
+import type { Api } from "../types.ts";
 
 // Public OAuth client id of the Deel CLI (a public client: no secret). The same in every environment.
 export const CLI_OAUTH_CLIENT_ID = "b035545c-ee8a-4884-a51f-e416447e6d62";
@@ -102,7 +103,7 @@ export function resolveConfig(opts: { env?: string; baseUrl?: string; beta?: boo
 
 // The base URL for a command's API. REST uses the configured base as is; SCIM swaps a
 // trailing /rest for /scim (or appends /scim to a --base-url without one).
-export function apiBaseUrl(baseUrl: string, api: "rest" | "scim" | undefined): string {
+export function apiBaseUrl(baseUrl: string, api: Api | undefined): string {
   if (api !== "scim") return baseUrl;
   return `${baseUrl.replace(/\/rest$/, "")}/scim`;
 }
