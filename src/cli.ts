@@ -349,7 +349,7 @@ export async function run(argv: string[]): Promise<number> {
 
   if (words.length > 0 && matched === 0) {
     const before = options.slice(0, found[0].index).some(isOption);
-    throw new CliError("usage.command", `Unknown command '${first}'.${didYouMean(first, root)}`, before ? "Options go after the command: deel <command> … --option." : "Run 'deel --help' to see available commands.");
+    throw new CliError("usage.command", `Unknown command '${words[0]}'.${didYouMean(words[0], root)}`, before ? "Options go after the command: deel <command> … --option." : "Run 'deel --help' to see available commands.");
   }
   // A word after a group that names none of its commands (a removed or mistyped one) fails instead of showing the
   // group's help and exiting 0.

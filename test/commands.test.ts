@@ -1,10 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import type { CommandDef } from "citty";
 import { run } from "../src/cli.ts";
 import { EXIT } from "../src/core/errors.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
 import { staticCommands } from "../src/commands/index.ts";
-import { commandRows, renderCommandRows } from "../src/commands/commands.ts";
+import { commandRows, renderCommandRows } from "../src/core/commands-list.ts";
 import { manifest as handPicked } from "../src/manifest.generated.ts";
 import { setGeneratedDescriptorsForTests } from "../src/public-api/commands.ts";
 import { parseDefinitions } from "../scripts/public-api/definitions.ts";
@@ -63,11 +64,21 @@ test("deel commands --filter keeps the rows that contain every word, and --json 
   assert.match(empty.err, /--filter needs the text to look for/);
 });
 
-test("commandRows sorts by command and renderCommandRows aligns the columns", () => {
-  const rows = commandRows(manifest.descriptors, {}, undefined);
-  assert.deepEqual(rows.map((row) => row.command), ["contracts get <contract>", "contracts get <contract> --worker-type eor"]);
+test("commandRows sorts by command, then path, whatever order the rows come in; renderCommandRows aligns the columns", () => {
+  const plain = manifest.descriptors.find((d) => d.path === "/contracts/{contract_id}")!;
+  const eor = manifest.descriptors.find((d) => d.path === "/eor/contracts/{contract_id}/details")!;
+  const samePlainCommandLaterPath = { ...plain, path: "/z/contracts/{contract_id}" };
+  const authLike = { meta: { description: "Sign in" } } as unknown as CommandDef;
+  const rows = commandRows([eor, samePlainCommandLaterPath, plain], { auth: authLike }, undefined);
+  assert.deepEqual(rows.map((row) => [row.command, row.path]), [
+    ["auth", null],
+    ["contracts get <contract>", "/contracts/{contract_id}"],
+    ["contracts get <contract>", "/z/contracts/{contract_id}"],
+    ["contracts get <contract> --worker-type eor", "/eor/contracts/{contract_id}/details"],
+  ]);
   const lines = renderCommandRows(rows).trimEnd().split("\n");
-  assert.equal(lines[0].indexOf("GET"), lines[1].indexOf("GET"));
+  assert.equal(lines[1].indexOf("GET"), lines[3].indexOf("GET"));
+  assert.equal(lines[1].indexOf("/contracts"), lines[3].indexOf("/eor"));
 });
 
 test("commands is a reserved static name", () => {

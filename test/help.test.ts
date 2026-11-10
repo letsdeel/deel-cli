@@ -57,7 +57,12 @@ test("root help lists the top-level words under the map's lifecycle stages, the 
     assert.match(out, /^ {2}Hiring {3,}contracts {3,}Every working arrangement: .* \(6 commands\)$/m);
     assert.match(out, /^ {2}Platform {3,}jobs {3,}/m);
     assert.match(out, /^ {3,}scim users list {3,}List users$/m);
-    assert.ok(out.indexOf("People ") < out.indexOf("Hiring "), "stages keep the domains.json order");
+    // The sections follow STAGE_ORDER, CLI first. Alphabetical order of the words would put `jobs` (Platform) before `people`.
+    const present = ["CLI", ...STAGE_ORDER].filter((stage) => new RegExp(`^ {2}${stage} {3,}`, "m").test(out));
+    assert.ok(present.length >= 4, `only ${present.join(", ")} found`);
+    const positions = present.map((stage) => out.search(new RegExp(`^ {2}${stage} {3,}`, "m")));
+    assert.deepEqual(positions, [...positions].sort((a, b) => a - b), `sections out of order: ${present.join(" < ")}`);
+    assert.ok(out.search(/^ {2}Platform {3,}/m) > out.search(/^ {2}People {3,}/m), "Platform comes after People");
     assert.match(out, /^GLOBAL OPTIONS/m);
   }
 });

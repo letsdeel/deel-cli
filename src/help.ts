@@ -381,7 +381,7 @@ function exampleLine(path: string[], row: string): string {
 // What the flags that pick an endpoint mean, shown under a group whose lines use them.
 const PICKING_LEGEND: Record<string, string> = {
   "worker-type": "--worker-type <type>   the contract or worker type (eor, gp, daas, contractor, employee); a line without it calls the endpoint whose path names no type",
-  as: "--as worker            signed in as the worker, not the client",
+  as: "--as <side>            the side acting: worker (not the client), or client where a line says so",
   "file-format": "--file-format <format> the document as a file (pdf, csv)",
   bulk: "--bulk                 many at once",
   status: "--status <value>       sets the record's own state",
@@ -426,6 +426,8 @@ export function suggestions(word: string, candidates: string[], limit = 5): stri
   if (!target) return [];
   const allowed = Math.max(1, Math.floor(target.length / 3));
   return candidates
+    // Two words whose lengths differ by more than `allowed` cannot be within that many edits: skip the matrix for them.
+    .filter((candidate) => candidate.startsWith(target) || Math.abs(candidate.length - target.length) <= allowed)
     .map((candidate) => ({ candidate, distance: candidate.startsWith(target) ? 0 : editDistance(target, candidate) }))
     .filter((entry) => entry.distance <= allowed)
     .sort((a, b) => a.distance - b.distance || byName(a.candidate, b.candidate))
