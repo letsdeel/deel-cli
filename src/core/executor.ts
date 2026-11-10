@@ -9,8 +9,11 @@ import type { Ctx } from "./context.ts";
 import type { OutputOpts } from "./output.ts";
 import { deriveIdempotencyKey } from "./idempotency.ts";
 import { CliError } from "./errors.ts";
+import { flagOf } from "./flags.ts";
+import { apiBaseUrl } from "./config.ts";
+import { maskUrlQuery } from "./logging.ts";
 import { envelope, render } from "./output.ts";
-import { HEADER } from "./constants.ts";
+import { HEADER, OUTCOME_ROUTES, SEND_ONCE_ROUTES, WITHHELD_RESPONSE_FIELDS, withheldFieldFor } from "./constants.ts";
 
 export type ParsedCall = {
   flags: Record<string, string | string[]>; // path + query values (arrays for repeatable query params)
@@ -62,11 +65,33 @@ function validateMaxItems(descriptor: Descriptor, userBody: unknown): void {
 }
 
 function buildPath(descriptor: Descriptor, flags: ParsedCall["flags"]): string {
-  return descriptor.path.replace(/\{([^}]+)\}/g, (_, name: string) => {
-    const value = flags[name];
-    if (value == null) throw new CliError("usage.path_param", `Missing required path parameter --${name}`);
-    return encodeURIComponent(String(value)); // path params are always scalar
-  });
+  // How the user typed this path param: an argument (<label>), a scope flag, or a flag of a hand-picked command.
+  const flagFor = (name: string) => {
+    const positional = descriptor.form?.positionals.find((p) => p.param === name);
+    if (positional) return `<${positional.label}>`;
+    const scope = descriptor.form?.scopes.find((s) => s.param === name);
+    if (scope) return `--${scope.flag}`;
+    const param = descriptor.params.find((p) => p.in === "path" && p.name === name);
+    return `--${param ? flagOf(param) : name}`;
+  };
+  return descriptor.path
+    .split("/")
+    .map((segment) =>
+      segment.replace(/\{([^}]+)\}/g, (_, name: string) => {
+        const value = flags[name];
+        if (value == null) throw new CliError("usage.path_param", `Missing required path parameter ${flagFor(name)}`);
+        const text = String(value); // path params are always scalar
+        // An empty value, a dot segment or a swallowed flag would send the request to another endpoint (the collection, or a parent path).
+        const dots = segment === `{${name}}` && (text === "." || text === "..");
+        // A flag's value that starts with -- is a flag that lost its value; an argument can only start with -- after a -- terminator, on purpose.
+        const swallowed = text.startsWith("--") && !descriptor.form?.positionals.some((p) => p.param === name);
+        if (text.trim() === "" || dots || swallowed) {
+          throw new CliError("usage.path_param", `Invalid value for path parameter ${flagFor(name)}: "${text}"`, `Pass the id the endpoint expects; a value that starts with -- is taken for a flag that lost its value.`);
+        }
+        return encodeURIComponent(text);
+      }),
+    )
+    .join("/");
 }
 
 // Query values may be a single string or, for array-typed params, several values
@@ -76,7 +101,7 @@ function buildQuery(descriptor: Descriptor, flags: ParsedCall["flags"]): Record<
   for (const param of descriptor.params) {
     if (param.in !== "query") continue;
     if (flags[param.name] != null) query[param.name] = flags[param.name];
-    else if (param.required) throw new CliError("usage.query_param", `Missing required --${param.name}`);
+    else if (param.required) throw new CliError("usage.query_param", `Missing required --${param.flag ?? param.name}`);
   }
   return query;
 }
@@ -116,7 +141,7 @@ async function multipartBody(descriptor: Descriptor, call: ParsedCall): Promise<
 export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx, opts: ExecOpts): Promise<void> {
   const path = buildPath(descriptor, call.flags);
   const query = buildQuery(descriptor, call.flags);
-  const url = new URL(ctx.config.baseUrl + path);
+  const url = new URL(apiBaseUrl(ctx.config.baseUrl, descriptor.api) + path);
   for (const [name, value] of Object.entries(query)) {
     if (Array.isArray(value)) for (const item of value) url.searchParams.append(name, item);
     else url.searchParams.set(name, value);
@@ -145,13 +170,16 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
     }
   }
 
+  // A send-once call acts again every time, so a key derived from the request would make the API replay the first.
+  const route = routeOf(descriptor);
+  const sendOnce = SEND_ONCE_ROUTES.has(route);
   let idempotencyKey: string | undefined;
   if (mutating) {
     idempotencyKey =
       call.idempotencyKey ??
-      deriveIdempotencyKey({ method: descriptor.method, path, query, body: effectiveKind === "multipart" ? await multipartFingerprint(descriptor, call) : wrapBody(descriptor, call.body) });
-    headers[HEADER.idempotencyKey] = idempotencyKey;
-    if (opts.debug) ctx.io.err(`[debug] idempotency-key: ${idempotencyKey}${call.idempotencyKey ? " (override)" : " (derived)"}\n`);
+      (sendOnce ? undefined : deriveIdempotencyKey({ method: descriptor.method, path, query, body: effectiveKind === "multipart" ? await multipartFingerprint(descriptor, call) : wrapBody(descriptor, call.body) }));
+    if (idempotencyKey !== undefined) headers[HEADER.idempotencyKey] = idempotencyKey;
+    if (opts.debug && idempotencyKey !== undefined) ctx.io.err(`[debug] idempotency-key: ${idempotencyKey}${call.idempotencyKey ? " (override)" : " (derived)"}\n`);
   }
 
   const response = await ctx.http({
@@ -159,11 +187,11 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
     url: url.toString(),
     headers,
     body,
-    retryable: !mutating || Boolean(idempotencyKey),
+    retryable: !sendOnce && (!mutating || Boolean(idempotencyKey)),
     meta: { command: descriptor.command.join(" "), idempotency_key: idempotencyKey },
   });
 
-  if (opts.debug) ctx.io.err(`[debug] ${descriptor.method} ${url} -> ${response.status}  x-request-id=${requestId}\n`);
+  if (opts.debug) ctx.io.err(`[debug] ${descriptor.method} ${maskUrlQuery(String(url))} -> ${response.status}  x-request-id=${requestId}\n`);
 
   if (response.status >= 400) throw errorFromResponse(response.status, response.json, requestId, ctx.config.beta === true);
 
@@ -173,7 +201,34 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   // Paginated list responses carry `page: { cursor, has_next_page }` next to `data`. Surface it in
   // the envelope (only when `data` was unwrapped from one) so the caller can page with --cursor.
   const page = hasDataEnvelope && isPlainObject(payload.page) ? (payload.page as Record<string, unknown>) : undefined;
-  await render(ctx.io, envelope(data, { request_id: requestId }, page), opts.output);
+  const { kept, withheld } = withholdSecrets(data);
+  for (const field of withheld) ctx.io.err(`[note] ${field} is not printed: ${WITHHELD_RESPONSE_FIELDS[field]}.\n`);
+  await render(ctx.io, envelope(kept, { request_id: requestId }, page), opts.output);
+  // A 2xx can still report that the call didn't work (a test delivery that failed): print it, then fail.
+  const outcome = Object.hasOwn(OUTCOME_ROUTES, route) ? OUTCOME_ROUTES[route] : undefined;
+  if (outcome && isPlainObject(kept) && kept[outcome.field] === false) {
+    const error = new CliError("api.unsuccessful", `The response reports ${outcome.field}: false.`, outcome.hint);
+    error.requestId = requestId;
+    throw error;
+  }
+}
+
+// The key SEND_ONCE_ROUTES and OUTCOME_ROUTES use: "METHOD /path" with the path params as {}.
+function routeOf(descriptor: Descriptor): string {
+  return `${descriptor.method.toUpperCase()} ${descriptor.path.replace(/\{[^}]+\}/g, "{}")}`;
+}
+
+// Drop the secret response fields from one record or from each record of a list, without mutating the response.
+export function withholdSecrets(data: unknown): { kept: unknown; withheld: string[] } {
+  const withheld = new Set<string>();
+  const strip = (item: unknown): unknown => {
+    if (!isPlainObject(item)) return item;
+    const secrets = Object.keys(item).filter((key) => withheldFieldFor(key) !== undefined);
+    if (!secrets.length) return item;
+    for (const key of secrets) withheld.add(withheldFieldFor(key)!);
+    return Object.fromEntries(Object.entries(item).filter(([key]) => !secrets.includes(key)));
+  };
+  return { kept: Array.isArray(data) ? data.map(strip) : strip(data), withheld: [...withheld] };
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
@@ -212,7 +267,9 @@ function errorCodeOf(item: any): string | undefined {
 // `betaSent`: the request already carried X-Beta, so a BETA_ACCESS_REQUIRED answer must not tell the user to add --beta.
 export function errorFromResponse(status: number, json: unknown, requestId: string, betaSent = false): CliError {
   const body = json as any;
-  const list: any[] | undefined = Array.isArray(body?.errors) ? body.errors : undefined;
+  // Most services answer { errors: [...] } or { error: {...} }; some nest the list ({ errors: { errors: [...] } })
+  // or the message ({ responseMessage: { message } }), and those messages are still the user's best hint.
+  const list: any[] | undefined = Array.isArray(body?.errors) ? body.errors : Array.isArray(body?.errors?.errors) ? body.errors.errors : undefined;
 
   let code: string;
   let message: string;
@@ -228,7 +285,7 @@ export function errorFromResponse(status: number, json: unknown, requestId: stri
   } else {
     const payload = body?.error ?? body ?? {};
     code = errorCodeOf(payload) ?? `http.${status}`;
-    message = payload.message ?? `Request failed with status ${status}`;
+    message = payload.message ?? payload.responseMessage?.message ?? `Request failed with status ${status}`;
     next = payload.next;
   }
 

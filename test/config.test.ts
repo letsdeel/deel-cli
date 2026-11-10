@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resolveConfig, requireIssuer, ENVIRONMENTS } from "../src/core/config.ts";
+import { apiBaseUrl, resolveConfig, requireIssuer, ENVIRONMENTS } from "../src/core/config.ts";
 import { configFrom } from "../src/commands/shared.ts";
 import type { CliError } from "../src/core/errors.ts";
 
@@ -142,4 +142,15 @@ test("--beta sets config.beta, and it is unset otherwise", () => {
 test("configFrom wires the --beta flag into the config", () => {
   assert.equal(configFrom({ beta: true }, []).beta, true);
   assert.equal(configFrom({}, []).beta, undefined);
+});
+
+test("SCIM commands call the sibling /scim base path", () => {
+  assert.equal(apiBaseUrl(ENVIRONMENTS.prod.baseUrl, "scim"), "https://api.letsdeel.com/scim");
+  assert.equal(apiBaseUrl(ENVIRONMENTS.demo.baseUrl, "scim"), "https://api-staging.letsdeel.com/scim");
+  assert.equal(apiBaseUrl("https://localhost:8787", "scim"), "https://localhost:8787/scim");
+});
+
+test("REST and hand-picked commands keep the configured base path", () => {
+  assert.equal(apiBaseUrl(ENVIRONMENTS.prod.baseUrl, "rest"), ENVIRONMENTS.prod.baseUrl);
+  assert.equal(apiBaseUrl(ENVIRONMENTS.prod.baseUrl, undefined), ENVIRONMENTS.prod.baseUrl);
 });

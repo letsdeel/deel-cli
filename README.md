@@ -6,7 +6,7 @@ A command-line client for selected endpoints from the [Deel Public API](https://
 deel auth status --json                              # verify your token and identity
 deel adjustments create --invoice --generate-input  # explore required fields
 deel jobs list --jq '.[] | {job_id, status}'        # filter recent async jobs
-deel logs requests list --status_class 4xx --beta   # your organization's failed API requests
+deel dev logs list --status_class 4xx --beta        # your organization's failed API requests
 ```
 
 ## Contents
@@ -173,6 +173,14 @@ deel adjustments create --invoice --generate-input      # JSON body skeleton to 
 
 `--help` for an action shows what generic `--help` cannot: the request-body fields (which arrive via `--input`, not as flags) and the response fields.
 
+When several endpoints share a command's words, the flags pick one. `--help` then lists one line per endpoint; the flags before `--help` show one endpoint's full help, and for the line without flags its ID does:
+
+```bash
+deel contracts get --help                               # one line per endpoint of 'contracts get'
+deel contracts get --worker-type eor --help             # the EOR endpoint's arguments, options and fields
+deel contracts get 12345 --help                         # the endpoint the plain line calls
+```
+
 ## Request input
 
 Body content is supplied with `--input`, which accepts four interchangeable forms:
@@ -232,11 +240,13 @@ List endpoints that paginate return a `page` object next to `data`; pass its `cu
 ```
 
 ```bash
-deel logs requests list --limit 100 --beta                        # first page; read page.cursor from the envelope
-deel logs requests list --limit 100 --cursor <page.cursor> --beta # next page, until has_next_page is false
+deel dev logs list --limit 100 --beta                        # first page; read page.cursor from the envelope
+deel dev logs list --limit 100 --cursor <page.cursor> --beta # next page, until has_next_page is false
 ```
 
 `--jq` and `--quiet` see only `data`, so to page read `page.cursor` from the full JSON envelope (or with `--fields`, which keeps `page`).
+
+A flag that takes a value (`--fields`, `--jq`, `--input`, `--env`, `--limit`...) and gets none, or gets the next flag in its place, fails before anything is sent. A value that starts with `-` is written attached: `--jq=-.a`.
 
 | Flag              | Effect                                                                 |
 | ----------------- | ---------------------------------------------------------------------- |
@@ -254,35 +264,37 @@ deel jobs list --quiet
 
 ## API tokens
 
-`deel tokens` lists, inspects and invalidates the API tokens of your organization, and your own personal tokens. The calling token needs the `tokens:read` scope, plus `tokens:write` to invalidate. The API never returns a token's secret value.
+`deel dev tokens` lists and inspects the API tokens of your organization, and your own personal tokens, and invalidates one. The calling token needs the `tokens:read` scope, plus `tokens:write` to invalidate. The API never returns a token's secret value. These endpoints are in beta, so each command takes `--beta`.
 
 ```bash
-deel tokens list                                        # newest first, one page (--all for every page)
-deel tokens list --signal stale                         # tokens that need attention: STALE | EXPIRING | ORPHANED | FULL_ACCESS | ... (any case)
-deel tokens get <id>
-deel tokens invalidate <id> --reason "rotated"              # asks to confirm; --yes when non-interactive
+deel dev tokens list --beta                            # newest first; --limit/--cursor to page
+deel dev tokens get <token_id> --beta
+deel dev tokens revocations create <token_id> --input reason=rotated --beta   # invalidates the token; there is no undo
+deel dev logs tokens list --beta                       # what each token has been used for
 ```
 
-An invalidated token stops working at once and cannot be restored.
+There is no confirmation prompt and no `--yes`: `revocations create` invalidates the token as soon as it is typed. Check the ID with `deel dev tokens get <token_id> --beta` first.
 
 ## Idempotency
 
-Every mutating request (`POST`/`PUT`/`PATCH`/`DELETE`) carries an `Idempotency-Key`. By default it is a **deterministic UUIDv5** derived from a canonicalized form of the request (method + path + query + body), so re-running the identical command sends the identical key and the server can dedupe a retry. Override it with `--idempotency-key <value>` when you want a fresh attempt.
+Every mutating request (`POST`/`PUT`/`PATCH`/`DELETE`) carries an `Idempotency-Key`. By default it is a **deterministic UUIDv5** derived from a canonicalized form of the request (method + path + query + body), so re-running the identical command sends the identical key and the server can dedupe a retry. Override it with `--idempotency-key <value>` when you want a fresh attempt. The exception is a call that must act every time it runs, such as `deel webhooks test`: it is sent once, with no retry and no derived key (an explicit `--idempotency-key` is still sent).
 
 ## Webhooks
 
-`deel webhooks list`, `get <id>` and `event-types` read webhook subscriptions; the signing key is never printed (reveal it in Developer Center → Webhooks).
+`deel webhooks list`, `get <id>` and `events list` read webhook subscriptions; the signing key is never printed (reveal it in Developer Center → Webhooks).
 
 ```bash
-deel webhooks create --name Payroll --url https://hooks.example.com/deel --event contract.created  # --event is repeatable
-deel webhooks update <id> --status disabled                    # changes only the given fields
-deel webhooks delete <id> --yes                                # --yes is required when non-interactive
-deel webhooks simulate <id> --event contract.created           # Deel delivers a test event to the receiver
+deel webhooks create --input file://webhook.json             # deel webhooks create --generate-input for the fields
+deel webhooks update <id> --input status=disabled       # changes only the given fields
+deel webhooks delete <id>
+deel webhooks test <webhook_id> --input event_type=contract.created --beta   # Deel delivers a test event to the receiver
 ```
 
-A webhook id can start with `-`, which the argument parser reads as a flag. Pass such an id as `--id=<id>` on `get`, `update`, `delete` and `simulate`: `deel webhooks get --id=-WZ1uT2DFF01`. `--id` wins over a positional id.
+Like every generated command, `delete` runs as soon as it is typed: there is no confirmation prompt and no `--yes`, so check the ID with `deel webhooks get <id>` first.
 
-`simulate` runs the delivery from Deel's servers, so the receiver URL must be publicly reachable; it is limited to 10 simulations per hour per event type, is never retried and gets no auto-derived `Idempotency-Key`, and exits 1 when the receiver does not answer 2xx.
+A webhook id can start with `-`, which the argument parser reads as a flag. Put it after `--`, which ends the options: `deel webhooks get -- -WZ1uT2DFF01`. The same works for any generated command.
+
+`test` runs the delivery from Deel's servers, so the receiver URL must be publicly reachable; it is limited to 10 simulations per hour per event type. It prints the delivery, then exits 1 when the response reports `is_success: false`. Each run sends a new event: it is sent once, with no retry and no derived `Idempotency-Key`.
 
 ## Environments
 
@@ -291,9 +303,10 @@ A webhook id can start with `-`, which the argument parser reads as a flag. Pass
 | `prod` (default) | `https://api.letsdeel.com/rest`                |
 | `demo`           | `https://api-staging.letsdeel.com/rest`        |
 
-Every API call — including `deel job status`/`deel job list` and the generated
+Every REST call — including `deel job status`/`deel job list` and the generated
 `deel jobs status`/`deel jobs list` — goes through this same `/rest`-prefixed
-base URL. There is no separate, unprefixed origin for any endpoint.
+base URL. The `deel scim …` commands use the sibling `/scim` base path
+(`https://api.letsdeel.com/scim`).
 
 
 ## Beta endpoints
@@ -301,8 +314,8 @@ base URL. There is no separate, unprefixed origin for any endpoint.
 An endpoint that is still in beta answers `BETA_ACCESS_REQUIRED` unless the request carries `X-Beta: true`. Pass `--beta` (on any command) to send that header:
 
 ```bash
-deel webhooks simulate <id> --event contract.created --beta
-deel logs requests list --beta             # the logs commands are beta too
+deel webhooks test <webhook_id> --input event_type=contract.created --beta
+deel dev logs list --beta                  # the logs commands are beta too
 ```
 
 ## Corporate proxies & custom CAs
@@ -339,7 +352,7 @@ All failure detail lives in the error envelope printed to stderr — never encod
 
 Each HTTP exchange is written as NDJSON to a size-capped, rotating local log (separate from any network telemetry). **By default only metadata is logged** — command, method, URL path (query string omitted), status, request id, duration, and request headers (the `Authorization` header masked to `Bearer ***`). **Response bodies are not written by default.**
 
-Opt in to full response bodies with `--log-bodies` per command, or `DEEL_LOG_BODIES=1` globally. When bodies are logged, keys whose names look sensitive (`token`, `password`, `email`, `iban`, `tax_id`, and similar) are masked — but a response body may still contain personal data, so enable this only when you need it. Disable logging entirely per-command with `--no-log`, or globally with `DEEL_LOG=off`.
+Opt in to full response bodies with `--log-bodies` per command, or `DEEL_LOG_BODIES=1` globally. When bodies are logged, the values of keys whose names look sensitive are masked as `***`: credentials (`token`, `password`, `secret`, `signature`), financial identifiers and pay (`iban`, `card`, `tax_id`, `salary`), government identifiers, contact and address details (`email`, `phone`, `address`, `postal_code`), and personal data of a person such as birth, family, health and the other special categories of the GDPR. A link (a key named `url`, `link`, `href`...) is logged without its query string and fragment, where a pre-signed link keeps its signature. The request URL is logged whole under `--log-bodies`, but the values of its sensitive query parameters (`?email=`, `?personal_id=`...) are masked by the same rule and its fragment is cut; the URL in `--debug` output and in a timeout or TLS error is masked the same way. Whatever its key, a value that is an email address or a JWT (a `?q=` search, a free-text `note`) is masked too. Names of people and companies, record ids, dates and amounts of a contract stay, so the log still says what was called. A response body may still contain personal data in a field the masking doesn't know, so enable this only when you need it. Disable logging entirely per-command with `--no-log`, or globally with `DEEL_LOG=off`.
 
 Location: `~/Library/Logs/deel/deel.log` (macOS),
 `%LOCALAPPDATA%\deel\logs` (Windows), `$XDG_STATE_HOME/deel/logs` (Linux).
@@ -392,15 +405,19 @@ scripts/
   check-shell.sh           # sh -n / bash -n + shellcheck for installer, build scripts, hooks
   check-pr.ts              # PR requirements (used by CI and by the /ship skill)
   check-doctor.ts          # pre-commit doctor gate; doctor-hashes.json is its ledger
+  generate-public-api.ts   # writes src/public-api/manifest.json from the public definitions
+  check-command-map.ts     # checks every src/public-api/commands.json entry makes a callable command
+  public-api/              # the generator: definitions input, command-map parsing, generation checks
 src/
   main.ts                  # entry point + top-level error handling
   cli.ts                   # command-tree wiring + routing
   help.ts                  # help / usage / contract / skeleton rendering
   version.ts               # CLI_VERSION (kept in sync with package.json by check-version)
   types.ts                 # shared descriptor/manifest types
-  manifest.generated.ts    # command descriptors (generated by the deel-cli-extractor skill — never hand-edited)
-  commands.map.ts          # command ↔ API endpoint mapping
-  commands/                # static commands (auth, job, webhooks, tokens)
+  manifest.generated.ts    # hand-picked command descriptors (generated by the deel-cli-extractor skill — never hand-edited)
+  commands.map.ts          # hand-picked command ↔ API endpoint mapping
+  public-api/              # generated public API commands: manifest.json (never hand-edited), commands.json (the command map), loader
+  commands/                # static commands (auth, job)
   core/                    # http, auth, keychain, config, tls, input, output, logging, …
 test/                      # automated tests (node --test), one file per module
 ```
@@ -411,7 +428,7 @@ test/                      # automated tests (node --test), one file per module
 npm ci              # install dependencies and the git hooks
 npm test            # run the automated test suite (node --test)
 npm run typecheck   # type-check with tsc (no emit)
-npm run check       # everything CI runs: typecheck, tests + coverage gate, manifest / lockfile / version / shell checks
+npm run check       # everything CI runs: typecheck, tests + coverage gate, manifest / command map / lockfile / version / shell checks
 npm run doctor      # npm run check + build smoke, then clears the pre-commit gate for your changed files
 ```
 
