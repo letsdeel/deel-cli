@@ -95,15 +95,25 @@ test("a static group uses its own description and the static footer", async () =
   assert.match(out, /^Add --help to a line's words for its flags \(e\.g\. deel auth login --help\)\.$/m);
 });
 
+// run() throws a usage error; main.ts turns it into the exit code and the printed error.
+async function usageError(argv: string[]): Promise<{ code?: string; message: string; next?: string }> {
+  try {
+    await capture(argv);
+  } catch (error) {
+    const { code, message, next } = error as { code?: string; message: string; next?: string };
+    return { code, message, next };
+  }
+  assert.fail(`${argv.join(" ")} did not fail`);
+}
+
 test("an unknown word suggests the closest commands, at the top level and under a group", async () => {
-  const top = await capture(["contrakts"]);
-  assert.equal(top.code, EXIT.ERROR);
-  assert.match(top.err, /^Unknown command 'contrakts'\. Did you mean: contracts\?$/m);
-  const under = await capture(["contracts", "amendmnts", "list"]);
-  assert.match(under.err, /^Unknown command 'amendmnts' under 'deel contracts'\. Did you mean: amendments\?$/m);
-  assert.match(under.err, /^Run 'deel contracts --help' to see available commands\.$/m);
-  const none = await capture(["zzzzzz"]);
-  assert.doesNotMatch(none.err, /Did you mean/);
+  const top = await usageError(["contrakts"]);
+  assert.equal(top.code, "usage.command");
+  assert.equal(top.message, "Unknown command 'contrakts'. Did you mean: contracts?");
+  const under = await usageError(["contracts", "amendmnts", "list"]);
+  assert.equal(under.message, "Unknown command 'deel contracts amendmnts'. Did you mean: amendments?");
+  assert.equal(under.next, "Run 'deel contracts --help' to see its commands.");
+  assert.equal((await usageError(["zzzzzz"])).message, "Unknown command 'zzzzzz'.");
 });
 
 test("a flag's value before or after the words is not a command word", async () => {
@@ -116,14 +126,14 @@ test("a flag's value before or after the words is not a command word", async () 
   assert.match(leaf.out, /USAGE {2}deel contracts get <contract> --worker-type eor/);
 });
 
-test("a command runs with a global flag and its value before the words", async () => {
+test("a command runs with a global flag and its value after the words", async () => {
   const realFetch = globalThis.fetch;
   const realToken = process.env.DEEL_TOKEN;
   const urls: string[] = [];
   globalThis.fetch = (async (url: unknown) => (urls.push(String(url)), Response.json({ data: {} }))) as typeof fetch;
   process.env.DEEL_TOKEN = "test-token";
   try {
-    for (const argv of [["--env", "demo", "--no-log", "contracts", "get", "c1"], ["--no-log", "contracts", "--env", "demo", "get", "c1", "--worker-type", "eor"]]) {
+    for (const argv of [["contracts", "get", "c1", "--env", "demo", "--no-log"], ["contracts", "get", "c1", "--worker-type", "eor", "--env", "demo", "--no-log"]]) {
       urls.length = 0;
       const { code, err } = await capture(argv);
       assert.equal(code, EXIT.OK, `${argv.join(" ")}: ${err}`);

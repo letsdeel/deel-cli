@@ -328,11 +328,14 @@ test("deel <beta-only command> sends X-Beta; --version and --beta reach the requ
   ]);
 });
 
-test("--version before the command words is a flag value, not a request for the CLI version", async () => {
+test("--version names the API version after the command words; before them it is refused, not read as the CLI's", async () => {
   const seen: Headers[] = [];
-  const result = await cli(["--version", "2026-01-01", "widgets", "reports", "list", ...BASE], recordingFetch(seen));
+  const result = await cli(["widgets", "reports", "list", "--version", "2026-01-01", ...BASE], recordingFetch(seen));
   assert.equal(result.code, EXIT.OK);
   assert.equal(seen[0].get("x-version"), "2026-01-01");
+  const before = await cli(["--version", "2026-01-01", "widgets", "reports", "list", ...BASE], recordingFetch(seen));
+  assert.equal(before.error?.code, "usage.command");
+  assert.match(before.error?.message, /^Options go after the command/);
   assert.match((await cli(["--env", "demo", "--version"])).out, /^deel \d+\.\d+\.\d+/);
 });
 

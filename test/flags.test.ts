@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { acceptsFlag, argvEnables, argvHasFlag, argvMentionsFlag, flagOf } from "../src/core/flags.ts";
+import { acceptsFlag, argvEnables, argvHasFlag, argvMentionsFlag, flagMissingValue, flagOf, argvAttachesValue } from "../src/core/flags.ts";
 
 test("acceptsFlag follows the parser: written, camelCase and kebab-case spellings, acronyms included", () => {
   assert.equal(acceptsFlag("widget_id", "widget_id"), true);
@@ -36,4 +36,30 @@ test("the flag matchers only read flags: a word that merely ends like one is not
   assert.equal(argvEnables(["--archived=false"], "archived"), false);
   assert.equal(argvEnables(["--no-archived"], "archived"), false);
   assert.equal(argvEnables(["xxarchived"], "archived"), false);
+});
+
+test("argvAttachesValue is true only for the --flag=value spelling of that value, in any spelling of the flag", () => {
+  assert.equal(argvAttachesValue(["--contract=-abc"], "contract", "-abc"), true);
+  assert.equal(argvAttachesValue(["--contract-id=-abc"], "contractId", "-abc"), true);
+  assert.equal(argvAttachesValue(["--contract", "-abc"], "contract", "-abc"), false);
+  assert.equal(argvAttachesValue(["--contract=-abc"], "contract", "-xyz"), false);
+  assert.equal(argvAttachesValue(["--other=-abc"], "contract", "-abc"), false);
+  assert.equal(argvAttachesValue(["contract=-abc", "--=-abc"], "contract", "-abc"), false);
+});
+
+test("flagMissingValue names the first valued flag typed bare, empty or before another flag, as it was typed", () => {
+  const flags = ["limit", "contract_types", "input"];
+  assert.equal(flagMissingValue(["--limit", "5"], flags), undefined);
+  assert.equal(flagMissingValue(["--limit=5", "--contract-types", "a", "--contract-types=b"], flags), undefined);
+  assert.equal(flagMissingValue(["--limit"], flags), "limit");
+  assert.equal(flagMissingValue(["--limit="], flags), "limit");
+  assert.equal(flagMissingValue(["--limit", "--json"], flags), "limit");
+  assert.equal(flagMissingValue(["x", "--contract-types"], flags), "contract-types");
+  assert.equal(flagMissingValue(["--contractTypes", "-x"], flags), "contractTypes");
+  // A lone - and a negative number are values; any other value starting with - has to be attached.
+  assert.equal(flagMissingValue(["--input", "-", "--limit", "-1", "--limit", "-2.5"], flags), undefined);
+  assert.equal(flagMissingValue(["--limit=-x"], flags), undefined);
+  // Flags it was not asked about, switches and everything after -- are left alone.
+  assert.equal(flagMissingValue(["--json", "--env"], flags), undefined);
+  assert.equal(flagMissingValue(["--", "--limit"], flags), undefined);
 });

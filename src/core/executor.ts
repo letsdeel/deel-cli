@@ -11,8 +11,9 @@ import { deriveIdempotencyKey } from "./idempotency.ts";
 import { CliError } from "./errors.ts";
 import { flagOf } from "./flags.ts";
 import { apiBaseUrl } from "./config.ts";
+import { maskUrlQuery } from "./logging.ts";
 import { envelope, render } from "./output.ts";
-import { HEADER, OUTCOME_ROUTES, SEND_ONCE_ROUTES, WITHHELD_RESPONSE_FIELDS } from "./constants.ts";
+import { HEADER, OUTCOME_ROUTES, SEND_ONCE_ROUTES, WITHHELD_RESPONSE_FIELDS, withheldFieldFor } from "./constants.ts";
 import type { VersionChoice, VersionFlags } from "./versions.ts";
 import { BETA_ACCESS_HINT, BETA_ERROR, betaFallback, chooseVersion } from "./versions.ts";
 
@@ -198,7 +199,7 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   const debugSent = (status: number) => {
     if (!opts.debug) return;
     const version = `x-version=${choice.version ?? "(none)"}${choice.beta ? " x-beta=true" : ""}`;
-    ctx.io.err(`[debug] ${descriptor.method} ${url} -> ${status}  ${version}  x-request-id=${requestId}\n`);
+    ctx.io.err(`[debug] ${descriptor.method} ${maskUrlQuery(String(url))} -> ${status}  ${version}  x-request-id=${requestId}\n`);
   };
 
   let response = await send(headers);
@@ -252,9 +253,9 @@ export function withholdSecrets(data: unknown): { kept: unknown; withheld: strin
   const withheld = new Set<string>();
   const strip = (item: unknown): unknown => {
     if (!isPlainObject(item)) return item;
-    const secrets = Object.keys(item).filter((key) => Object.hasOwn(WITHHELD_RESPONSE_FIELDS, key));
+    const secrets = Object.keys(item).filter((key) => withheldFieldFor(key) !== undefined);
     if (!secrets.length) return item;
-    for (const key of secrets) withheld.add(key);
+    for (const key of secrets) withheld.add(withheldFieldFor(key)!);
     return Object.fromEntries(Object.entries(item).filter(([key]) => !secrets.includes(key)));
   };
   return { kept: Array.isArray(data) ? data.map(strip) : strip(data), withheld: [...withheld] };

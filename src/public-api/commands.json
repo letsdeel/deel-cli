@@ -457,7 +457,7 @@
  {"method": "POST", "path": "/worker", "command": "deel people create --worker-type daas"},
  {"method": "POST", "path": "/eor/worker", "command": "deel people create --worker-type eor"},
  {"method": "POST", "path": "/gp/workers", "command": "deel people create --worker-type gp"},
- {"method": "DELETE", "path": "/people/{worker_id}/custom_fields/{id}", "command": "deel people custom-fields delete <worker_id> --person <id>"},
+ {"method": "DELETE", "path": "/people/{worker_id}/custom_fields/{id}", "command": "deel people custom-fields delete <id> --person <worker_id>"},
  {"method": "GET", "path": "/people/custom_fields/{id}", "command": "deel people custom-fields get <id>"},
  {"method": "GET", "path": "/people/custom_fields", "command": "deel people custom-fields list"},
  {"method": "GET", "path": "/people/{worker_id}/custom_fields", "command": "deel people custom-fields list --person <worker_id>"},

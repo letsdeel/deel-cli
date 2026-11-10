@@ -1,7 +1,7 @@
 // Generated public API commands, and how the command line picks one endpoint among those sharing its words.
 
 import type { CommandForm, Descriptor, GeneratedManifest } from "../types.ts";
-import { argvEnables, argvFlagValue, argvMentionsFlag } from "../core/flags.ts";
+import { argvAttachesValue, argvEnables, argvFlagValue, argvMentionsFlag } from "../core/flags.ts";
 import { CliError } from "../core/errors.ts";
 import domainStages from "./domains.json" with { type: "json" };
 import { manifest as handPicked } from "../manifest.generated.ts";
@@ -58,7 +58,8 @@ function pickingOf(form: CommandForm): Picking[] {
 function matches(form: CommandForm, argv: string[], foreign: Picking[]): boolean {
   for (const selector of form.selectors) {
     if (selector.value === undefined) {
-      if (!argvEnables(argv, selector.flag)) return false;
+      // A switch must be on, unless the line writes it in brackets: then the bare command is that endpoint too.
+      if (!selector.optional && !argvEnables(argv, selector.flag)) return false;
       continue;
     }
     const value = argvFlagValue(argv, selector.flag);
@@ -83,7 +84,8 @@ export function selectForm(candidates: Descriptor[], argv: string[]): Descriptor
   for (const { flag, isSwitch } of candidates.flatMap((d) => pickingOf(d.form!))) {
     if (isSwitch || !argvMentionsFlag(argv, flag)) continue;
     const value = argvFlagValue(argv, flag);
-    if (!value || value.startsWith("-")) throw new CliError("usage.flag_value", `--${flag} needs a value.`, `Write --${flag}=<value>; run it with --help to see the values.`);
+    // A separate token that starts with - is the next flag; an attached --flag=-value is the value, whatever it starts with.
+    if (!value || (value.startsWith("-") && !argvAttachesValue(argv, flag, value))) throw new CliError("usage.flag_value", `--${flag} needs a value.`, `Write --${flag}=<value>; run it with --help to see the values.`);
   }
   const found = matchForm(candidates, argv);
   if (found) return found;

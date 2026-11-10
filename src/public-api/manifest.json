@@ -164431,15 +164431,15 @@
    "form": {
     "positionals": [
      {
-      "label": "worker_id",
-      "param": "worker_id"
+      "label": "id",
+      "param": "id"
      }
     ],
     "scopes": [
      {
       "flag": "person",
-      "label": "id",
-      "param": "id"
+      "label": "worker_id",
+      "param": "worker_id"
      }
     ],
     "selectors": []

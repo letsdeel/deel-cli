@@ -257,6 +257,8 @@ deel dev logs list --limit 100 --cursor <page.cursor> --beta # next page, until 
 
 `--jq` and `--quiet` see only `data`, so to page read `page.cursor` from the full JSON envelope (or with `--fields`, which keeps `page`).
 
+A flag that takes a value (`--fields`, `--jq`, `--input`, `--env`, `--limit`...) and gets none, or gets the next flag in its place, fails before anything is sent. A value that starts with `-` is written attached: `--jq=-.a`.
+
 | Flag              | Effect                                                                 |
 | ----------------- | ---------------------------------------------------------------------- |
 | `--no-json`       | Human-readable view on a TTY (default is always JSON)                  |
@@ -273,14 +275,16 @@ deel jobs list --quiet
 
 ## API tokens
 
-`deel dev tokens` lists and inspects the API tokens of your organization, and your own personal tokens, and invalidates one. The calling token needs the `tokens:read` scope, plus `tokens:write` to invalidate. The API never returns a token's secret value.
+`deel dev tokens` lists and inspects the API tokens of your organization, and your own personal tokens, and invalidates one. The calling token needs the `tokens:read` scope, plus `tokens:write` to invalidate. The API never returns a token's secret value. These endpoints are in beta, so each command takes `--beta`.
 
 ```bash
-deel dev tokens list                                   # newest first; --limit/--cursor to page
-deel dev tokens get <token_id>
-deel dev tokens revocations create <token_id> --input reason=rotated   # invalidates the token; there is no undo
-deel dev logs tokens list                              # what each token has been used for
+deel dev tokens list --beta                            # newest first; --limit/--cursor to page
+deel dev tokens get <token_id> --beta
+deel dev tokens revocations create <token_id> --input reason=rotated --beta   # invalidates the token; there is no undo
+deel dev logs tokens list --beta                       # what each token has been used for
 ```
+
+There is no confirmation prompt and no `--yes`: `revocations create` invalidates the token as soon as it is typed. Check the ID with `deel dev tokens get <token_id> --beta` first.
 
 ## Idempotency
 
@@ -296,6 +300,8 @@ deel webhooks update <id> --input status=disabled       # changes only the given
 deel webhooks delete <id>
 deel webhooks test <webhook_id> --input event_type=contract.created --beta   # Deel delivers a test event to the receiver
 ```
+
+Like every generated command, `delete` runs as soon as it is typed: there is no confirmation prompt and no `--yes`, so check the ID with `deel webhooks get <id>` first.
 
 A webhook id can start with `-`, which the argument parser reads as a flag. Put it after `--`, which ends the options: `deel webhooks get -- -WZ1uT2DFF01`. The same works for any generated command.
 
@@ -377,7 +383,7 @@ All failure detail lives in the error envelope printed to stderr — never encod
 
 Each HTTP exchange is written as NDJSON to a size-capped, rotating local log (separate from any network telemetry). **By default only metadata is logged** — command, method, URL path (query string omitted), status, request id, duration, and request headers (the `Authorization` header masked to `Bearer ***`). **Response bodies are not written by default.**
 
-Opt in to full response bodies with `--log-bodies` per command, or `DEEL_LOG_BODIES=1` globally. When bodies are logged, keys whose names look sensitive (`token`, `password`, `email`, `iban`, `tax_id`, and similar) are masked — but a response body may still contain personal data, so enable this only when you need it. Disable logging entirely per-command with `--no-log`, or globally with `DEEL_LOG=off`.
+Opt in to full response bodies with `--log-bodies` per command, or `DEEL_LOG_BODIES=1` globally. When bodies are logged, the values of keys whose names look sensitive are masked as `***`: credentials (`token`, `password`, `secret`, `signature`), financial identifiers and pay (`iban`, `card`, `tax_id`, `salary`), government identifiers, contact and address details (`email`, `phone`, `address`, `postal_code`), and personal data of a person such as birth, family, health and the other special categories of the GDPR. A link (a key named `url`, `link`, `href`...) is logged without its query string and fragment, where a pre-signed link keeps its signature. The request URL is logged whole under `--log-bodies`, but the values of its sensitive query parameters (`?email=`, `?personal_id=`...) are masked by the same rule and its fragment is cut; the URL in `--debug` output and in a timeout or TLS error is masked the same way. Whatever its key, a value that is an email address or a JWT (a `?q=` search, a free-text `note`) is masked too. Names of people and companies, record ids, dates and amounts of a contract stay, so the log still says what was called. A response body may still contain personal data in a field the masking doesn't know, so enable this only when you need it. Disable logging entirely per-command with `--no-log`, or globally with `DEEL_LOG=off`.
 
 Location: `~/Library/Logs/deel/deel.log` (macOS),
 `%LOCALAPPDATA%\deel\logs` (Windows), `$XDG_STATE_HOME/deel/logs` (Linux).

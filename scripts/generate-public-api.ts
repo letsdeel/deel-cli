@@ -1,16 +1,15 @@
 #!/usr/bin/env node
 // Generates src/public-api/manifest.json from a definitions file or URL (--from), naming every endpoint from the command map.
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { parseArgs } from "node:util";
 import { manifest as handPicked } from "../src/manifest.generated.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
-import type { GeneratedManifest } from "../src/types.ts";
 import { loadJson, parseDefinitions } from "./public-api/definitions.ts";
-import type { MapEntry } from "./public-api/command-map.ts";
-import { generate, renderManifest } from "./public-api/generate.ts";
+import { readCommandMap } from "./public-api/command-map.ts";
+import { generate, readGeneratedManifest, renderManifest } from "./public-api/generate.ts";
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -32,8 +31,7 @@ async function main(argv: string[]): Promise<number> {
 
   const definitions = parseDefinitions(await loadJson(values.from));
   const mapPath = values.map ? resolve(process.cwd(), values.map) : resolve(REPO_ROOT, "src/public-api/commands.json");
-  const map = JSON.parse(readFileSync(mapPath, "utf8")) as MapEntry[];
-  if (!Array.isArray(map)) throw new Error(`${mapPath} is not a command map (an array of entries)`);
+  const map = readCommandMap(mapPath);
 
   if (definitions.length === 0) {
     process.stderr.write("[error] The input holds no definitions; nothing written.\n");
@@ -45,12 +43,7 @@ async function main(argv: string[]): Promise<number> {
   // The released names are the committed manifest's, wherever the new one is written, unless --previous names another.
   const lockPath = values.previous ? resolve(process.cwd(), values.previous) : resolve(REPO_ROOT, "src/public-api/manifest.json");
   if (values.previous && !existsSync(lockPath)) throw new Error(`--previous ${values.previous} does not exist`);
-  let previous: GeneratedManifest | undefined;
-  if (existsSync(lockPath)) {
-    const parsed = JSON.parse(readFileSync(lockPath, "utf8"));
-    if (!parsed || typeof parsed !== "object" || !Array.isArray(parsed.descriptors)) throw new Error(`${lockPath} is not a generated manifest`);
-    previous = parsed as GeneratedManifest;
-  }
+  const previous = existsSync(lockPath) ? readGeneratedManifest(lockPath) : undefined;
 
   const result = generate(definitions, {
     reserved: { commands: handPicked.descriptors, topLevel: RESERVED_COMMANDS },
