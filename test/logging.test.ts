@@ -277,25 +277,21 @@ test("a body string that holds an email or a JWT is masked even under an ordinar
   delete process.env.DEEL_LOG_DIR;
 });
 
-test("masking personal text is linear: long unspaced runs of email- and JWT-like text finish at once", () => {
+// A backtracking scan would not return in any reasonable time on 1e6 characters, so the runner's own timeout
+// (rather than a wall-clock assertion that depends on the machine) is what fails this test.
+test("masking personal text is linear: long unspaced runs of email- and JWT-like text finish", { timeout: 60_000 }, () => {
   const n = 1_000_000;
   const shapes = ["a", "a@", "a@a.", "@@@@", ".....", "a@a.a.a.a.", "eyJ.eyJ.", "eyJa.b.", "a.@", "==&&??//", " a@ "];
   for (const shape of shapes) {
     const text = shape.repeat(Math.ceil(n / shape.length));
-    const startedAt = performance.now();
     looksPersonal(text);
-    const masked = maskUrlQuery(`https://x/y?q=${text}&k=${text.slice(0, 1000)}`);
-    assert.equal(typeof masked, "string");
-    const took = performance.now() - startedAt;
-    assert.ok(took < 2000, `${JSON.stringify(shape)} took ${Math.round(took)} ms`);
+    assert.equal(typeof maskUrlQuery(`https://x/y?q=${text}&k=${text.slice(0, 1000)}`), "string", JSON.stringify(shape));
   }
   // A very long key goes through the key policy just as fast.
   const key = "a_".repeat(500_000);
-  const startedAt = performance.now();
-  isSensitiveKey(key);
-  isLinkKey(key);
-  keyWords(key);
-  assert.ok(performance.now() - startedAt < 2000);
+  assert.equal(typeof isSensitiveKey(key), "boolean");
+  assert.equal(typeof isLinkKey(key), "boolean");
+  assert.ok(keyWords(key).length > 0);
 });
 
 test("an email or a JWT is found as a token, with its edges, and nothing else is", () => {

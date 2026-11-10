@@ -142,7 +142,7 @@ export function maskUrlQuery(url: string): string {
 }
 
 // `link` is true under a link key, which masks the query of the strings it holds (or lists). The entry's own top-level
-// keys are not redacted this way: its `url` is the request URL, kept whole under --log-bodies.
+// keys are not redacted this way: its `url` is the request URL, which `withLogging` masks with `maskUrlQuery` before it gets here.
 function redact(value: unknown, link = false): unknown {
   if (typeof value === "string") return maskPersonalText(link ? maskLink(value) : value);
   if (Array.isArray(value)) return value.map((item) => redact(item, link));
