@@ -12,7 +12,7 @@ import type { Config } from "../src/core/config.ts";
 import { HEADER } from "../src/core/constants.ts";
 import { log, setLoggingEnabled, setLogBodiesEnabled } from "../src/core/logging.ts";
 
-const CONFIG: Config = { env: "demo", baseUrl: "https://example.test/rest", issuer: null, clientId: "test-client", oauthBaseUrlOk: false };
+const CONFIG: Config = { env: "prod", baseUrl: "https://example.test/rest", issuer: null, clientId: "test-client", oauthBaseUrlOk: false };
 
 function ctxWith(handler: (req: HttpRequest) => HttpResponse, io = captureIO({}), config: Config = CONFIG) {
   const seen: HttpRequest[] = [];

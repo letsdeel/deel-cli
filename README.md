@@ -325,6 +325,8 @@ deel <command> --beta
 deel <command> --version 2026-01-01
 ```
 
+**Outside prod the CLI sends no `X-Version`.** The versions in the CLI come from prod's API, and another environment (`--env demo`, or a `--base-url` on another host) can be on other versions: they are approved per environment, on different days. So there, unless you pass `--version <YYYY-MM-DD>`, the request carries no version and the API gateway resolves one itself. `X-Beta: true` is still sent for a beta-only command and for `--beta`; `--beta` does not pick a version from the CLI's list there, and does not fail with `usage.beta`. `--debug` shows `x-version=(none)`. `--versions` and `--help` always describe prod.
+
 If a beta graduates (or ends) after this CLI was released, the API rejects `X-Beta` before running anything; the CLI then retries once, without `X-Beta` (with the same version, or with the stable version the API names (else the newest stable one in the CLI's own list) when nothing is in beta any more and you did not pin a version with `--version`) and with the same idempotency key. `--debug` shows the retry. A command that is sent once (`webhooks test`) is never retried.
 
 ## Environments
@@ -333,6 +335,8 @@ If a beta graduates (or ends) after this CLI was released, the API rejects `X-Be
 | ---------------- | ---------------------------------------------- |
 | `prod` (default) | `https://api.letsdeel.com/rest`                |
 | `demo`           | `https://api-staging.letsdeel.com/rest`        |
+
+Only `prod` is on the API versions listed in the CLI. Any other environment (`demo`, or a `--base-url` on another host) can be ahead of or behind them, so the CLI sends no `X-Version` there and lets the API gateway pick it (see [API versions](#api-versions)).
 
 Every REST call — including `deel job status`/`deel job list` and the generated
 `deel jobs status`/`deel jobs list` — goes through this same `/rest`-prefixed

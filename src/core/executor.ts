@@ -156,9 +156,11 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   // the transport's request-id middleware leaves an existing header untouched.
   let requestId = ctx.newRequestId();
   const headers: Record<string, string> = { [HEADER.accept]: "application/json", [HEADER.requestId]: requestId };
+  // The manifest's versions are prod's: any other environment lets the gateway pick the version (see chooseVersion).
+  const prod = ctx.config.env === "prod";
   let choice = chooseVersion(descriptor, opts.version ?? {}, ctx.clock(), (line) => {
     if (!opts.output.quiet) ctx.io.err(line);
-  });
+  }, !prod);
   setVersionHeaders(headers, choice);
 
   let body: BodyInit | null = null;
@@ -209,7 +211,7 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   // before any service runs, so one retry is safe even for a POST. It keeps the idempotency key. A send-once route
   // (SEND_ONCE_ROUTES) is never sent twice, so its error is surfaced instead.
   const code = response.status >= 400 ? errorCode(response.json) : undefined;
-  const fallback = sendOnce ? undefined : betaFallback(choice, code, descriptor.versions, ctx.clock(), opts.version?.apiVersion !== undefined, firstError(response.json)?.details?.latest_stable_version);
+  const fallback = sendOnce ? undefined : betaFallback(choice, code, prod ? descriptor.versions : undefined, ctx.clock(), opts.version?.apiVersion !== undefined, firstError(response.json)?.details?.latest_stable_version);
   if (fallback) {
     if (opts.debug) ctx.io.err(`[debug] ${code}: ${fallback.reason}; retrying once without x-beta\n`);
     choice = fallback.choice;

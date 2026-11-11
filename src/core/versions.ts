@@ -52,7 +52,10 @@ function noVersionData(descriptor: Descriptor, flag: string): CliError {
   );
 }
 
-export function chooseVersion(descriptor: Descriptor, flags: VersionFlags, now: number, warn: (line: string) => void): VersionChoice {
+// `gatewayResolves` is for an environment other than prod. Its API can be on other versions than the ones in the manifest
+// (versions are approved per environment, on different days), which describe prod. Unless the user names a version, none
+// is sent and the gateway picks one; the manifest's list is not used to choose a beta either.
+export function chooseVersion(descriptor: Descriptor, flags: VersionFlags, now: number, warn: (line: string) => void, gatewayResolves = false): VersionChoice {
   const versions = descriptor.versions;
   const requested = flags.apiVersion?.trim();
 
@@ -70,6 +73,8 @@ export function chooseVersion(descriptor: Descriptor, flags: VersionFlags, now: 
     }
     return { version: requested, beta: Boolean(flags.beta) || (known !== undefined && isBetaAt(known, now)) };
   }
+
+  if (gatewayResolves) return { beta: Boolean(flags.beta) || Boolean(descriptor.beta) };
 
   if (flags.beta) {
     // A hand-picked command has no list to pick a beta from: --beta only adds X-Beta to its own version, as it always did.
