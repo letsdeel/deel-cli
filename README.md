@@ -22,7 +22,9 @@ deel dev logs list --status_class 4xx --beta        # your organization's failed
 - [API tokens](#api-tokens)
 - [Idempotency](#idempotency)
 - [Webhooks](#webhooks)
+- [API versions](#api-versions)
 - [Environments](#environments)
+- [Beta endpoints](#beta-endpoints)
 - [Corporate proxies & custom CAs](#corporate-proxies--custom-cas)
 - [Exit codes](#exit-codes)
 - [Logging](#logging)
@@ -176,8 +178,8 @@ deel commands --filter amendment                        # search every command (
 When several endpoints share a command's words, a few flags pick one, and the group help lists each line:
 
 ```
-  get <contract>                     Retrieve a single contract
-  get <contract> --worker-type eor   Retrieve EOR Contract Details
+  get <contract_id>                     Retrieve a single contract
+  get <contract_id> --worker-type eor   Retrieve EOR Contract Details
 ```
 
 `--worker-type <eor|gp|daas|contractor|employee>` names the contract or worker type, `--as worker` is the worker's side of an action, `--file-format pdf|csv` returns a document and `--bulk` acts on many at once. The line without a `--worker-type` calls the endpoint whose path names no type. A mistyped word gets a "did you mean".
