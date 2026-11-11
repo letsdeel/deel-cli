@@ -23,8 +23,30 @@ const REPO_ROOT = resolve(HERE, "../../..");
 
 type AnyObj = Record<string, any>;
 
-function mapType(schema: AnyObj | undefined): ScalarType {
-  const t = schema?.type;
+// Resolves the ways a spec marks a schema nullable: OAS 3.0 `nullable: true`, OAS 3.1
+// `type: ["string", "null"]`, and a `oneOf`/`anyOf` that includes `{ type: "null" }`. Returns
+// the schema with the null member stripped, so type, enum and properties read normally.
+export function normalizeSchema(schema: AnyObj | undefined): { schema: AnyObj; nullable: boolean } {
+  let out: AnyObj = schema ?? {};
+  let nullable = out.nullable === true;
+  const isNull = (member: AnyObj) => member?.type === "null";
+  for (const key of ["oneOf", "anyOf"] as const) {
+    const variants: AnyObj[] | undefined = out[key];
+    if (!Array.isArray(variants) || !variants.some(isNull)) continue;
+    nullable = true;
+    const rest = variants.filter((member) => !isNull(member));
+    const { [key]: _drop, ...outer } = out;
+    out = rest.length === 1 ? { ...rest[0], ...outer } : outer;
+  }
+  if (Array.isArray(out.type)) {
+    if (out.type.includes("null")) nullable = true;
+    out = { ...out, type: out.type.find((t: string) => t !== "null") };
+  }
+  return { schema: out, nullable };
+}
+
+function mapType(rawSchema: AnyObj | undefined): ScalarType {
+  const t = normalizeSchema(rawSchema).schema.type;
   if (t === "number" || t === "integer" || t === "boolean" || t === "array" || t === "object") return t;
   return "string";
 }
@@ -55,7 +77,8 @@ export function splitFields(objSchema: AnyObj | undefined): { textProps: CliPara
   const required: string[] = objSchema?.required ?? [];
   const textProps: CliParam[] = [];
   const fileFields: string[] = [];
-  for (const [name, schema] of Object.entries<AnyObj>(props)) {
+  for (const [name, rawSchema] of Object.entries<AnyObj>(props)) {
+    const { schema, nullable } = normalizeSchema(rawSchema);
     const isBinary = schema.format === "binary";
     const isBinaryArray = schema.type === "array" && schema.items?.format === "binary";
     if (isBinary || isBinaryArray) {
@@ -69,6 +92,7 @@ export function splitFields(objSchema: AnyObj | undefined): { textProps: CliPara
         in: "body",
         type,
         required: required.includes(name),
+        ...(nullable ? { nullable: true as const } : {}),
         ...(schema.enum ? { enum: (schema.enum as unknown[]).filter((v): v is string => v !== null) } : {}),
         ...(schema.description ? { description: schema.description } : {}),
         ...(properties?.length ? { properties } : {}),
@@ -118,7 +142,8 @@ export function bodyFrom(op: AnyObj): {
 }
 
 function propsToParams(props: AnyObj = {}, required: string[] = []): CliParam[] {
-  return Object.entries<AnyObj>(props).map(([name, s]) => {
+  return Object.entries<AnyObj>(props).map(([name, rawSchema]) => {
+    const s = normalizeSchema(rawSchema).schema;
     const type = mapType(s);
     // Recurse into nested objects, and into array-of-object items, so every response
     // field is visible in --help / --help --json, however deep.
