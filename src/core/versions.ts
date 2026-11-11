@@ -52,7 +52,7 @@ function noVersionData(descriptor: Descriptor, flag: string): CliError {
   );
 }
 
-export function chooseVersion(descriptor: Descriptor, flags: VersionFlags, now: number, warn: (line: string) => void): VersionChoice {
+export function chooseVersion(descriptor: Descriptor, flags: VersionFlags, now: number, warn: (line: string) => void, gatewayResolves = false): VersionChoice {
   const versions = descriptor.versions;
   const requested = flags.apiVersion?.trim();
 
@@ -64,12 +64,15 @@ export function chooseVersion(descriptor: Descriptor, flags: VersionFlags, now: 
     if (!isValidDate(requested)) {
       throw new CliError("usage.version", `--version expects a date (YYYY-MM-DD) or "none", got "${requested}".`);
     }
+    if (gatewayResolves) return { version: requested, beta: Boolean(flags.beta) };
     const known = versions?.find((entry) => entry.version === requested);
     if (versions && !known) {
       warn(`warning: ${requested} is not a known version of '${commandName(descriptor)}' (known: ${versions.map((entry) => entry.version).join(", ") || "none"}); sending it anyway.\n`);
     }
     return { version: requested, beta: Boolean(flags.beta) || (known !== undefined && isBetaAt(known, now)) };
   }
+
+  if (gatewayResolves) return { beta: Boolean(flags.beta) || Boolean(descriptor.beta) };
 
   if (flags.beta) {
     // A hand-picked command has no list to pick a beta from: --beta only adds X-Beta to its own version, as it always did.

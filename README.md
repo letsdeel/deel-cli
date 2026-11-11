@@ -325,6 +325,8 @@ deel <command> --beta
 deel <command> --version 2026-01-01
 ```
 
+Requests to a non-prod environment (`--env demo`) do not send `X-Version` by default, because versions might differ between environments. `--version <YYYY-MM-DD>` still sends one.
+
 If a beta graduates (or ends) after this CLI was released, the API rejects `X-Beta` before running anything; the CLI then retries once, without `X-Beta` (with the same version, or with the stable version the API names (else the newest stable one in the CLI's own list) when nothing is in beta any more and you did not pin a version with `--version`) and with the same idempotency key. `--debug` shows the retry. A command that is sent once (`webhooks test`) is never retried.
 
 ## Environments

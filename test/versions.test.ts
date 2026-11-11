@@ -48,12 +48,12 @@ function descriptor(over: Partial<Descriptor> = {}): Descriptor {
 const ok = (): HttpResponse => ({ status: 200, headers: {}, text: "", json: { data: { id: "w1" } } });
 const fail = (status: number, json: unknown): HttpResponse => ({ status, headers: {}, text: "", json });
 
-function harness(responses: HttpResponse[]) {
+function harness(responses: HttpResponse[], env = "prod") {
   const io = captureIO({});
   const seen: HttpRequest[] = [];
   let ids = 0;
   const ctx = createContext({
-    config: { env: "demo", baseUrl: "https://example.test/rest", issuer: null, clientId: "test-client", oauthBaseUrlOk: false },
+    config: { env, baseUrl: "https://example.test/rest", issuer: null, clientId: "test-client", oauthBaseUrlOk: false },
     token: "tok",
     io,
     clock: () => NOW,
@@ -69,8 +69,8 @@ function harness(responses: HttpResponse[]) {
 
 const opts = (version: ExecOpts["version"] = {}, debug = false, quiet = false): ExecOpts => ({ output: { json: true, quiet, raw: false }, debug, form: false, version });
 
-async function call(desc: Descriptor, responses: HttpResponse[], version: ExecOpts["version"] = {}, debug = false, quiet = false) {
-  const h = harness(responses);
+async function call(desc: Descriptor, responses: HttpResponse[], version: ExecOpts["version"] = {}, debug = false, quiet = false, env = "prod") {
+  const h = harness(responses, env);
   let error: any;
   try {
     await execute(desc, { flags: {}, body: { name: "w" }, files: {} }, h.ctx, opts(version, debug, quiet));
@@ -127,6 +127,75 @@ test("no flag on a beta-only descriptor: sends X-Beta by default", async () => {
   const { seen } = await call(descriptor({ version: "2026-09-15", beta: true }), [ok()]);
   assert.equal(seen[0].headers["x-version"], "2026-09-15");
   assert.equal(seen[0].headers["x-beta"], "true");
+});
+
+test("chooseVersion: outside prod no version is chosen from the manifest, and a beta is not picked from its list", () => {
+  assert.deepEqual(chooseVersion(descriptor(), {}, NOW, () => {}, true), { beta: false });
+  assert.deepEqual(chooseVersion(descriptor({ version: "2026-09-15", beta: true }), {}, NOW, () => {}, true), { beta: true });
+  assert.deepEqual(chooseVersion(descriptor(), { beta: true }, NOW, () => {}, true), { beta: true });
+  assert.deepEqual(chooseVersion(descriptor({ versions: VERSIONS.slice(0, 1) }), { beta: true }, NOW, () => {}, true), { beta: true });
+  assert.deepEqual(chooseVersion(descriptor({ version: undefined, versions: undefined }), { beta: true }, NOW, () => {}, true), { beta: true });
+});
+
+test("chooseVersion: outside prod a version the user names is still sent", () => {
+  assert.deepEqual(chooseVersion(descriptor(), { apiVersion: "2026-01-01" }, NOW, () => {}, true), { version: "2026-01-01", beta: false });
+  assert.deepEqual(chooseVersion(descriptor(), { apiVersion: "2026-09-15" }, NOW, () => {}, true), { version: "2026-09-15", beta: false });
+  assert.deepEqual(chooseVersion(descriptor(), { apiVersion: "2026-09-15", beta: true }, NOW, () => {}, true), { version: "2026-09-15", beta: true });
+  const warnings: string[] = [];
+  assert.deepEqual(chooseVersion(descriptor(), { apiVersion: "2026-12-12" }, NOW, (line) => warnings.push(line), true), { version: "2026-12-12", beta: false });
+  assert.deepEqual(warnings, []);
+  assert.deepEqual(chooseVersion(descriptor(), { apiVersion: "none" }, NOW, () => {}, true), { beta: false });
+});
+
+test("outside prod (demo, or any other environment) no X-Version is sent and the gateway picks it", async () => {
+  for (const env of ["demo", "example.test"]) {
+    const { seen, error } = await call(descriptor(), [ok()], {}, false, false, env);
+    assert.equal(error, undefined);
+    assert.equal("x-version" in seen[0].headers, false, env);
+    assert.equal("x-beta" in seen[0].headers, false, env);
+  }
+});
+
+test("outside prod a beta-only command and --beta still send X-Beta, without a version", async () => {
+  const betaOnly = await call(descriptor({ version: "2026-09-15", beta: true }), [ok()], {}, false, false, "demo");
+  assert.equal("x-version" in betaOnly.seen[0].headers, false);
+  assert.equal(betaOnly.seen[0].headers["x-beta"], "true");
+  const flagged = await call(descriptor(), [ok()], { beta: true }, false, false, "demo");
+  assert.equal("x-version" in flagged.seen[0].headers, false);
+  assert.equal(flagged.seen[0].headers["x-beta"], "true");
+});
+
+test("outside prod --beta works on a command whose manifest lists no beta", async () => {
+  const { seen, error } = await call(descriptor({ versions: VERSIONS.slice(0, 1) }), [ok()], { beta: true }, false, false, "demo");
+  assert.equal(error, undefined);
+  assert.equal(seen[0].headers["x-beta"], "true");
+});
+
+test("outside prod --version still sends the version the user names", async () => {
+  const { seen } = await call(descriptor(), [ok()], { apiVersion: "2026-01-01" }, false, false, "demo");
+  assert.equal(seen[0].headers["x-version"], "2026-01-01");
+  assert.equal("x-beta" in seen[0].headers, false);
+});
+
+test("deel --env demo sends no X-Version, and --version still reaches the request", async () => {
+  const seen: Headers[] = [];
+  const plain = await cli(["widgets", "reports", "list", "--env", "demo", "--no-log"], recordingFetch(seen));
+  assert.equal(plain.code, EXIT.OK);
+  const pinned = await cli(["widgets", "reports", "list", "--env", "demo", "--version", "2026-01-01", "--no-log"], recordingFetch(seen));
+  assert.equal(pinned.code, EXIT.OK);
+  assert.deepEqual(seen.map((headers) => [headers.get("x-version"), headers.get("x-beta")]), [[null, null], ["2026-01-01", null]]);
+});
+
+test("outside prod the retry of a rejected beta does not fall back to the manifest's stable version", async () => {
+  const noBeta = fail(400, { errors: [{ code: "NO_BETA_VERSION", message: "no beta" }] });
+  const { seen, error } = await call(descriptor(), [noBeta, ok()], { beta: true }, false, false, "demo");
+  assert.equal(seen.length, 1);
+  assert.equal(error.code, "NO_BETA_VERSION");
+  const advised = fail(400, { errors: [{ code: "NO_BETA_VERSION", message: "no beta", details: { latest_stable_version: "2026-05-05" } }] });
+  const retried = await call(descriptor(), [advised, ok()], { beta: true }, false, false, "demo");
+  assert.equal(retried.error, undefined);
+  assert.equal(retried.seen[1].headers["x-version"], "2026-05-05");
+  assert.equal("x-beta" in retried.seen[1].headers, false);
 });
 
 test("a hand-picked descriptor without a version sends no X-Version", async () => {
@@ -425,7 +494,7 @@ async function onTerminal<T>(fn: () => Promise<T>): Promise<T> {
   }
 }
 
-const BASE = ["--base-url", "https://example.test/rest", "--no-log"];
+const BASE = ["--env", "prod", "--base-url", "https://example.test/rest", "--no-log"];
 
 test("deel <beta-only command> sends X-Beta; --version and --beta reach the request", async () => {
   const seen: Headers[] = [];
