@@ -129,12 +129,10 @@ test("no flag on a beta-only descriptor: sends X-Beta by default", async () => {
   assert.equal(seen[0].headers["x-beta"], "true");
 });
 
-// The manifest's versions are prod's. Another environment can be on other versions, so the gateway picks one there.
 test("chooseVersion: outside prod no version is chosen from the manifest, and a beta is not picked from its list", () => {
   assert.deepEqual(chooseVersion(descriptor(), {}, NOW, () => {}, true), { beta: false });
   assert.deepEqual(chooseVersion(descriptor({ version: "2026-09-15", beta: true }), {}, NOW, () => {}, true), { beta: true });
   assert.deepEqual(chooseVersion(descriptor(), { beta: true }, NOW, () => {}, true), { beta: true });
-  // Even a list with nothing in beta is not consulted: --beta is not refused with usage.beta.
   assert.deepEqual(chooseVersion(descriptor({ versions: VERSIONS.slice(0, 1) }), { beta: true }, NOW, () => {}, true), { beta: true });
   assert.deepEqual(chooseVersion(descriptor({ version: undefined, versions: undefined }), { beta: true }, NOW, () => {}, true), { beta: true });
 });
@@ -178,7 +176,6 @@ test("outside prod --version still sends the version the user names", async () =
 test("outside prod the retry of a rejected beta does not fall back to the manifest's stable version", async () => {
   const noBeta = fail(400, { errors: [{ code: "NO_BETA_VERSION", message: "no beta" }] });
   const { seen, error } = await call(descriptor(), [noBeta, ok()], { beta: true }, false, false, "demo");
-  // Nothing from the gateway to name a version (prod's list is not trusted), so there is no retry to make.
   assert.equal(seen.length, 1);
   assert.equal(error.code, "NO_BETA_VERSION");
   const advised = fail(400, { errors: [{ code: "NO_BETA_VERSION", message: "no beta", details: { latest_stable_version: "2026-05-05" } }] });

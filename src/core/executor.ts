@@ -156,7 +156,6 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   // the transport's request-id middleware leaves an existing header untouched.
   let requestId = ctx.newRequestId();
   const headers: Record<string, string> = { [HEADER.accept]: "application/json", [HEADER.requestId]: requestId };
-  // The manifest's versions are prod's: any other environment lets the gateway pick the version (see chooseVersion).
   const prod = ctx.config.env === "prod";
   let choice = chooseVersion(descriptor, opts.version ?? {}, ctx.clock(), (line) => {
     if (!opts.output.quiet) ctx.io.err(line);

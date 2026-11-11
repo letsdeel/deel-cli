@@ -52,9 +52,6 @@ function noVersionData(descriptor: Descriptor, flag: string): CliError {
   );
 }
 
-// `gatewayResolves` is for an environment other than prod. Its API can be on other versions than the ones in the manifest
-// (versions are approved per environment, on different days), which describe prod. Unless the user names a version, none
-// is sent and the gateway picks one; the manifest's list is not used to choose a beta either.
 export function chooseVersion(descriptor: Descriptor, flags: VersionFlags, now: number, warn: (line: string) => void, gatewayResolves = false): VersionChoice {
   const versions = descriptor.versions;
   const requested = flags.apiVersion?.trim();
