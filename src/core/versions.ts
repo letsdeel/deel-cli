@@ -64,6 +64,7 @@ export function chooseVersion(descriptor: Descriptor, flags: VersionFlags, now: 
     if (!isValidDate(requested)) {
       throw new CliError("usage.version", `--version expects a date (YYYY-MM-DD) or "none", got "${requested}".`);
     }
+    if (gatewayResolves) return { version: requested, beta: Boolean(flags.beta) };
     const known = versions?.find((entry) => entry.version === requested);
     if (versions && !known) {
       warn(`warning: ${requested} is not a known version of '${commandName(descriptor)}' (known: ${versions.map((entry) => entry.version).join(", ") || "none"}); sending it anyway.\n`);

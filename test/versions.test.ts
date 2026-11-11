@@ -139,7 +139,11 @@ test("chooseVersion: outside prod no version is chosen from the manifest, and a 
 
 test("chooseVersion: outside prod a version the user names is still sent", () => {
   assert.deepEqual(chooseVersion(descriptor(), { apiVersion: "2026-01-01" }, NOW, () => {}, true), { version: "2026-01-01", beta: false });
-  assert.deepEqual(chooseVersion(descriptor(), { apiVersion: "2026-09-15" }, NOW, () => {}, true), { version: "2026-09-15", beta: true });
+  assert.deepEqual(chooseVersion(descriptor(), { apiVersion: "2026-09-15" }, NOW, () => {}, true), { version: "2026-09-15", beta: false });
+  assert.deepEqual(chooseVersion(descriptor(), { apiVersion: "2026-09-15", beta: true }, NOW, () => {}, true), { version: "2026-09-15", beta: true });
+  const warnings: string[] = [];
+  assert.deepEqual(chooseVersion(descriptor(), { apiVersion: "2026-12-12" }, NOW, (line) => warnings.push(line), true), { version: "2026-12-12", beta: false });
+  assert.deepEqual(warnings, []);
   assert.deepEqual(chooseVersion(descriptor(), { apiVersion: "none" }, NOW, () => {}, true), { beta: false });
 });
 
@@ -171,6 +175,15 @@ test("outside prod --version still sends the version the user names", async () =
   const { seen } = await call(descriptor(), [ok()], { apiVersion: "2026-01-01" }, false, false, "demo");
   assert.equal(seen[0].headers["x-version"], "2026-01-01");
   assert.equal("x-beta" in seen[0].headers, false);
+});
+
+test("deel --env demo sends no X-Version, and --version still reaches the request", async () => {
+  const seen: Headers[] = [];
+  const plain = await cli(["widgets", "reports", "list", "--env", "demo", "--no-log"], recordingFetch(seen));
+  assert.equal(plain.code, EXIT.OK);
+  const pinned = await cli(["widgets", "reports", "list", "--env", "demo", "--version", "2026-01-01", "--no-log"], recordingFetch(seen));
+  assert.equal(pinned.code, EXIT.OK);
+  assert.deepEqual(seen.map((headers) => [headers.get("x-version"), headers.get("x-beta")]), [[null, null], ["2026-01-01", null]]);
 });
 
 test("outside prod the retry of a rejected beta does not fall back to the manifest's stable version", async () => {
