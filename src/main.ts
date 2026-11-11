@@ -8,7 +8,10 @@ import { reexecWithSystemCa } from "./core/tls.ts";
 // CA trust (OS store by default) is installed lazily in the HTTP transport, so
 // offline commands (--help, --generate-input) stay fast.
 run(process.argv.slice(2))
-  .then((code) => process.exit(code))
+  .then((code) => {
+    // Not process.exit: it can cut off stdout still queued on a pipe, e.g. a large JSON result piped to jq.
+    process.exitCode = code;
+  })
   .catch((err) => {
     if (err instanceof CliError) {
       // Bun's binary ignores setDefaultCACertificates; retry once trusting the OS store.
