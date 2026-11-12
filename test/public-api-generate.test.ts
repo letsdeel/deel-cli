@@ -61,6 +61,24 @@ test("generates one command per endpoint from the fixtures", () => {
   ]);
 });
 
+test("a response field the spec marks x-deel-sensitive is carried into the manifest as sensitive, and the mark is the only addition", () => {
+  const marked = parseDefinitions([
+    {
+      api: "rest", method: "GET", path: "/gadgets", version: "2026-01-01", beta_until: null, sunset_at: null,
+      operation: {
+        operationId: "getGadgets-v2026-01-01", summary: "List gadgets",
+        responses: { "200": { content: { "application/json": { schema: { type: "object", properties: { data: { type: "array", items: { type: "object", properties: {
+          id: { type: "string" },
+          badge_color_choice: { type: "string", "x-deel-sensitive": true },
+        } } } } } } } } },
+      },
+    },
+  ]);
+  const { manifest, errors } = generate(marked, options());
+  assert.deepEqual(errors, []);
+  assert.deepEqual(manifest.descriptors[0].responseFields.map((field) => [field.name, field.sensitive]), [["id", undefined], ["badge_color_choice", true]]);
+});
+
 test("a sunset endpoint is left out", () => {
   const { manifest } = generate(widgets(), options());
   assert.ok(!manifest.descriptors.some((descriptor) => descriptor.path.startsWith("/old-things")));

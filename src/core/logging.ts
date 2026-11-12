@@ -40,11 +40,19 @@ function logDir(): string {
 // with no separator at all.
 const RUN_TOGETHER_KEYS = [...SENSITIVE_LOG_KEYS].filter((needle) => needle.includes("_")).map((needle) => needle.replaceAll("_", ""));
 
+// Names of the response fields the spec marks sensitive, in any spelling.
+let markedFields = new Set<string>();
+const spelling = (name: string) => keyWords(name).join("_");
+export function setMarkedSensitiveFields(names: Iterable<string>): void {
+  markedFields = new Set([...names].map(spelling));
+}
+
 // Match by substring so variants (access_token, tax_id, …) are caught, not just exact keys, whichever way the key is
 // spelled: `taxId`, `tax-id`, `TAX_ID` and `taxid` are one name. The short names that would match inside other words
 // are matched as whole words of the key.
 export function isSensitiveKey(key: string): boolean {
   const words = keyWords(key);
+  if (markedFields.has(words.join("_"))) return true;
   const lower = key.toLowerCase();
   for (const needle of SENSITIVE_LOG_KEYS) if (lower.includes(needle)) return true;
   const run = words.join("");

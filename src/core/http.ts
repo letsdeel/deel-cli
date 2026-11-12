@@ -154,7 +154,7 @@ export function withLogging(logger: Logger, clock: () => number): Middleware {
       kind: "request",
       ...(request.meta ?? {}),
       method: request.method,
-      url: withBodies ? maskUrlQuery(request.url) : urlPath(request.url),
+      url: urlPath(request.url),
       request_id: request.headers[HEADER.requestId],
       status: response.status,
       duration_ms: clock() - startedAt,

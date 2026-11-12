@@ -171,3 +171,50 @@ test("normalizeSchema leaves a non-null multi-type union alone and flags nothing
   assert.equal(nullable, false);
   assert.equal(Array.isArray(schema.oneOf), true);
 });
+
+test("responseFrom carries the spec's x-deel-sensitive mark onto a response field, at any depth, and only for the boolean true", () => {
+  const { responseFields } = responseFrom({
+    responses: {
+      "200": {
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                data: {
+                  type: "object",
+                  properties: {
+                    id: { type: "string" },
+                    badge_color_choice: { type: "string", "x-deel-sensitive": true },
+                    nullable_mark: { oneOf: [{ type: "string", "x-deel-sensitive": true }, { type: "null" }] },
+                    as_text: { type: "string", "x-deel-sensitive": "yes" },
+                    as_false: { type: "string", "x-deel-sensitive": false },
+                    owner: { type: "object", properties: { nickname: { type: "string", "x-deel-sensitive": true }, title: { type: "string" } } },
+                    tags: { type: "array", items: { type: "object", properties: { label: { type: "string", "x-deel-sensitive": true } } } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const byName = (fields: { name: string; sensitive?: true; properties?: any[] }[] | undefined, name: string) => fields!.find((field) => field.name === name)!;
+  assert.equal(byName(responseFields, "id").sensitive, undefined);
+  assert.equal(byName(responseFields, "badge_color_choice").sensitive, true);
+  assert.equal(byName(responseFields, "nullable_mark").sensitive, true);
+  assert.equal(byName(responseFields, "as_text").sensitive, undefined);
+  assert.equal(byName(responseFields, "as_false").sensitive, undefined);
+  assert.equal(byName(byName(responseFields, "owner").properties, "nickname").sensitive, true);
+  assert.equal(byName(byName(responseFields, "owner").properties, "title").sensitive, undefined);
+  assert.equal(byName(byName(responseFields, "tags").properties, "label").sensitive, true);
+});
+
+test("responseFrom adds no sensitive key at all when the spec marks nothing, so an unmarked manifest does not change", () => {
+  const { responseFields } = responseFrom({
+    responses: { "200": { content: { "application/json": { schema: { type: "object", properties: { data: { type: "object", properties: { id: { type: "string" } } } } } } } } },
+  });
+  assert.deepEqual(responseFields, [{ name: "id", in: "body", type: "string", required: false }]);
+});

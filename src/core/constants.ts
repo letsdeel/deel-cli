@@ -11,17 +11,10 @@ export const LOG_MAX_BYTES_DEFAULT = 10 * 1024 * 1024;
 export const LOG_MAX_FILES_DEFAULT = 5;
 export const LOG_DIR_MODE = 0o700;  // owner read/write/enter; no group or other access
 export const LOG_FILE_MODE = 0o600; // owner read/write only
-// What the local log masks, by key name, wherever the key sits in a logged body. The policy: credentials; links that
-// sign the holder in or fetch a file; financial, tax and government identifiers; contact and address details; and the
-// personal data of a person (birth, family, health, beliefs and the other special categories of the GDPR, article 9).
-// Names of people and companies, ids of records, dates, amounts of a contract and codes of a country or currency are
-// kept, so the log still says what was called. test/logging.test.ts walks every field name of the generated manifest:
-// each is masked here, made only of words listed in test/fixtures/log-safe-words.txt, or reviewed by name.
-//
-// Substrings, matched (case-insensitive) against the whole key, so variants (access_token, tax_id) are caught.
-//
-// The credentials come first and are exported on their own: a response field that holds one is withheld or printed on
-// purpose (test/constants.test.ts), so that test reads the same vocabulary, not one of its own.
+// What the local log masks by key name: credentials, and links that sign the holder in or fetch a file. Response
+// fields the spec marks sensitive are masked by name too (setMarkedSensitiveFields, core/logging.ts).
+// Substrings, matched (case-insensitive) against the whole key, so variants (access_token, api_key) are caught.
+// Credentials are exported on their own because test/constants.test.ts reads the same vocabulary.
 export const CREDENTIAL_LOG_KEYS = [
   "token", "password", "passwd", "secret", "authorization", "credential", "api_key", "apikey", "private_key", "access_key",
   "signing_key", "signature", "magic_link", "cvv", "cvc", "pin",
@@ -31,28 +24,8 @@ export const SENSITIVE_LOG_KEYS = new Set([
   ...CREDENTIAL_LOG_KEYS,
   // links that sign the holder in or fetch a file without further auth (magic and pre-signed links)
   "download_link", "upload_url", "pdf_url",
-  // financial: bank, card, tax and pay of a person
-  "iban", "swift", "bank", "card", "routing", "account_number", "account_holder", "sort_code", "branch_code", "rib_number", "ifsc",
-  "bsb", "tax", "vat_id", "vat_number", "salary", "wage",
-  // government and personal identifiers
-  "ssn", "passport", "national_id", "nationalid", "personal_id", "personalid", "identity", "id_number", "document_number",
-  "documentnumber", "social_security", "driver", "licen", "citizen",
-  // contact and address
-  "email", "phone", "mobile", "telephone", "address", "postcode", "post_code", "postal", "zipcode", "zip_code", "street",
-  // the person: birth, family, and the special categories of the GDPR, article 9
-  "dob", "birth", "gender", "nationalit", "marital", "spouse", "dependent", "ethnic", "religio", "politic", "health",
-  "medical", "disabilit", "sexual", "orientation", "biometric", "genetic", "family", "children", "demographic", "emergency",
-  "immigration", "beneficiar", "answer", "username", "identifier", "sensitive",
-  // what a person is paid
-  "compensation", "income", "bonus", "commission",
 ]);
-// Short names that would match inside other words (`pan` in company, `tin` in setting), so they are matched as whole
-// words of a key, as `LINK_KEY_WORDS` is: national tax and identity numbers by their initials, and the rest.
-export const SENSITIVE_LOG_WORDS = new Set([
-  "pan", "tin", "nin", "nic", "nric", "cpf", "curp", "dni", "nif", "nie", "sin", "ein", "itin", "nino", "pesel", "bic", "otp", "mfa",
-  ...CREDENTIAL_LOG_WORDS, "race", "racial", "union", "sick", "sex", "fax", "zip", "personal", "national",
-  "pii", "pep", "ftin", "giin", "visa", "ip", "digits", "resident", "residence", "line1", "line2",
-]);
+export const SENSITIVE_LOG_WORDS = new Set(CREDENTIAL_LOG_WORDS);
 // Words of a key (`download_url`, `downloadUrl`) that name a link. A link in a response body is logged without its
 // query string and fragment, where a pre-signed link keeps its signature.
 export const LINK_KEY_WORDS = new Set(["url", "urls", "uri", "uris", "link", "links", "href", "hrefs"]);

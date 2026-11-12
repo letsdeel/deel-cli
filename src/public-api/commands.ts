@@ -1,16 +1,32 @@
 // Generated public API commands, and how the command line picks one endpoint among those sharing its words.
 
-import type { CommandForm, Descriptor, GeneratedManifest } from "../types.ts";
+import type { CliParam, CommandForm, Descriptor, GeneratedManifest } from "../types.ts";
 import { argvAttachesValue, argvEnables, argvFlagValue, argvMentionsFlag } from "../core/flags.ts";
 import { CliError } from "../core/errors.ts";
+import { setMarkedSensitiveFields } from "../core/logging.ts";
 import domainStages from "./domains.json" with { type: "json" };
 import { manifest as handPicked } from "../manifest.generated.ts";
 
 // The manifest is parsed only when a command needs it, so --version and the static commands don't pay for it.
 let descriptors: Descriptor[] | undefined;
 
+export function markedFieldNames(all: Descriptor[]): Set<string> {
+  const names = new Set<string>();
+  const walk = (fields: CliParam[]) => {
+    for (const field of fields) {
+      if (field.sensitive) names.add(field.name);
+      if (field.properties) walk(field.properties);
+    }
+  };
+  for (const descriptor of all) walk(descriptor.responseFields);
+  return names;
+}
+
 export async function loadGeneratedDescriptors(): Promise<Descriptor[]> {
-  descriptors ??= ((await import("./manifest.json", { with: { type: "json" } })).default as GeneratedManifest).descriptors;
+  if (!descriptors) {
+    descriptors = ((await import("./manifest.json", { with: { type: "json" } })).default as GeneratedManifest).descriptors;
+    setMarkedSensitiveFields(markedFieldNames(descriptors));
+  }
   return descriptors;
 }
 
@@ -26,6 +42,7 @@ export function allDescriptors(): Descriptor[] {
 
 export function setGeneratedDescriptorsForTests(next: Descriptor[] | undefined): void {
   descriptors = next;
+  setMarkedSensitiveFields(markedFieldNames(next ?? []));
 }
 
 // The command line a user types for one endpoint, e.g. "deel contracts get <contract> --worker-type eor".
