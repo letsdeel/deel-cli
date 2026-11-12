@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { splitFields, bodyFrom, responseFrom, normalizeSchema } from "../.claude/skills/deel-cli-extractor/extract.ts";
+import type { CliParam } from "../src/types.ts";
 
 test("splitFields recursively expands nested object schemas into properties", () => {
   const { textProps } = splitFields({
@@ -201,7 +202,7 @@ test("responseFrom carries the spec's x-deel-sensitive mark onto a response fiel
     },
   });
 
-  const byName = (fields: { name: string; sensitive?: true; properties?: any[] }[] | undefined, name: string) => fields!.find((field) => field.name === name)!;
+  const byName = (fields: CliParam[] | undefined, name: string) => fields!.find((field) => field.name === name)!;
   assert.equal(byName(responseFields, "id").sensitive, undefined);
   assert.equal(byName(responseFields, "badge_color_choice").sensitive, true);
   assert.equal(byName(responseFields, "nullable_mark").sensitive, true);
@@ -217,4 +218,33 @@ test("responseFrom adds no sensitive key at all when the spec marks nothing, so 
     responses: { "200": { content: { "application/json": { schema: { type: "object", properties: { data: { type: "object", properties: { id: { type: "string" } } } } } } } } },
   });
   assert.deepEqual(responseFields, [{ name: "id", in: "body", type: "string", required: false }]);
+});
+
+test("responseFrom marks an array field whose items carry x-deel-sensitive, and an array of objects with one marked property keeps the mark on that property", () => {
+  const { responseFields } = responseFrom({
+    responses: {
+      "200": {
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                data: {
+                  type: "object",
+                  properties: {
+                    nicknames: { type: "array", items: { type: "string", "x-deel-sensitive": true } },
+                    codes: { type: "array", items: { type: "string" } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const byName = (name: string) => responseFields.find((field: CliParam) => field.name === name)!;
+  assert.equal(byName("nicknames").sensitive, true);
+  assert.equal(byName("codes").sensitive, undefined);
 });

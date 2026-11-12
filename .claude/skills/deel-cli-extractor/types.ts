@@ -12,6 +12,7 @@ export type CliParam = {
   description?: string;
   properties?: CliParam[];
   maxItems?: number;
+  sensitive?: true;
 };
 
 export type BodyKind = "none" | "json" | "json-array" | "multipart";

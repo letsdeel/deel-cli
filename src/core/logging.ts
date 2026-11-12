@@ -57,14 +57,13 @@ export function maskMarkedFields(json: unknown, fields: CliParam[] | undefined):
       }),
     );
   };
-  const body = json as Record<string, unknown> | null;
-  if (body && typeof body === "object" && !Array.isArray(body) && "data" in body && !fields.some((field) => field.name === "data")) {
-    return { ...body, data: walk(body.data, fields) };
+  if (json && typeof json === "object" && !Array.isArray(json) && "data" in json) {
+    return { ...json, data: walk((json as Record<string, unknown>).data, fields) };
   }
   return walk(json, fields);
 }
 
-// Match by substring so variants (access_token, tax_id, …) are caught, not just exact keys, whichever way the key is
+// Match by substring so variants (access_token, api_key, …) are caught, not just exact keys, whichever way the key is
 // spelled: `taxId`, `tax-id`, `TAX_ID` and `taxid` are one name. The short names that would match inside other words
 // are matched as whole words of the key.
 export function isSensitiveKey(key: string): boolean {
@@ -166,7 +165,7 @@ export function maskUrlQuery(url: string): string {
 }
 
 // `link` is true under a link key, which masks the query of the strings it holds (or lists). The entry's own top-level
-// keys are not redacted this way: its `url` is the request URL, which `withLogging` masks with `maskUrlQuery` before it gets here.
+// keys are not redacted this way: its `url` is the request URL, which `withLogging` logs without its query string.
 function redact(value: unknown, link = false): unknown {
   if (typeof value === "string") return maskPersonalText(link ? maskLink(value) : value);
   if (Array.isArray(value)) return value.map((item) => redact(item, link));

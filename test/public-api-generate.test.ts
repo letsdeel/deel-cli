@@ -79,6 +79,18 @@ test("a response field the spec marks x-deel-sensitive is carried into the manif
   assert.deepEqual(manifest.descriptors[0].responseFields.map((field) => [field.name, field.sensitive]), [["id", undefined], ["badge_color_choice", true]]);
 });
 
+test("mergeVariants keeps x-deel-sensitive on a property when any variant that names it carries the mark", () => {
+  const merged = mergeVariants({
+    oneOf: [
+      { type: "object", properties: { email: { type: "string" }, id: { type: "string" } } },
+      { type: "object", properties: { email: { type: "string", "x-deel-sensitive": true }, id: { type: "string" } } },
+    ],
+  });
+
+  assert.equal(merged.properties.email["x-deel-sensitive"], true);
+  assert.equal(merged.properties.id["x-deel-sensitive"], undefined);
+});
+
 test("a sunset endpoint is left out", () => {
   const { manifest } = generate(widgets(), options());
   assert.ok(!manifest.descriptors.some((descriptor) => descriptor.path.startsWith("/old-things")));

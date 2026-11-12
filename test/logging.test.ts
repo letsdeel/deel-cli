@@ -186,6 +186,14 @@ test("maskMarkedFields reads the data envelope, an array body and a body that is
   assert.equal(maskMarkedFields(null, fields), null);
 });
 
+test("maskMarkedFields reads the envelope like the executor, even when the endpoint has a field called data", () => {
+  const fields = [plain("id"), plain("data", { type: "object", properties: [marked("account_ref")] }), plain("status")];
+  assert.deepEqual(
+    maskMarkedFields({ data: [{ id: "1", data: { account_ref: "x", other: "kept" }, status: "ok" }] }, fields),
+    { data: [{ id: "1", data: { account_ref: "***", other: "kept" }, status: "ok" }] },
+  );
+});
+
 test("maskMarkedFields changes nothing when the endpoint marks no field or has none", () => {
   const body = { data: { id: "1", name: "n" } };
   assert.deepEqual(maskMarkedFields(body, [plain("id"), plain("name")]), body);
