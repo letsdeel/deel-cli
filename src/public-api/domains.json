@@ -1,0 +1,172 @@
+[
+ {
+  "stage": "Company setup",
+  "domains": [
+   {
+    "name": "org",
+    "description": "Organization, child orgs, departments, teams, org structure, locations, relationship types, groups"
+   },
+   {
+    "name": "legal-entities",
+    "description": "Legal entities, registration documents, settings, cost centers"
+   },
+   {
+    "name": "access",
+    "description": "Managers, roles, magic links, sessions"
+   }
+  ]
+ },
+ {
+  "stage": "People",
+  "domains": [
+   {
+    "name": "people",
+    "description": "The worker record: create, personal info, addresses, compensation, custom fields, reporting lines, positions"
+   }
+  ]
+ },
+ {
+  "stage": "Hiring",
+  "domains": [
+   {
+    "name": "ats",
+    "description": "Jobs, postings, candidates, applications, interviews, offers"
+   },
+   {
+    "name": "countries",
+    "description": "Country research: guide, hiring rules, start dates, costs, employment cost"
+   },
+   {
+    "name": "contracts",
+    "description": "Every working arrangement: create, update, sign, invite, amendments, documents, templates, milestones, tasks"
+   },
+   {
+    "name": "onboarding",
+    "description": "Onboarding tracker, individual onboarding, partner candidates"
+   }
+  ]
+ },
+ {
+  "stage": "Time",
+  "domains": [
+   {
+    "name": "time-off",
+    "description": "Requests, approvals, balances, policies"
+   },
+   {
+    "name": "timesheets",
+    "description": "Contractor timesheets, presets, reviews"
+   },
+   {
+    "name": "time-tracking",
+    "description": "Shifts, shift rates, Time Tracking timesheets"
+   }
+  ]
+ },
+ {
+  "stage": "Pay",
+  "domains": [
+   {
+    "name": "payroll",
+    "description": "Payroll events, gross-to-net, groups, on-demand payroll, imports, payslips"
+   },
+   {
+    "name": "adjustments",
+    "description": "Bonuses, expenses, deductions, off-cycle payments"
+   },
+   {
+    "name": "payouts",
+    "description": "How workers get paid: bank accounts, payout methods, balances, withdrawals"
+   },
+   {
+    "name": "billing",
+    "description": "What the org pays Deel: invoices, payments, statements, refunds, vendor bills"
+   }
+  ]
+ },
+ {
+  "stage": "Benefits and rewards",
+  "domains": [
+   {
+    "name": "benefits",
+    "description": "Benefit offerings and enrollments"
+   },
+   {
+    "name": "equity",
+    "description": "Grants, awards, exercises, valuations, ledger"
+   }
+  ]
+ },
+ {
+  "stage": "Leaving",
+  "domains": [
+   {
+    "name": "offboarding",
+    "description": "Terminations, resignations, sign-offs, offboarding tracker"
+   }
+  ]
+ },
+ {
+  "stage": "Compliance",
+  "domains": [
+   {
+    "name": "documents",
+    "description": "Compliance documents, HR documents, tax forms, secure vault"
+   },
+   {
+    "name": "screenings",
+    "description": "KYC, AML and KYB verification"
+   },
+   {
+    "name": "immigration",
+    "description": "Cases, visas, quotes, documents"
+   }
+  ]
+ },
+ {
+  "stage": "Operations",
+  "domains": [
+   {
+    "name": "it",
+    "description": "Assets, orders, products, warehouses, policies, seats, clearances"
+   },
+   {
+    "name": "tasks",
+    "description": "The admin's to-do list"
+   }
+  ]
+ },
+ {
+  "stage": "Platform",
+  "domains": [
+   {
+    "name": "webhooks",
+    "description": "Subscriptions, event types, test events"
+   },
+   {
+    "name": "jobs",
+    "description": "Asynchronous jobs that bulk commands start, and their status"
+   },
+   {
+    "name": "dev",
+    "description": "API tokens, request logs, consent"
+   },
+   {
+    "name": "oauth2-apps",
+    "description": "The organization's OAuth apps (integration apps): list, get, update, enable and disable"
+   },
+   {
+    "name": "lookups",
+    "description": "Reference lists: countries, currencies, job titles, seniorities, time-off types, industries"
+   },
+   {
+    "name": "files",
+    "description": "File uploads"
+   },
+   {
+    "name": "scim",
+    "description": "SCIM 2.0 users, for identity providers"
+   }
+  ]
+ }
+]

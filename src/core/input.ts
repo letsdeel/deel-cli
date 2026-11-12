@@ -13,10 +13,10 @@ export function parseInput(raw: string, bodyProps: CliParam[]): ParsedInput {
   const value = readRawValue(raw);
   const trimmed = value.trimStart();
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
-    return coerceTopLevel(parseJson(value), bodyProps);
+    return coerceTopLevel(parseJson(value), bodyProps, false);
   }
   if (value.includes("=")) {
-    return coerceTopLevel(parseShorthandObject(value), bodyProps);
+    return coerceTopLevel(parseShorthandObject(value), bodyProps, true);
   }
   throw new CliError(
     "input.unrecognized",
@@ -131,7 +131,8 @@ function parseScalar(text: string): unknown {
 
 // ---------------- schema coercion ----------------
 
-function coerceTopLevel(value: unknown, bodyProps: CliParam[]): unknown {
+// nullLiteral: shorthand only. JSON already has a real null, so a JSON string "null" stays text.
+function coerceTopLevel(value: unknown, bodyProps: CliParam[], nullLiteral: boolean): unknown {
   if (bodyProps.length === 0 || value === null || typeof value !== "object" || Array.isArray(value)) {
     return value;
   }
@@ -140,12 +141,13 @@ function coerceTopLevel(value: unknown, bodyProps: CliParam[]): unknown {
   for (const [key, fieldValue] of Object.entries(record)) {
     const param = paramsByName.get(key);
     if (!param) continue;
-    record[key] = coerceScalar(fieldValue, param);
+    record[key] = coerceScalar(fieldValue, param, nullLiteral);
   }
   return record;
 }
 
-function coerceScalar(value: unknown, param: CliParam): unknown {
+function coerceScalar(value: unknown, param: CliParam, nullLiteral: boolean): unknown {
+  if (nullLiteral && value === "null" && param.nullable) return null;
   if (typeof value !== "string") return value;
   let coerced: unknown = value;
   if (param.type === "number" || param.type === "integer") {

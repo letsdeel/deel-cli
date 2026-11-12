@@ -45,3 +45,30 @@ test("non-number for a number field errors", () => {
 test("unrecognized input errors", () => {
   assert.throws(() => parseInput("just-a-word", props), /Unrecognized/);
 });
+
+test("shorthand null clears a nullable field of any type, and stays literal otherwise", () => {
+  const nullableProps: CliParam[] = [
+    { name: "note", in: "body", type: "string", required: false, nullable: true },
+    { name: "amount", in: "body", type: "number", required: false, nullable: true },
+    { name: "flag", in: "body", type: "boolean", required: false, nullable: true },
+    { name: "title", in: "body", type: "string", required: false },
+  ];
+  assert.deepEqual(parseInput("note=null,amount=null,flag=null", nullableProps), { note: null, amount: null, flag: null });
+  assert.deepEqual(parseInput("title=null", nullableProps), { title: "null" });
+  assert.deepEqual(parseInput('{"note":null}', nullableProps), { note: null });
+});
+
+test("shorthand null clears a nullable enum or integer field without enum or number checks", () => {
+  const props: CliParam[] = [
+    { name: "status", in: "body", type: "string", required: false, nullable: true, enum: ["open", "closed"] },
+    { name: "count", in: "body", type: "integer", required: false, nullable: true },
+  ];
+  assert.deepEqual(parseInput("status=null,count=null", props), { status: null, count: null });
+  assert.throws(() => parseInput("status=pending", props), /must be one of/);
+});
+
+test("a JSON string \"null\" on a nullable field stays text; only shorthand maps the literal", () => {
+  const props: CliParam[] = [{ name: "note", in: "body", type: "string", required: false, nullable: true }];
+  assert.deepEqual(parseInput('{"note":"null"}', props), { note: "null" });
+  assert.deepEqual(parseInput("note=null", props), { note: null });
+});

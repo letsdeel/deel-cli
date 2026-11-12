@@ -20,7 +20,7 @@ function quoteForSecurity(value: string): string {
   return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
-const macStore: CredentialStore = {
+export const macStore: CredentialStore = {
   available: () => true,
   get(account) {
     const r = spawnSync("security", ["find-generic-password", "-s", SERVICE, "-a", account, "-w"], { encoding: "utf8" });

@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { withAuth, withVersion, withRequestId, withRetry, withBeta } from "../src/core/http.ts";
+import { fetchTransport, withAuth, withVersion, withRequestId, withRetry, withBeta } from "../src/core/http.ts";
 import type { HttpRequest, HttpResponse, Transport } from "../src/core/http.ts";
 
 const req = (over: Partial<HttpRequest> = {}): HttpRequest => ({ method: "GET", url: "https://x", headers: {}, ...over });
@@ -25,6 +25,32 @@ test("withAuth adds nothing when there is no token", async () => {
   const a = capturing();
   await withAuth(null)(a.next)(req());
   assert.equal(a.seen[0].headers["authorization"], undefined);
+});
+
+test("an error that names the request URL masks its sensitive query values", async () => {
+  const a = capturing();
+  await assert.rejects(
+    () => withAuth("tok")(a.next)(req({ url: "http://x/people?email=a%40b.co&personal_id=P123&page=2" })),
+    (error: Error) => /non-https URL: http:\/\/x\/people\?email=\*\*\*&personal_id=\*\*\*&page=2$/.test(error.message),
+  );
+  assert.equal(a.seen.length, 0);
+});
+
+test("a timeout and a TLS failure name the request URL with its sensitive query values masked", async (t) => {
+  const realFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = realFetch;
+  });
+  const url = "https://x/people?email=a%40b.co&page=2";
+  const fail = (error: Error) => {
+    globalThis.fetch = (async () => {
+      throw error;
+    }) as typeof fetch;
+  };
+  fail(Object.assign(new Error("aborted"), { name: "AbortError" }));
+  await assert.rejects(() => fetchTransport(req({ url })), (error: Error) => error.message === "Request timed out: GET https://x/people?email=***&page=2");
+  fail(Object.assign(new Error("unable to verify the first certificate"), { code: "UNABLE_TO_VERIFY_LEAF_SIGNATURE" }));
+  await assert.rejects(() => fetchTransport(req({ url })), (error: Error) => error.message === "TLS verification failed: https://x/people?email=***&page=2");
 });
 
 test("withAuth refuses to send a token over a non-https URL", async () => {
@@ -67,6 +93,46 @@ test("withRetry does not retry a non-retryable request", async () => {
   const response = await withRetry(3)(next)(req({ retryable: false }));
   assert.equal(response.status, 503);
   assert.equal(call, 1);
+});
+
+test("withAuth resolves an async token provider at send time", async () => {
+  const a = capturing();
+  let calls = 0;
+  await withAuth(async () => (calls++, "fresh"))(a.next)(req());
+  assert.equal(a.seen[0].headers["authorization"], "Bearer fresh");
+  assert.equal(calls, 1);
+});
+
+test("withAuth does not call the provider when a credential is already set or the URL is not https", async () => {
+  let calls = 0;
+  const provider = async () => (calls++, "fresh");
+  const a = capturing();
+  await withAuth(provider)(a.next)(req({ headers: { authorization: "Bearer preset" } }));
+  assert.equal(calls, 0);
+  await assert.rejects(async () => {
+    await withAuth(provider)(a.next)(req({ url: "http://x" }));
+  }, /non-https/);
+  assert.equal(calls, 0);
+});
+
+test("withAuth sends no header when the provider has no token", async () => {
+  const a = capturing();
+  await withAuth(async () => null)(a.next)(req());
+  assert.equal(a.seen[0].headers["authorization"], undefined);
+});
+
+test("a retry asks the token provider again and the caller's request is left untouched", async () => {
+  const tokens = ["first", "second"];
+  const seen: HttpRequest[] = [];
+  const base: Transport = async (request) => (seen.push(request), seen.length === 1 ? res(503) : res(200));
+  const request = req({ retryable: true });
+  const response = await withRetry()(withAuth(async () => tokens.shift() as string)(base))(request);
+  assert.equal(response.status, 200);
+  assert.deepEqual(
+    seen.map((sent) => sent.headers["authorization"]),
+    ["Bearer first", "Bearer second"],
+  );
+  assert.equal(request.headers["authorization"], undefined);
 });
 
 test("withBeta sends X-Beta: true only when enabled", async () => {
