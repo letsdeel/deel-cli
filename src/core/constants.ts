@@ -76,7 +76,7 @@ export function withheldFieldFor(key: string): string | undefined {
   return WITHHELD_BY_SPELLING.get(keyWords(key).join("_"));
 }
 
-// Endpoints whose every call acts again (a test delivery): sent once, with no retry and no derived Idempotency-Key,
+// Endpoints whose every call acts again (a test delivery): sent once, with no retry and no automatic Idempotency-Key,
 // so running the command again sends a new one. Keyed "METHOD /path" with the path params as {}.
 export const SEND_ONCE_ROUTES = new Set(["POST /webhooks/{}/simulate"]);
 // Endpoints whose 2xx response says whether the call worked: when that field is false, the response is printed and
@@ -84,10 +84,6 @@ export const SEND_ONCE_ROUTES = new Set(["POST /webhooks/{}/simulate"]);
 export const OUTCOME_ROUTES: Record<string, { field: string; hint: string }> = {
   "POST /webhooks/{}/simulate": { field: "is_success", hint: "The test delivery did not succeed; the printed response shows what the receiver answered." },
 };
-
-// --- Idempotency ---
-// Fixed DeelCLI namespace for deterministic UUIDv5 keys.
-export const IDEMPOTENCY_NAMESPACE = "8f4b6c1e-3d2a-4f9c-9a1b-7e5d0c2a1f00";
 
 // --- Environment detection ---
 // Presence of any of these (CI must equal "true") forces non-interactive mode.
