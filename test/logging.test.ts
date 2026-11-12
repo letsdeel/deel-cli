@@ -7,9 +7,8 @@ import { join } from "node:path";
 import { withLogging } from "../src/core/http.ts";
 import type { HttpRequest, HttpResponse, Transport } from "../src/core/http.ts";
 import { SENSITIVE_LOG_KEYS } from "../src/core/constants.ts";
-import { isLinkKey, isSensitiveKey, keyWords, log, looksPersonal, maskLink, maskUrlQuery, setLoggingEnabled, setLogBodiesEnabled, setMarkedSensitiveFields } from "../src/core/logging.ts";
-import { markedFieldNames, setGeneratedDescriptorsForTests } from "../src/public-api/commands.ts";
-import type { CliParam, Descriptor } from "../src/types.ts";
+import { isLinkKey, isSensitiveKey, keyWords, log, looksPersonal, maskLink, maskMarkedFields, maskUrlQuery, setLoggingEnabled, setLogBodiesEnabled } from "../src/core/logging.ts";
+import type { CliParam } from "../src/types.ts";
 
 const req = (over: Partial<HttpRequest> = {}): HttpRequest => ({ method: "GET", url: "https://x/rest/people/me", headers: {}, ...over });
 const res = (json: unknown): HttpResponse => ({ status: 200, headers: {}, text: "", json });
@@ -165,58 +164,62 @@ test("the log never keeps the request's query, with or without --log-bodies", as
 
 const marked = (name: string, extra: Partial<CliParam> = {}): CliParam => ({ name, in: "body", type: "string", required: false, sensitive: true, ...extra });
 const plain = (name: string, extra: Partial<CliParam> = {}): CliParam => ({ name, in: "body", type: "string", required: false, ...extra });
-const withFields = (responseFields: CliParam[]): Descriptor => ({
-  command: ["x", "get"], method: "GET", path: "/x", async: false, bodyKind: "none", supportsMultipart: false, bodyWrapper: "none",
-  params: [], bodyProps: [], fileFields: [], responseKind: "object", responseFields,
+
+test("maskMarkedFields masks a marked field where the endpoint puts it, and the same name elsewhere is left as it is", () => {
+  const fields = [plain("id"), marked("badge_color_choice"), plain("owner", { type: "object", properties: [plain("id"), marked("nickname")] }), plain("tags", { type: "array", properties: [marked("label"), plain("kind")] })];
+  const body = { id: "1", badge_color_choice: "teal", owner: { id: "7", nickname: "ace", unlisted: "kept" }, tags: [{ label: "a", kind: "x" }, { label: "b", kind: "y" }], extra: { badge_color_choice: "not this endpoint's field" } };
+  assert.deepEqual(maskMarkedFields(body, fields), {
+    id: "1",
+    badge_color_choice: "***",
+    owner: { id: "7", nickname: "***", unlisted: "kept" },
+    tags: [{ label: "***", kind: "x" }, { label: "***", kind: "y" }],
+    extra: { badge_color_choice: "not this endpoint's field" },
+  });
 });
 
-test("markedFieldNames collects every marked response field, nested ones and array items included", () => {
-  const names = markedFieldNames([
-    withFields([plain("id"), marked("badge_color_choice"), plain("owner", { type: "object", properties: [marked("favourite_snack"), plain("title")] })]),
-    withFields([marked("lucky_number", { type: "array" })]),
-  ]);
-  assert.deepEqual([...names].sort(), ["badge_color_choice", "favourite_snack", "lucky_number"]);
+test("maskMarkedFields reads the data envelope, an array body and a body that is not an object", () => {
+  const fields = [plain("id"), marked("secret_note")];
+  assert.deepEqual(maskMarkedFields({ data: { id: "1", secret_note: "n" }, page: { total: 1 } }, fields), { data: { id: "1", secret_note: "***" }, page: { total: 1 } });
+  assert.deepEqual(maskMarkedFields({ data: [{ id: "1", secret_note: "n" }] }, fields), { data: [{ id: "1", secret_note: "***" }] });
+  assert.deepEqual(maskMarkedFields([{ id: "1", secret_note: "n" }], fields), [{ id: "1", secret_note: "***" }]);
+  assert.equal(maskMarkedFields("text", fields), "text");
+  assert.equal(maskMarkedFields(null, fields), null);
 });
 
-test("a field the spec marks sensitive is masked in the body log in any spelling, and an unmarked new field is kept", () => {
-  try {
-    setMarkedSensitiveFields(markedFieldNames([withFields([marked("badge_color_choice"), plain("shelf_label")])]));
-    assert.equal(isSensitiveKey("badge_color_choice"), true);
-    assert.equal(isSensitiveKey("badgeColorChoice"), true);
-    assert.equal(isSensitiveKey("Badge-Color-Choice"), true);
-    assert.equal(isSensitiveKey("shelf_label"), false, "a field nobody marked is logged as it is");
-  } finally {
-    setMarkedSensitiveFields([]);
-  }
+test("maskMarkedFields changes nothing when the endpoint marks no field or has none", () => {
+  const body = { data: { id: "1", name: "n" } };
+  assert.deepEqual(maskMarkedFields(body, [plain("id"), plain("name")]), body);
+  assert.equal(maskMarkedFields(body, []), body);
+  assert.equal(maskMarkedFields(body, undefined), body);
 });
 
-test("a marked field of the response is masked in the written log, nested in an object and in an array", async () => {
+test("withLogging masks the marked fields of the endpoint in the written log and keeps an unmarked field of the same name", async () => {
   const dir = mkdtempSync(join(tmpdir(), "deel-log-"));
   process.env.DEEL_LOG_DIR = dir;
   setLoggingEnabled(true);
   setLogBodiesEnabled(true);
   try {
-    setMarkedSensitiveFields(["badge_color_choice"]);
     const c = captured();
-    await withLogging(c.logger, () => 0)(async () => res({ data: [{ id: "1", badge_color_choice: "teal", detail: { badgeColorChoice: "navy", shelf_label: "A3" } }] }))(req());
+    const fields = [plain("id"), plain("name"), plain("owner", { type: "object", properties: [plain("id"), marked("name")] })];
+    await withLogging(c.logger, () => 0)(async () => res({ data: { id: "1", name: "Widget", owner: { id: "7", name: "Ada" } } }))(req({ responseFields: fields }));
     log(c.entries[0]);
     const parsed = JSON.parse(readFileSync(join(dir, "deel.log"), "utf8").trim().split("\n").pop()!);
-    assert.deepEqual(parsed.response, { data: [{ id: "1", badge_color_choice: "***", detail: { badgeColorChoice: "***", shelf_label: "A3" } }] });
+    assert.deepEqual(parsed.response, { data: { id: "1", name: "Widget", owner: { id: "7", name: "***" } } });
   } finally {
-    setMarkedSensitiveFields([]);
     setLogBodiesEnabled(false);
     delete process.env.DEEL_LOG_DIR;
   }
 });
 
-test("loading the generated manifest registers the fields it marks, and no marked field stays registered after a reset", async () => {
-  setGeneratedDescriptorsForTests([withFields([marked("badge_color_choice")])]);
+test("withLogging logs the body as it is when the request carries no response fields, apart from the credential names", async () => {
+  setLogBodiesEnabled(true);
   try {
-    assert.equal(isSensitiveKey("badge_color_choice"), true);
+    const c = captured();
+    await withLogging(c.logger, () => 0)(async () => res({ data: { id: "1", name: "Widget" } }))(req());
+    assert.deepEqual(c.entries[0].response, { data: { id: "1", name: "Widget" } });
   } finally {
-    setGeneratedDescriptorsForTests(undefined);
+    setLogBodiesEnabled(false);
   }
-  assert.equal(isSensitiveKey("badge_color_choice"), false);
 });
 
 test("the log masks credentials and sign-in links by name, in every spelling, and decides nothing else by name", () => {

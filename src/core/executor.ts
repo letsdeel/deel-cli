@@ -196,6 +196,7 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
       body,
       retryable: !sendOnce && (!mutating || Boolean(idempotencyKey)),
       meta: { command: descriptor.command.join(" "), idempotency_key: idempotencyKey },
+      responseFields: descriptor.responseFields,
     });
   const debugSent = (status: number) => {
     if (!opts.debug) return;

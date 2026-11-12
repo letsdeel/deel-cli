@@ -4,6 +4,7 @@
 import { appendFileSync, mkdirSync, statSync, renameSync, existsSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
+import type { CliParam } from "../types.ts";
 import { LOG_DIR_MODE, LOG_FILE_MODE, LOG_MAX_BYTES_DEFAULT, LOG_MAX_FILES_DEFAULT, LINK_KEY_WORDS, SENSITIVE_LOG_KEYS, SENSITIVE_LOG_WORDS, keyWords } from "./constants.ts";
 
 export { keyWords };
@@ -40,11 +41,27 @@ function logDir(): string {
 // with no separator at all.
 const RUN_TOGETHER_KEYS = [...SENSITIVE_LOG_KEYS].filter((needle) => needle.includes("_")).map((needle) => needle.replaceAll("_", ""));
 
-// Names of the response fields the spec marks sensitive, in any spelling.
-let markedFields = new Set<string>();
-const spelling = (name: string) => keyWords(name).join("_");
-export function setMarkedSensitiveFields(names: Iterable<string>): void {
-  markedFields = new Set([...names].map(spelling));
+// Masks the response fields the spec marks sensitive, at the position the endpoint's own fields give them: the same
+// name elsewhere, on another endpoint or beside it, is left as it is.
+export function maskMarkedFields(json: unknown, fields: CliParam[] | undefined): unknown {
+  if (!fields?.length) return json;
+  const walk = (value: unknown, level: CliParam[]): unknown => {
+    if (Array.isArray(value)) return value.map((item) => walk(item, level));
+    if (!value || typeof value !== "object") return value;
+    const byName = new Map(level.map((field) => [field.name, field]));
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, nested]) => {
+        const field = byName.get(key);
+        if (!field) return [key, nested];
+        return [key, field.sensitive ? "***" : field.properties ? walk(nested, field.properties) : nested];
+      }),
+    );
+  };
+  const body = json as Record<string, unknown> | null;
+  if (body && typeof body === "object" && !Array.isArray(body) && "data" in body && !fields.some((field) => field.name === "data")) {
+    return { ...body, data: walk(body.data, fields) };
+  }
+  return walk(json, fields);
 }
 
 // Match by substring so variants (access_token, tax_id, …) are caught, not just exact keys, whichever way the key is
@@ -52,7 +69,6 @@ export function setMarkedSensitiveFields(names: Iterable<string>): void {
 // are matched as whole words of the key.
 export function isSensitiveKey(key: string): boolean {
   const words = keyWords(key);
-  if (markedFields.has(words.join("_"))) return true;
   const lower = key.toLowerCase();
   for (const needle of SENSITIVE_LOG_KEYS) if (lower.includes(needle)) return true;
   const run = words.join("");

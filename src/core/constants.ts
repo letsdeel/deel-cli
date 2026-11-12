@@ -12,7 +12,7 @@ export const LOG_MAX_FILES_DEFAULT = 5;
 export const LOG_DIR_MODE = 0o700;  // owner read/write/enter; no group or other access
 export const LOG_FILE_MODE = 0o600; // owner read/write only
 // What the local log masks by key name: credentials, and links that sign the holder in or fetch a file. Response
-// fields the spec marks sensitive are masked by name too (setMarkedSensitiveFields, core/logging.ts).
+// fields the spec marks sensitive are masked at their position in the response (maskMarkedFields, core/logging.ts).
 // Substrings, matched (case-insensitive) against the whole key, so variants (access_token, api_key) are caught.
 // Credentials are exported on their own because test/constants.test.ts reads the same vocabulary.
 export const CREDENTIAL_LOG_KEYS = [
