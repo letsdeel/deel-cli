@@ -257,7 +257,7 @@ deel dev logs list --limit 100 --beta                        # first page; read 
 deel dev logs list --limit 100 --cursor <page.cursor> --beta # next page, until has_next_page is false
 ```
 
-`--jq` and `--quiet` see only `data`, so to page read `page.cursor` from the full JSON envelope (or with `--fields`, which keeps `page`).
+`--jq` and `--quiet` see only `data`, so to page read `page.cursor` from the full JSON envelope (or with `--fields`, which keeps `page`). The CLI also prints `next page: --cursor <value>` on stderr whenever there is a next page, and reports a list that returns a bare top-level `cursor` the same way, as `page`.
 
 A flag that takes a value (`--fields`, `--jq`, `--input`, `--env`, `--limit`...) and gets none, or gets the next flag in its place, fails before anything is sent. A value that starts with `-` is written attached: `--jq=-.a`.
 

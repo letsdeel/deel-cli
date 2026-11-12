@@ -589,3 +589,39 @@ test("errorFromResponse reads the message from a nested error list and from resp
   const wrapped = errorFromResponse(400, { statusCode: 400, responseMessage: { message: "Missing a user header" } }, "req-2");
   assert.deepEqual([wrapped.code, wrapped.message], ["http.400", "Missing a user header"]);
 });
+
+// ---------------- top-level next-page cursor ----------------
+const cursorPage = (json: unknown) => ctxWith(() => ({ status: 200, headers: {}, text: "", json }));
+
+test("execute() reports a top-level cursor as page and names it on stderr", async () => {
+  const { ctx, io } = cursorPage({ data: [{ request_id: "req_1" }], cursor: "abc123" });
+
+  await execute(logsListDescriptor, { flags: {}, files: {} }, ctx, JSON_OUT);
+
+  assert.deepEqual(JSON.parse(io.stdout.join("")).page, { cursor: "abc123", has_next_page: true });
+  assert.deepEqual(io.stderr, ["next page: --cursor abc123\n"]);
+});
+
+test("execute() names the next page on stderr when --jq or --quiet hide the envelope", async () => {
+  for (const output of [{ ...JSON_OUT, jq: ".[].request_id" }, { ...JSON_OUT, quiet: true }]) {
+    const { ctx, io } = cursorPage({ data: [{ request_id: "req_1" }], cursor: "abc123" });
+    await execute(logsListDescriptor, { flags: {}, files: {} }, ctx, output);
+    assert.deepEqual(io.stderr, ["next page: --cursor abc123\n"], JSON.stringify(output));
+  }
+});
+
+test("execute() prints no next-page line for a null, empty or non-string cursor, or when page already carries one", async () => {
+  for (const json of [{ data: [], cursor: null }, { data: [], cursor: "" }, { data: [], cursor: 7 }, { data: [], page: { cursor: null, has_next_page: false } }]) {
+    const { ctx, io } = cursorPage(json);
+    await execute(logsListDescriptor, { flags: {}, files: {} }, ctx, JSON_OUT);
+    assert.deepEqual(io.stderr, [], JSON.stringify(json));
+    assert.equal("cursor" in (JSON.parse(io.stdout.join("")).page ?? {}) && JSON.parse(io.stdout.join("")).page.has_next_page === true, false);
+  }
+});
+
+test("execute() prefers the page object over a top-level cursor", async () => {
+  const { ctx, io } = cursorPage({ data: [], cursor: "top", page: { cursor: "inner", has_next_page: true } });
+  await execute(logsListDescriptor, { flags: {}, files: {} }, ctx, JSON_OUT);
+  assert.deepEqual(JSON.parse(io.stdout.join("")).page, { cursor: "inner", has_next_page: true });
+  assert.deepEqual(io.stderr, ["next page: --cursor inner\n"]);
+});

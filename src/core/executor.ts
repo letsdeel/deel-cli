@@ -232,7 +232,13 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
   const data = hasDataEnvelope ? (payload.data ?? null) : (payload ?? null);
   // Paginated list responses carry `page: { cursor, has_next_page }` next to `data`. Surface it in
   // the envelope (only when `data` was unwrapped from one) so the caller can page with --cursor.
-  const page = hasDataEnvelope && isPlainObject(payload.page) ? (payload.page as Record<string, unknown>) : undefined;
+  // A list can instead carry the next-page cursor at the top level (`{ data, cursor }`); it is reported as the same `page`.
+  const topLevelCursor = hasDataEnvelope && typeof payload.cursor === "string" && payload.cursor !== "" ? payload.cursor : undefined;
+  const page = hasDataEnvelope && isPlainObject(payload.page)
+    ? (payload.page as Record<string, unknown>)
+    : topLevelCursor ? { cursor: topLevelCursor, has_next_page: true } : undefined;
+  // --jq, --fields and --quiet print only `data`, so the way to the next page is also told on stderr.
+  if (typeof page?.cursor === "string" && page.cursor !== "") ctx.io.err(`next page: --cursor ${page.cursor}\n`);
   const { kept, withheld } = withholdSecrets(data);
   for (const field of withheld) ctx.io.err(`[note] ${field} is not printed: ${WITHHELD_RESPONSE_FIELDS[field]}.\n`);
   await render(ctx.io, envelope(kept, { request_id: requestId }, page), opts.output);
