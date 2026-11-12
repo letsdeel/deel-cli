@@ -1,0 +1,71 @@
+[
+  {
+    "api": "rest", "method": "GET", "path": "/widgets", "version": "2026-01-01", "beta_until": null, "sunset_at": null,
+    "operation": {
+      "operationId": "getWidgets-v2026-01-01", "summary": "List widgets",
+      "parameters": [{ "name": "limit", "in": "query", "schema": { "type": "integer" } }],
+      "responses": { "200": { "content": { "application/json": { "schema": { "type": "object", "properties": { "data": { "type": "array", "items": { "type": "object", "properties": { "id": { "type": "string" } } } } } } } } } },
+      "x-extension": "dropped"
+    }
+  },
+  {
+    "api": "rest", "method": "GET", "path": "/widgets/{widget_id}", "version": "2026-01-01", "beta_until": null, "sunset_at": null,
+    "operation": {
+      "summary": "Retrieve a widget",
+      "parameters": [{ "name": "widget_id", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "responses": { "200": { "content": { "application/json": { "schema": { "type": "object", "properties": { "data": { "type": "object", "properties": { "id": { "type": "string" } } } } } } } } }
+    }
+  },
+  {
+    "api": "rest", "method": "POST", "path": "/widgets", "version": "2026-01-01", "beta_until": null, "sunset_at": null,
+    "operation": {
+      "summary": "Create a widget",
+      "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "data": { "type": "object", "required": ["name"], "properties": { "name": { "type": "string" } } } } } } } },
+      "responses": { "201": { "content": { "application/json": { "schema": { "type": "object", "properties": { "data": { "type": "object", "properties": { "id": { "type": "string" } } } } } } } } }
+    }
+  },
+  {
+    "api": "rest", "method": "PATCH", "path": "/widgets/{widget_id}", "version": "2026-01-01", "beta_until": null, "sunset_at": null,
+    "operation": {
+      "summary": "Update a widget",
+      "parameters": [
+        { "name": "widget_id", "in": "path", "required": true, "schema": { "type": "string" } },
+        { "name": "fields", "in": "query", "schema": { "type": "string" } }
+      ],
+      "requestBody": { "content": { "application/json": { "schema": { "type": "object", "properties": { "name": { "type": "string" } } } } } },
+      "responses": { "200": {} }
+    }
+  },
+  {
+    "api": "rest", "method": "GET", "path": "/widgets/notes", "version": "2026-01-01", "beta_until": null, "sunset_at": null,
+    "operation": { "summary": "List notes on every widget", "responses": { "200": {} } }
+  },
+  {
+    "api": "rest", "method": "GET", "path": "/widgets/{widget_id}/notes", "version": "2026-01-01", "beta_until": null, "sunset_at": null,
+    "operation": {
+      "summary": "List notes on a widget",
+      "parameters": [{ "name": "widget_id", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "responses": { "200": {} }
+    }
+  },
+  {
+    "api": "rest", "method": "GET", "path": "/widgets/reports", "version": "2026-01-01", "beta_until": null, "sunset_at": null,
+    "operation": { "summary": "Widget report (stable)", "responses": { "200": {} } }
+  },
+  {
+    "api": "rest", "method": "GET", "path": "/widgets/reports", "version": "2026-06-01", "beta_until": "2099-01-01", "sunset_at": null,
+    "operation": { "summary": "Widget report (beta)", "responses": { "200": {} } }
+  },
+  {
+    "api": "rest", "method": "GET", "path": "/gizmos", "version": "2026-03-01", "beta_until": "2099-01-01", "sunset_at": null,
+    "operation": { "summary": "List gizmos", "responses": { "200": {} } }
+  },
+  {
+    "api": "rest", "method": "DELETE", "path": "/old-things/{id}", "version": "2024-01-01", "beta_until": null, "sunset_at": "2025-01-01",
+    "operation": { "summary": "Delete an old thing", "responses": { "204": {} } }
+  },
+  {
+    "api": "scim", "method": "GET", "path": "/Users", "version": "2026-01-01", "beta_until": null, "sunset_at": null,
+    "operation": { "summary": "List users", "responses": { "200": {} } }
+  }
+]

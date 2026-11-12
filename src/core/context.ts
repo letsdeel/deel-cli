@@ -5,8 +5,8 @@ import { randomUUID } from "node:crypto";
 import type { Config } from "./config.ts";
 import type { IOStreams } from "./io.ts";
 import { realIO } from "./io.ts";
-import type { Transport } from "./http.ts";
-import { fetchTransport, compose, withAuth, withVersion, withRequestId, withRetry, withLogging } from "./http.ts";
+import type { Transport, TokenProvider } from "./http.ts";
+import { fetchTransport, compose, withAuth, withVersion, withRequestId, withRetry, withLogging, withBeta } from "./http.ts";
 import type { Logger } from "./logging.ts";
 import { log as defaultLog } from "./logging.ts";
 import { CLI_VERSION } from "../version.ts";
@@ -18,12 +18,12 @@ export type Ctx = {
   newRequestId: () => string;
   logger: Logger;
   config: Config;
-  token: string | null;
+  token: string | TokenProvider | null;
 };
 
 export type CreateContextOpts = {
   config: Config;
-  token: string | null;
+  token: string | TokenProvider | null;
   io?: IOStreams;
   clock?: () => number;
   rng?: () => string;
@@ -43,6 +43,7 @@ export function createContext(o: CreateContextOpts): Ctx {
   const http = compose(
     base,
     withRetry(),
+    withBeta(o.config.beta),
     withRequestId(newRequestId),
     withVersion(CLI_VERSION),
     withAuth(o.token),

@@ -1,15 +1,28 @@
-import { test } from "node:test";
+import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { resolveConfig, ENVIRONMENTS } from "../src/core/config.ts";
+import { apiBaseUrl, resolveConfig, requireIssuer, ENVIRONMENTS } from "../src/core/config.ts";
+import { configFrom } from "../src/commands/shared.ts";
+import type { CliError } from "../src/core/errors.ts";
+
+// DEEL_CLI_BASE_URL overrides the base URL for every test below, so a developer who exports it must not break them.
+let savedBaseUrlVar: string | undefined;
+before(() => {
+  savedBaseUrlVar = process.env.DEEL_CLI_BASE_URL;
+  delete process.env.DEEL_CLI_BASE_URL;
+});
+after(() => {
+  if (savedBaseUrlVar === undefined) delete process.env.DEEL_CLI_BASE_URL;
+  else process.env.DEEL_CLI_BASE_URL = savedBaseUrlVar;
+});
 
 test("defaults to prod", () => {
   const config = resolveConfig({});
   assert.equal(config.env, "prod");
-  assert.equal(config.baseUrl, ENVIRONMENTS.prod);
+  assert.equal(config.baseUrl, ENVIRONMENTS.prod.baseUrl);
 });
 
 test("--env selects a known environment", () => {
-  assert.equal(resolveConfig({ env: "demo" }).baseUrl, ENVIRONMENTS.demo);
+  assert.equal(resolveConfig({ env: "demo" }).baseUrl, ENVIRONMENTS.demo.baseUrl);
 });
 
 test("--base-url overrides --env and strips a trailing slash", () => {
@@ -29,63 +42,186 @@ test("DEEL_ENV is honored when no --env is passed", () => {
   const prev = process.env.DEEL_ENV;
   process.env.DEEL_ENV = "demo";
   try {
-    assert.equal(resolveConfig({}).baseUrl, ENVIRONMENTS.demo);
+    assert.equal(resolveConfig({}).baseUrl, ENVIRONMENTS.demo.baseUrl);
   } finally {
     if (prev === undefined) delete process.env.DEEL_ENV;
     else process.env.DEEL_ENV = prev;
   }
 });
 
-function withBaseUrlEnv(value: string | undefined, fn: () => void) {
-  const prev = process.env.DEEL_CLI_BASE_URL;
-  if (value === undefined) delete process.env.DEEL_CLI_BASE_URL;
-  else process.env.DEEL_CLI_BASE_URL = value;
+function withEnvVars(vars: Record<string, string | undefined>, body: () => void) {
+  const saved: Record<string, string | undefined> = {};
+  for (const [key, value] of Object.entries(vars)) {
+    saved[key] = process.env[key];
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
   try {
-    fn();
+    body();
   } finally {
-    if (prev === undefined) delete process.env.DEEL_CLI_BASE_URL;
-    else process.env.DEEL_CLI_BASE_URL = prev;
+    for (const [key, value] of Object.entries(saved)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
   }
 }
 
+test("each environment carries its OAuth issuer and the CLI client id", () => {
+  withEnvVars({ DEEL_OAUTH_ISSUER: undefined, DEEL_OAUTH_CLIENT_ID: undefined }, () => {
+    const prod = resolveConfig({});
+    assert.equal(prod.issuer, "https://api.letsdeel.com");
+    assert.equal(prod.clientId, "b035545c-ee8a-4884-a51f-e416447e6d62");
+    assert.equal(prod.oauthBaseUrlOk, true);
+    assert.equal(resolveConfig({ env: "demo" }).issuer, "https://api-staging.letsdeel.com");
+  });
+});
+
+test("DEEL_OAUTH_ISSUER and DEEL_OAUTH_CLIENT_ID override the defaults", () => {
+  withEnvVars({ DEEL_OAUTH_ISSUER: "https://idp.example.test/", DEEL_OAUTH_CLIENT_ID: "client-x" }, () => {
+    const config = resolveConfig({});
+    assert.equal(config.issuer, "https://idp.example.test");
+    assert.equal(config.clientId, "client-x");
+  });
+});
+
+test("a non-https DEEL_OAUTH_ISSUER fails only when an OAuth issuer is needed", () => {
+  withEnvVars({ DEEL_OAUTH_ISSUER: "http://idp.example.test" }, () => {
+    const config = resolveConfig({});
+    assert.equal(config.issuer, null);
+    assert.match(config.issuerError ?? "", /must be an https URL/);
+    assert.equal(config.oauthBaseUrlOk, true);
+    assert.throws(() => requireIssuer(config), (error: CliError) => error.code === "config.oauth");
+  });
+});
+
+test("OAuth tokens are only allowed towards the environment's own host", () => {
+  withEnvVars({ DEEL_OAUTH_ISSUER: undefined, DEEL_OAUTH_CLIENT_ID: undefined }, () => {
+    assert.equal(resolveConfig({ env: "prod", baseUrl: "https://api.letsdeel.com/rest/v2" }).oauthBaseUrlOk, true);
+    assert.equal(resolveConfig({ env: "prod", baseUrl: "https://other.example.test/rest" }).oauthBaseUrlOk, false);
+  });
+});
+
+test("an overridden issuer makes its own host an allowed API host", () => {
+  withEnvVars({ DEEL_OAUTH_ISSUER: "https://dev.example.test" }, () => {
+    assert.equal(resolveConfig({ env: "nope", baseUrl: "https://dev.example.test/rest" }).oauthBaseUrlOk, true);
+    assert.equal(resolveConfig({ env: "nope", baseUrl: "https://other.example.test/rest" }).oauthBaseUrlOk, false);
+  });
+});
+
+test("an unknown environment reached through --base-url takes its issuer from the base URL's origin", () => {
+  withEnvVars({ DEEL_OAUTH_ISSUER: undefined }, () => {
+    const config = resolveConfig({ env: "nope", baseUrl: "https://x.example.test/rest" });
+    assert.equal(config.issuer, "https://x.example.test");
+    assert.equal(config.oauthBaseUrlOk, true);
+  });
+});
+
+test("DEEL_OAUTH_ISSUER takes priority over the issuer derived from --base-url", () => {
+  withEnvVars({ DEEL_OAUTH_ISSUER: "https://idp.example.test" }, () => {
+    const config = resolveConfig({ env: "nope", baseUrl: "https://x.example.test/rest" });
+    assert.equal(config.issuer, "https://idp.example.test");
+    assert.equal(config.oauthBaseUrlOk, false);
+  });
+});
+
+test("--base-url without --env or DEEL_ENV is its own environment, named after its host", () => {
+  withEnvVars({ DEEL_ENV: undefined, DEEL_OAUTH_ISSUER: undefined }, () => {
+    const config = resolveConfig({ baseUrl: "https://api.example.test/rest" });
+    assert.equal(config.env, "api.example.test");
+    assert.equal(config.issuer, "https://api.example.test");
+    assert.equal(config.oauthBaseUrlOk, true);
+  });
+  withEnvVars({ DEEL_ENV: "prod" }, () => {
+    assert.equal(resolveConfig({ baseUrl: "https://api.example.test/rest" }).env, "prod");
+  });
+});
+
+test("a known environment keeps its issuer whatever --base-url says", () => {
+  withEnvVars({ DEEL_OAUTH_ISSUER: undefined }, () => {
+    const config = resolveConfig({ env: "prod", baseUrl: "https://other.example.test/rest" });
+    assert.equal(config.issuer, "https://api.letsdeel.com");
+    assert.equal(config.oauthBaseUrlOk, false);
+  });
+});
+
+test("--beta sets config.beta, and it is unset otherwise", () => {
+  assert.equal(resolveConfig({ beta: true }).beta, true);
+  assert.equal(resolveConfig({}).beta, undefined);
+  assert.equal(resolveConfig({ beta: false }).beta, undefined);
+});
+
+test("configFrom wires the --beta flag into the config", () => {
+  assert.equal(configFrom({ beta: true }, []).beta, true);
+  assert.equal(configFrom({}, []).beta, undefined);
+});
+
+test("SCIM commands call the sibling /scim base path", () => {
+  assert.equal(apiBaseUrl(ENVIRONMENTS.prod.baseUrl, "scim"), "https://api.letsdeel.com/scim");
+  assert.equal(apiBaseUrl(ENVIRONMENTS.demo.baseUrl, "scim"), "https://api-staging.letsdeel.com/scim");
+  assert.equal(apiBaseUrl("https://localhost:8787", "scim"), "https://localhost:8787/scim");
+});
+
+test("REST and hand-picked commands keep the configured base path", () => {
+  assert.equal(apiBaseUrl(ENVIRONMENTS.prod.baseUrl, "rest"), ENVIRONMENTS.prod.baseUrl);
+  assert.equal(apiBaseUrl(ENVIRONMENTS.prod.baseUrl, undefined), ENVIRONMENTS.prod.baseUrl);
+});
+
 test("DEEL_CLI_BASE_URL is used when no --base-url is passed", () => {
-  withBaseUrlEnv("https://example.test/rest", () => {
+  withEnvVars({ DEEL_CLI_BASE_URL: "https://example.test/rest" }, () => {
     assert.equal(resolveConfig({}).baseUrl, "https://example.test/rest");
   });
 });
 
 test("--base-url beats DEEL_CLI_BASE_URL", () => {
-  withBaseUrlEnv("https://env.test/rest", () => {
+  withEnvVars({ DEEL_CLI_BASE_URL: "https://env.test/rest" }, () => {
     assert.equal(resolveConfig({ baseUrl: "https://flag.test/rest" }).baseUrl, "https://flag.test/rest");
   });
 });
 
-test("DEEL_CLI_BASE_URL beats --env", () => {
-  withBaseUrlEnv("https://env.test/rest", () => {
+test("DEEL_CLI_BASE_URL beats --env and DEEL_ENV for the URL", () => {
+  withEnvVars({ DEEL_CLI_BASE_URL: "https://env.test/rest", DEEL_ENV: "demo" }, () => {
+    assert.equal(resolveConfig({}).baseUrl, "https://env.test/rest");
     assert.equal(resolveConfig({ env: "demo" }).baseUrl, "https://env.test/rest");
   });
 });
 
-test("an empty DEEL_CLI_BASE_URL falls back to --env", () => {
-  withBaseUrlEnv("", () => {
-    assert.equal(resolveConfig({ env: "demo" }).baseUrl, ENVIRONMENTS.demo);
-  });
+test("an empty or whitespace-only DEEL_CLI_BASE_URL is ignored", () => {
+  for (const value of ["", "   "]) {
+    withEnvVars({ DEEL_CLI_BASE_URL: value }, () => {
+      assert.equal(resolveConfig({ env: "demo" }).baseUrl, ENVIRONMENTS.demo.baseUrl);
+    });
+  }
 });
 
-test("DEEL_CLI_BASE_URL trailing slash is stripped", () => {
-  withBaseUrlEnv("https://env.test/rest/", () => {
+test("DEEL_CLI_BASE_URL is trimmed and its trailing slash stripped", () => {
+  withEnvVars({ DEEL_CLI_BASE_URL: " https://env.test/rest/ " }, () => {
     assert.equal(resolveConfig({}).baseUrl, "https://env.test/rest");
   });
 });
 
-test("an invalid DEEL_CLI_BASE_URL names the variable", () => {
-  withBaseUrlEnv("not a url", () => {
-    assert.throws(() => resolveConfig({}), /DEEL_CLI_BASE_URL/);
+test("DEEL_CLI_BASE_URL without --env or DEEL_ENV is its own environment, named after its host", () => {
+  withEnvVars({ DEEL_CLI_BASE_URL: "https://env.test:8443/rest", DEEL_ENV: undefined }, () => {
+    const config = resolveConfig({});
+    assert.equal(config.env, "env.test:8443");
+    assert.equal(config.oauthBaseUrlOk, true);
   });
 });
 
-test("a non-https DEEL_CLI_BASE_URL is rejected", () => {
-  withBaseUrlEnv("http://localhost:8787/rest", () => {
+test("an invalid DEEL_CLI_BASE_URL names the variable", () => {
+  withEnvVars({ DEEL_CLI_BASE_URL: "not a url" }, () => {
+    assert.throws(() => resolveConfig({}), /Invalid DEEL_CLI_BASE_URL/);
+  });
+});
+
+test("a non-https DEEL_CLI_BASE_URL is rejected and names the variable", () => {
+  withEnvVars({ DEEL_CLI_BASE_URL: "http://localhost:8787/rest" }, () => {
     assert.throws(() => resolveConfig({}), /DEEL_CLI_BASE_URL must use https/);
+  });
+});
+
+test("errors for a bad --base-url name the flag even when DEEL_CLI_BASE_URL is set", () => {
+  withEnvVars({ DEEL_CLI_BASE_URL: "https://env.test/rest" }, () => {
+    assert.throws(() => resolveConfig({ baseUrl: "http://localhost:8787/rest" }), /--base-url must use https/);
+    assert.throws(() => resolveConfig({ baseUrl: "not a url" }), /Invalid --base-url/);
   });
 });
