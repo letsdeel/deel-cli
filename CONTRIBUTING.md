@@ -84,10 +84,28 @@ brackets (`[--worker-type eor]`, or a switch, `[--bulk]`): the command picks the
 `npm run check:command-map` checks that every entry makes a command the CLI can call: the line parses,
 every path ID has an argument in path order, no flag takes a global flag's name, command lines and
 endpoints are unique, no entry takes a hand-picked or static command's name, and a released command line
-(one in `src/public-api/manifest.json`) never changes. The generator also checks that every argument fills a
+(one in `src/public-api/manifest.json`) never changes by accident: [a released command line can change in a new version](#changing-a-released-command), on purpose. The generator also checks that every argument fills a
 parameter and that a flag that picks an endpoint isn't another endpoint's own flag. Every domain (the first word)
 needs an entry in `src/public-api/domains.json` with its stage and description, for `deel --help`. Names
 for new endpoints are reviewed by the maintainers; when you're unsure of one, ask in the PR.
+
+### Changing a released command
+
+The generator and `check:command-map` refuse any change to a released command line, so that nothing
+renames a command by accident (a sync or a typo). A released command can still change on purpose, in a new
+version of the CLI, for example to free a bare name for a newer endpoint that supersedes it
+(`deel immigration cases list` for `/immigration/cases`, with the older client endpoint now
+`deel immigration cases list --as client`). A pull request that does this:
+
+1. changes the line in `src/public-api/commands.json`;
+2. regenerates the manifest with `--previous` pointing at a manifest without the renamed descriptors, which
+   switches the lock off for them, and keeps every other descriptor as it was;
+3. lists, in its description, each old line and the new one, and says that it is a breaking change;
+4. has a test that the new flag form calls the endpoint and that the old bare line is refused;
+5. is approved by a maintainer, and ships in the next version, whose release notes name the renamed lines.
+
+Scripts that call the old line fail with `usage.variant` after upgrading; `--help` on the command shows the
+current forms.
 
 ## Pull requests
 

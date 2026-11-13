@@ -823,6 +823,7 @@ test("every README example of a command the manifest marks beta carries --beta",
 
 test("the client immigration cases and the external-ID shifts are picked by a flag, so the bare names stay free for the endpoints that supersede them", async () => {
   const real = await loadGeneratedDescriptors();
+  const group = (words: string) => real.filter((descriptor) => descriptor.command.join(" ") === words);
   const usageFor = (method: string, path: string) => {
     const found = real.find((descriptor) => descriptor.method === method && descriptor.path === path);
     assert.ok(found, `${method} ${path} is in the manifest`);
@@ -833,4 +834,19 @@ test("the client immigration cases and the external-ID shifts are picked by a fl
   assert.equal(usageFor("GET", "/time_tracking/shifts/{external_id}"), "deel time-tracking shifts get <external_id> --external-id");
   assert.equal(usageFor("PATCH", "/time_tracking/shifts/{external_id}"), "deel time-tracking shifts update <external_id> --external-id");
   assert.equal(usageFor("DELETE", "/time_tracking/shifts/{external_id}"), "deel time-tracking shifts delete <external_id> --external-id");
+
+  // The flag form calls the endpoint, and the bare line is refused until an endpoint takes the bare words.
+  const cases = group("immigration cases list");
+  assert.equal(selectForm(cases, ["--as", "client"]).path, "/immigration/client/cases");
+  assert.equal(selectForm(cases, ["--as", "worker"]).path, "/immigration/workers/cases");
+  assert.throws(() => selectForm(cases, []), /match no single form of 'deel immigration cases list'/);
+  const caseGets = group("immigration cases get");
+  assert.equal(selectForm(caseGets, ["--as", "client"]).path, "/immigration/client/cases/{id}");
+  assert.throws(() => selectForm(caseGets, []), /match no single form of 'deel immigration cases get'/);
+  for (const [verb, method] of [["get", "GET"], ["update", "PATCH"], ["delete", "DELETE"]] as const) {
+    const shifts = group(`time-tracking shifts ${verb}`);
+    const picked = selectForm(shifts, ["--external-id"]);
+    assert.deepEqual([picked.method, picked.path], [method, "/time_tracking/shifts/{external_id}"]);
+    assert.throws(() => selectForm(shifts, []), new RegExp(`match no single form of 'deel time-tracking shifts ${verb}'`));
+  }
 });
