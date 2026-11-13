@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { extract, splitFields, bodyFrom, responseFrom } from "../.claude/skills/deel-cli-extractor/extract.ts";
+import { splitFields, bodyFrom, responseFrom, normalizeSchema } from "../.claude/skills/deel-cli-extractor/extract.ts";
+import type { CliParam } from "../src/types.ts";
 
 test("splitFields recursively expands nested object schemas into properties", () => {
   const { textProps } = splitFields({
@@ -107,19 +108,72 @@ test("responseFrom expands a response field that is an array of objects into ite
   assert.equal(items!.properties!.find((field) => field.name === "status")!.required, true);
 });
 
-test("extract copies a map entry's confirm text into its descriptor and only there", () => {
-  const spec = { paths: { "/things/{id}": { post: { summary: "Drop" }, get: { summary: "Get" } } } };
-  const { manifest, hardErrors } = extract(spec, [
-    { command: "things drop", method: "POST", path: "/things/{id}", confirm: "Drop {id}?" },
-    { command: "things get", method: "GET", path: "/things/{id}" },
-  ]);
-  assert.deepEqual(hardErrors, []);
-  const byName = Object.fromEntries(manifest.descriptors.map((d) => [d.command.join(" "), d]));
-  assert.equal(byName["things drop"].confirm, "Drop {id}?");
-  assert.ok(!("confirm" in byName["things get"]));
+test("splitFields flags nullable body fields and leaves the rest unflagged", () => {
+  const { textProps } = splitFields({
+    type: "object",
+    properties: {
+      note: { type: "string", nullable: true },
+      amount: { type: "number", nullable: true },
+      external_id: { type: "string" },
+    },
+  });
+
+  assert.equal(textProps.find((field) => field.name === "note")!.nullable, true);
+  assert.equal(textProps.find((field) => field.name === "amount")!.nullable, true);
+  assert.equal("nullable" in textProps.find((field) => field.name === "external_id")!, false);
 });
 
-test("responseFrom carries nullable fields, including nested ones, and only those", () => {
+test("splitFields flags nullable fields of nested objects", () => {
+  const { textProps } = splitFields({
+    type: "object",
+    properties: {
+      address: {
+        type: "object",
+        properties: {
+          line2: { type: "string", nullable: true },
+          city: { type: "string" },
+        },
+      },
+    },
+  });
+
+  const address = textProps.find((field) => field.name === "address")!;
+  assert.equal(address.properties!.find((field) => field.name === "line2")!.nullable, true);
+  assert.equal("nullable" in address.properties!.find((field) => field.name === "city")!, false);
+});
+
+
+test("splitFields detects OAS 3.1 nullable: type arrays and oneOf/anyOf with a null member", () => {
+  const { textProps } = splitFields({
+    type: "object",
+    properties: {
+      note: { type: ["string", "null"], description: "kept" },
+      amount: { type: ["null", "number"] },
+      status: { oneOf: [{ type: "string", enum: ["open", "closed"] }, { type: "null" }] },
+      count: { anyOf: [{ type: "integer" }, { type: "null" }] },
+      plain: { type: "string" },
+    },
+  });
+  const byName = (name: string) => textProps.find((field) => field.name === name)!;
+
+  assert.equal(byName("note").nullable, true);
+  assert.equal(byName("note").type, "string");
+  assert.equal(byName("note").description, "kept");
+  assert.equal(byName("amount").nullable, true);
+  assert.equal(byName("amount").type, "number");
+  assert.equal(byName("status").nullable, true);
+  assert.deepEqual(byName("status").enum, ["open", "closed"]);
+  assert.equal(byName("count").type, "integer");
+  assert.equal("nullable" in byName("plain"), false);
+});
+
+test("normalizeSchema leaves a non-null multi-type union alone and flags nothing", () => {
+  const { schema, nullable } = normalizeSchema({ oneOf: [{ type: "string" }, { type: "number" }] });
+  assert.equal(nullable, false);
+  assert.equal(Array.isArray(schema.oneOf), true);
+});
+
+test("responseFrom carries the spec's x-deel-sensitive mark onto a response field, at any depth, and only for the boolean true", () => {
   const { responseFields } = responseFrom({
     responses: {
       "200": {
@@ -130,10 +184,14 @@ test("responseFrom carries nullable fields, including nested ones, and only thos
               properties: {
                 data: {
                   type: "object",
-                  required: ["id", "owner"],
                   properties: {
                     id: { type: "string" },
-                    owner: { type: "object", nullable: true, required: ["name"], properties: { name: { type: "string", nullable: true } } },
+                    badge_color_choice: { type: "string", "x-deel-sensitive": true },
+                    nullable_mark: { oneOf: [{ type: "string", "x-deel-sensitive": true }, { type: "null" }] },
+                    as_text: { type: "string", "x-deel-sensitive": "yes" },
+                    as_false: { type: "string", "x-deel-sensitive": false },
+                    owner: { type: "object", properties: { nickname: { type: "string", "x-deel-sensitive": true }, title: { type: "string" } } },
+                    tags: { type: "array", items: { type: "object", properties: { label: { type: "string", "x-deel-sensitive": true } } } },
                   },
                 },
               },
@@ -144,20 +202,49 @@ test("responseFrom carries nullable fields, including nested ones, and only thos
     },
   });
 
-  const id = responseFields.find((field) => field.name === "id");
-  const owner = responseFields.find((field) => field.name === "owner");
-  assert.equal("nullable" in id!, false);
-  assert.equal(owner!.nullable, true);
-  assert.equal(owner!.required, true);
-  assert.equal(owner!.properties![0].nullable, true);
+  const byName = (fields: CliParam[] | undefined, name: string) => fields!.find((field) => field.name === name)!;
+  assert.equal(byName(responseFields, "id").sensitive, undefined);
+  assert.equal(byName(responseFields, "badge_color_choice").sensitive, true);
+  assert.equal(byName(responseFields, "nullable_mark").sensitive, true);
+  assert.equal(byName(responseFields, "as_text").sensitive, undefined);
+  assert.equal(byName(responseFields, "as_false").sensitive, undefined);
+  assert.equal(byName(byName(responseFields, "owner").properties, "nickname").sensitive, true);
+  assert.equal(byName(byName(responseFields, "owner").properties, "title").sensitive, undefined);
+  assert.equal(byName(byName(responseFields, "tags").properties, "label").sensitive, true);
 });
 
-test("splitFields carries nullable on request-body fields and leaves it off the others", () => {
-  const { textProps } = splitFields({
-    type: "object",
-    required: ["name"],
-    properties: { name: { type: "string", nullable: true }, note: { type: "string" } },
+test("responseFrom adds no sensitive key at all when the spec marks nothing, so an unmarked manifest does not change", () => {
+  const { responseFields } = responseFrom({
+    responses: { "200": { content: { "application/json": { schema: { type: "object", properties: { data: { type: "object", properties: { id: { type: "string" } } } } } } } } },
   });
-  assert.equal(textProps.find((field) => field.name === "name")?.nullable, true);
-  assert.equal("nullable" in textProps.find((field) => field.name === "note")!, false);
+  assert.deepEqual(responseFields, [{ name: "id", in: "body", type: "string", required: false }]);
+});
+
+test("responseFrom marks an array field whose items carry x-deel-sensitive, and an array of objects with one marked property keeps the mark on that property", () => {
+  const { responseFields } = responseFrom({
+    responses: {
+      "200": {
+        content: {
+          "application/json": {
+            schema: {
+              type: "object",
+              properties: {
+                data: {
+                  type: "object",
+                  properties: {
+                    nicknames: { type: "array", items: { type: "string", "x-deel-sensitive": true } },
+                    codes: { type: "array", items: { type: "string" } },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const byName = (name: string) => responseFields.find((field: CliParam) => field.name === name)!;
+  assert.equal(byName("nicknames").sensitive, true);
+  assert.equal(byName("codes").sensitive, undefined);
 });

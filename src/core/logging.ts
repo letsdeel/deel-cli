@@ -4,7 +4,10 @@
 import { appendFileSync, mkdirSync, statSync, renameSync, existsSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
-import { LOG_DIR_MODE, LOG_FILE_MODE, LOG_MAX_BYTES_DEFAULT, LOG_MAX_FILES_DEFAULT, SENSITIVE_LOG_KEYS } from "./constants.ts";
+import type { CliParam } from "../types.ts";
+import { LOG_DIR_MODE, LOG_FILE_MODE, LOG_MAX_BYTES_DEFAULT, LOG_MAX_FILES_DEFAULT, LINK_KEY_WORDS, SENSITIVE_LOG_KEYS, SENSITIVE_LOG_WORDS, keyWords } from "./constants.ts";
+
+export { keyWords };
 
 // A logger is any sink for structured entries; the default writes bounded NDJSON.
 export type Logger = (entry: Record<string, unknown>) => void;
@@ -34,23 +37,152 @@ function logDir(): string {
   return join(process.env.XDG_STATE_HOME ?? join(home, ".local", "state"), "deel", "logs");
 }
 
-// Match by substring so variants (access_token, tax_id, …) are caught, not just exact keys.
-function isSensitiveKey(key: string): boolean {
+// The needles with an underscore (`account_number`), as one run of letters (`accountnumber`), for a key written
+// with no separator at all.
+const RUN_TOGETHER_KEYS = [...SENSITIVE_LOG_KEYS].filter((needle) => needle.includes("_")).map((needle) => needle.replaceAll("_", ""));
+
+// Masks the response fields the spec marks sensitive, at the position the endpoint's own fields give them: the same
+// name elsewhere, on another endpoint or beside it, is left as it is.
+export function maskMarkedFields(json: unknown, fields: CliParam[] | undefined): unknown {
+  if (!fields?.length) return json;
+  const walk = (value: unknown, level: CliParam[]): unknown => {
+    if (Array.isArray(value)) return value.map((item) => walk(item, level));
+    if (!value || typeof value !== "object") return value;
+    const byName = new Map(level.map((field) => [field.name, field]));
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, nested]) => {
+        const field = byName.get(key);
+        if (!field) return [key, nested];
+        return [key, field.sensitive ? "***" : field.properties ? walk(nested, field.properties) : nested];
+      }),
+    );
+  };
+  if (json && typeof json === "object" && !Array.isArray(json) && "data" in json) {
+    return { ...json, data: walk((json as Record<string, unknown>).data, fields) };
+  }
+  return walk(json, fields);
+}
+
+// Match by substring so variants (access_token, api_key, …) are caught, not just exact keys, whichever way the key is
+// spelled: `taxId`, `tax-id`, `TAX_ID` and `taxid` are one name. The short names that would match inside other words
+// are matched as whole words of the key.
+export function isSensitiveKey(key: string): boolean {
+  const words = keyWords(key);
   const lower = key.toLowerCase();
   for (const needle of SENSITIVE_LOG_KEYS) if (lower.includes(needle)) return true;
+  const run = words.join("");
+  if (RUN_TOGETHER_KEYS.some((needle) => run.includes(needle))) return true;
+  return words.some((word) => SENSITIVE_LOG_WORDS.has(word));
+}
+
+// Whether a key names a link (a url, uri, link or href), whose value may be signed in its query or fragment.
+export function isLinkKey(key: string): boolean {
+  return keyWords(key).some((word) => LINK_KEY_WORDS.has(word));
+}
+
+// A pre-signed link works for whoever holds it, and the signature sits in its query string or fragment, so those
+// are cut; the scheme, host and path stay for debugging.
+export function maskLink(value: string): string {
+  const cut = value.search(/[?#]/);
+  return cut === -1 ? value : `${value.slice(0, cut)}?***`;
+}
+
+function decoded(text: string): string {
+  try {
+    return decodeURIComponent(text.replace(/\+/g, " "));
+  } catch {
+    return text;
+  }
+}
+
+// A value that is personal data whatever key carries it: an email address (`?q=ana@example.com`, a free-text `note`) or
+// a JWT-shaped token. Key names can't catch a search or filter parameter, or a note, that holds one. Read as a single
+// pass over the text, split into tokens at whitespace and URL or punctuation delimiters, with plain checks on each
+// token (no regular expression over unbounded input, so a long run of `a@a.` can't make it quadratic).
+const TOKEN_DELIMITERS = new Set("/?&=,;<>()[]{}\"'");
+const BASE64URL = /^[\w-]+$/;
+const isDelimiter = (char: string): boolean => TOKEN_DELIMITERS.has(char) || /\s/.test(char);
+
+function isEmail(token: string): boolean {
+  const at = token.indexOf("@");
+  if (at < 1) return false;
+  const domain = token.slice(at + 1);
+  for (let index = 1; index < domain.length - 1; index++) if (domain[index] === "." && domain[index - 1] !== "." && domain[index + 1] !== "." && domain[index + 1] !== "@") return true;
   return false;
 }
 
-function redact(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(redact);
+function isJwt(token: string): boolean {
+  if (!token.startsWith("eyJ")) return false;
+  const parts = token.split(".");
+  return parts.length === 3 && BASE64URL.test(parts[0]) && BASE64URL.test(parts[1]) && (parts[2] === "" || BASE64URL.test(parts[2]));
+}
+
+const isPersonalToken = (token: string): boolean => isEmail(token) || isJwt(token);
+
+function scanPersonal(text: string, mask: boolean): { found: boolean; text: string } {
+  const out: string[] = [];
+  let found = false;
+  let start = 0;
+  for (let index = 0; index <= text.length; index++) {
+    if (index < text.length && !isDelimiter(text[index])) continue;
+    const token = text.slice(start, index);
+    if (token && isPersonalToken(token)) {
+      found = true;
+      if (!mask) return { found, text };
+      out.push("***");
+    } else out.push(token);
+    if (index < text.length) out.push(text[index]);
+    start = index + 1;
+  }
+  return { found, text: out.join("") };
+}
+
+export const looksPersonal = (text: string): boolean => scanPersonal(text, false).found;
+const maskPersonalText = (text: string): string => scanPersonal(text, true).text;
+
+// A request URL with the values of its sensitive query parameters masked, by the same key policy as a body field
+// (`?email=...`, `?personalId=...`, `?ids[]=...`, a repeated key, an encoded key); the other parameters, the path and the
+// host stay readable. The fragment is never sent to a server and may hold a token, so it is cut. A value under a link key
+// (`?redirect_url=...`) loses its own query like a link in a body. Text that isn't a URL passes unchanged.
+export function maskUrlQuery(url: string): string {
+  const hash = url.indexOf("#");
+  const withoutFragment = hash === -1 ? url : url.slice(0, hash);
+  const cut = withoutFragment.indexOf("?");
+  if (cut === -1) return hash === -1 ? url : `${withoutFragment}#***`;
+  const params = withoutFragment
+    .slice(cut + 1)
+    .split("&")
+    .map((pair) => {
+      const equals = pair.indexOf("=");
+      if (equals === -1) return pair;
+      const key = decoded(pair.slice(0, equals)).replace(/\[\]$/, "");
+      const value = pair.slice(equals + 1);
+      if (isSensitiveKey(key)) return `${pair.slice(0, equals)}=***`;
+      if (isLinkKey(key)) return `${pair.slice(0, equals)}=${encodeURIComponent(maskPersonalText(maskLink(decoded(value))))}`;
+      return looksPersonal(decoded(value)) ? `${pair.slice(0, equals)}=${encodeURIComponent(maskPersonalText(decoded(value)))}` : pair;
+    });
+  return `${withoutFragment.slice(0, cut)}?${params.join("&")}${hash === -1 ? "" : "#***"}`;
+}
+
+// `link` is true under a link key, which masks the query of the strings it holds (or lists). The entry's own top-level
+// keys are not redacted this way: its `url` is the request URL, which `withLogging` logs without its query string.
+function redact(value: unknown, link = false): unknown {
+  if (typeof value === "string") return maskPersonalText(link ? maskLink(value) : value);
+  if (Array.isArray(value)) return value.map((item) => redact(item, link));
   if (value && typeof value === "object") {
     const redacted: Record<string, unknown> = {};
     for (const [key, nested] of Object.entries(value as Record<string, unknown>)) {
-      redacted[key] = isSensitiveKey(key) ? "***" : redact(nested);
+      redacted[key] = isSensitiveKey(key) ? "***" : redact(nested, isLinkKey(key));
     }
     return redacted;
   }
   return value;
+}
+
+function redactEntry(entry: Record<string, unknown>): Record<string, unknown> {
+  const redacted: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(entry)) redacted[key] = isSensitiveKey(key) ? "***" : redact(value);
+  return redacted;
 }
 
 function rotate(file: string) {
@@ -74,7 +206,7 @@ export function log(entry: Record<string, unknown>): void {
     mkdirSync(dir, { recursive: true, mode: LOG_DIR_MODE });
     const file = join(dir, "deel.log");
     rotate(file);
-    const line = JSON.stringify({ ts: new Date().toISOString(), ...(redact(entry) as object) }) + "\n";
+    const line = JSON.stringify({ ts: new Date().toISOString(), ...redactEntry(entry) }) + "\n";
     appendFileSync(file, line, { mode: LOG_FILE_MODE });
   } catch {
     /* fail-open: logging must never break a command */

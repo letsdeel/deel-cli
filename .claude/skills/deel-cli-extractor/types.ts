@@ -7,11 +7,12 @@ export type CliParam = {
   in: ParamLoc;
   type: ScalarType;
   required: boolean;
-  nullable?: boolean; // the API may send null for this field (the key is still present when required)
+  nullable?: true;
   enum?: string[];
   description?: string;
   properties?: CliParam[];
   maxItems?: number;
+  sensitive?: true;
 };
 
 export type BodyKind = "none" | "json" | "json-array" | "multipart";
@@ -23,7 +24,6 @@ export type Descriptor = {
   path: string;
   summary?: string;
   version?: string;
-  confirm?: string;
   async: boolean;
   bodyKind: BodyKind;
   supportsMultipart: boolean;

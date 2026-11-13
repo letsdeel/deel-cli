@@ -1,76 +1,101 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { confirmDescriptor, isStdinInUse, run, variantCommand } from "../src/cli.ts";
+import { confirmDescriptor, isStdinInUse, resolveStdinInUse, run } from "../src/cli.ts";
+import { confirmMessage } from "../src/core/executor.ts";
 import { captureIO } from "../src/core/io.ts";
 import { CliError } from "../src/core/errors.ts";
-import { manifest } from "../src/manifest.generated.ts";
+import { loadGeneratedDescriptors } from "../src/public-api/commands.ts";
 import type { Descriptor } from "../src/types.ts";
 
 const APP_ID = "11111111-2222-3333-4444-555555555555";
+const DISABLE_MESSAGE = "Disable app {app_id}? This revokes all consents and tokens; enable does not restore them.";
 
-const withConfirm: Descriptor = {
-  command: ["things", "drop"],
-  method: "POST",
-  path: "/things/{thing_id}/drop",
-  confirm: "Drop {thing_id} for {missing}?",
-  async: false,
-  bodyKind: "none",
-  supportsMultipart: false,
-  bodyWrapper: "none",
-  params: [],
-  bodyProps: [],
-  fileFields: [],
-  responseKind: "object",
-  responseFields: [],
-};
-const withoutConfirm: Descriptor = { ...withConfirm, confirm: undefined };
+const descriptors = await loadGeneratedDescriptors();
+const find = (method: string, path: string): Descriptor => descriptors.find((d) => d.method === method && d.path === path)!;
+const disable = find("POST", "/oauth2-apps/{app_id}/disable");
+const enable = find("POST", "/oauth2-apps/{app_id}/enable");
 
 const terminal = () => captureIO({ isTTY: true });
 const noTerminal = () => captureIO({ isTTY: false });
 
+test("only the oauth2-apps disable endpoint asks before sending", () => {
+  assert.equal(confirmMessage(disable), DISABLE_MESSAGE);
+  assert.equal(confirmMessage(enable), undefined);
+  assert.equal(confirmMessage(find("GET", "/oauth2-apps")), undefined);
+});
+
 test("confirmDescriptor fills {param} placeholders from the flags and asks [y/N]", async () => {
   const questions: string[] = [];
-  await confirmDescriptor(withConfirm, { thing_id: "t1" }, false, terminal(), async (q) => (questions.push(q), true));
-  assert.deepEqual(questions, ["Drop t1 for {missing}? [y/N] "]);
+  await confirmDescriptor(disable, { app_id: APP_ID }, false, terminal(), async (q) => (questions.push(q), true));
+  assert.deepEqual(questions, [`Disable app ${APP_ID}? This revokes all consents and tokens; enable does not restore them. [y/N] `]);
 });
 
-test("confirmDescriptor proceeds on yes in a terminal", async () => {
-  await confirmDescriptor(withConfirm, { thing_id: "t1" }, false, terminal(), async () => true);
+test("confirmDescriptor leaves a placeholder it has no value for", async () => {
+  const questions: string[] = [];
+  await confirmDescriptor(disable, {}, false, terminal(), async (q) => (questions.push(q), true));
+  assert.match(questions[0], /^Disable app \{app_id\}\?/);
 });
 
-test("confirmDescriptor aborts on no in a terminal", async () => {
+test("confirmDescriptor proceeds on yes in a terminal and aborts on no", async () => {
+  await confirmDescriptor(disable, { app_id: APP_ID }, false, terminal(), async () => true);
   await assert.rejects(
-    () => confirmDescriptor(withConfirm, { thing_id: "t1" }, false, terminal(), async () => false),
-    (err: CliError) => err.code === "things.aborted",
+    () => confirmDescriptor(disable, { app_id: APP_ID }, false, terminal(), async () => false),
+    (err: CliError) => err.code === "oauth2-apps.aborted",
   );
 });
 
 test("confirmDescriptor with --yes never prompts, even without a terminal", async () => {
   const ask = async () => assert.fail("must not prompt");
-  await confirmDescriptor(withConfirm, {}, true, terminal(), ask);
-  await confirmDescriptor(withConfirm, {}, true, noTerminal(), ask);
+  await confirmDescriptor(disable, {}, true, terminal(), ask);
+  await confirmDescriptor(disable, {}, true, noTerminal(), ask);
 });
 
 test("confirmDescriptor without a terminal and without --yes is a usage error that never prompts", async () => {
   await assert.rejects(
-    () => confirmDescriptor(withConfirm, {}, false, noTerminal(), async () => assert.fail("must not prompt")),
-    (err: CliError) => err.code === "usage.confirm" && /Pass --yes to run this non-interactively/.test(err.next ?? ""),
+    () => confirmDescriptor(disable, {}, false, noTerminal(), async () => assert.fail("must not prompt")),
+    (err: CliError) => err.code === "usage.confirm" && /Pass --yes to run this non-interactively/.test(err.next ?? "") && /oauth2-apps update <app_id> --status disabled/.test(err.message),
   );
 });
 
-test("confirmDescriptor in a terminal refuses without --yes when stdin carries the token or the input, and never prompts", async () => {
+test("confirmDescriptor leaves commands that ask nothing alone", async () => {
+  await confirmDescriptor(enable, {}, false, noTerminal(), async () => assert.fail("must not prompt"));
+});
+
+test("confirmDescriptor refuses when stdin is in use, even in a terminal", async () => {
   await assert.rejects(
-    () => confirmDescriptor(withConfirm, {}, false, terminal(), async () => assert.fail("must not prompt"), true),
-    (err: CliError) => err.code === "usage.confirm" && /Pass --yes: stdin carries the token or the input/.test(err.next ?? ""),
+    () => confirmDescriptor(disable, { app_id: APP_ID }, false, terminal(), async () => assert.fail("must not prompt"), true),
+    (err: CliError) => err.code === "usage.confirm" && /stdin carries the token or the input/.test(err.next ?? ""),
   );
 });
 
-test("confirmDescriptor with --yes proceeds when stdin carries the token or the input", async () => {
-  await confirmDescriptor(withConfirm, {}, true, terminal(), async () => assert.fail("must not prompt"), true);
+test("isStdinInUse is true for --input -, --token-stdin and a piped stdin, and false for a terminal", () => {
+  assert.equal(isStdinInUse({ input: "-" }, true), true);
+  assert.equal(isStdinInUse({ "token-stdin": true }, true), true);
+  assert.equal(isStdinInUse({}, false), true);
+  assert.equal(isStdinInUse({ input: "name=x" }, true), false);
+  assert.equal(isStdinInUse({}, true), false);
 });
 
-test("confirmDescriptor leaves commands without confirm alone", async () => {
-  await confirmDescriptor(withoutConfirm, {}, false, noTerminal(), async () => assert.fail("must not prompt"));
+test("resolveStdinInUse asks the terminal only when a prompt could be needed", () => {
+  const asked = (descriptor: Descriptor, args: Parameters<typeof resolveStdinInUse>[1]) => {
+    let calls = 0;
+    resolveStdinInUse(descriptor, args, () => (calls++, true));
+    return calls;
+  };
+  assert.equal(asked(enable, {}), 0);
+  assert.equal(asked(disable, { yes: true }), 0);
+  assert.equal(asked(disable, {}), 1);
+});
+
+test("resolveStdinInUse combines --token-stdin, --input - and the terminal for a confirming command", () => {
+  const cases: Array<[Parameters<typeof resolveStdinInUse>[1], boolean, boolean]> = [
+    [{ "token-stdin": true }, true, true],
+    [{ input: "-" }, true, true],
+    [{ input: "name=x" }, true, false],
+    [{}, true, false],
+    [{}, false, true],
+  ];
+  for (const [args, tty, expected] of cases) assert.equal(resolveStdinInUse(disable, args, () => tty), expected, JSON.stringify({ args, tty }));
 });
 
 // End to end through run(): the test process has no TTY, so the run is non-interactive.
@@ -99,65 +124,52 @@ async function runWithFetch(argv: string[]): Promise<{ requests: { method: strin
   }
 }
 
-test("deel oauth2-apps disable without --yes and without a terminal sends nothing", async () => {
-  const { requests, error } = await runWithFetch(["oauth2-apps", "disable", "--app_id", APP_ID]);
+test("deel oauth2-apps update --status disabled without --yes and without a terminal sends nothing", async () => {
+  const { requests, error } = await runWithFetch(["oauth2-apps", "update", APP_ID, "--status", "disabled", "--beta"]);
   assert.equal(error?.code, "usage.confirm");
   assert.equal(requests.length, 0);
 });
 
-test("deel oauth2-apps disable --yes sends the request without prompting", async () => {
-  const { requests, error, out } = await runWithFetch(["oauth2-apps", "disable", "--app_id", APP_ID, "--yes"]);
+test("deel oauth2-apps update --status disabled --yes sends the request without prompting", async () => {
+  const { requests, error, out } = await runWithFetch(["oauth2-apps", "update", APP_ID, "--status", "disabled", "--yes", "--beta"]);
   assert.equal(error, undefined);
   assert.deepEqual(requests.map((r) => `${r.method} ${new URL(r.url).pathname}`), [`POST /rest/oauth2-apps/${APP_ID}/disable`]);
   assert.match(out, /api_access/);
 });
 
-test("deel oauth2-apps enable needs no confirmation", async () => {
-  const { requests, error } = await runWithFetch(["oauth2-apps", "enable", "--app_id", APP_ID]);
-  assert.equal(error, undefined);
-  assert.equal(requests.length, 1);
+test("deel oauth2-apps update --status enabled needs no confirmation and takes no --yes", async () => {
+  const plain = await runWithFetch(["oauth2-apps", "update", APP_ID, "--status", "enabled", "--beta"]);
+  assert.equal(plain.error, undefined);
+  assert.equal(plain.requests.length, 1);
+  const withYes = await runWithFetch(["oauth2-apps", "update", APP_ID, "--status", "enabled", "--yes", "--beta"]);
+  assert.equal(withYes.error?.code, "usage.flag");
+  assert.equal(withYes.requests.length, 0);
 });
 
-test("the oauth2-apps disable confirm text names the app and warns about revoked consents and tokens", () => {
-  const disable = manifest.descriptors.find((d) => d.command.join(" ") === "oauth2-apps disable");
-  assert.equal(disable?.confirm, "Disable app {app_id}? This revokes all consents and tokens; enable does not restore them.");
+test("--token-stdin on the confirming command refuses before reading the token or sending anything", async () => {
+  const { requests, error } = await runWithFetch(["oauth2-apps", "update", APP_ID, "--status", "disabled", "--token-stdin", "--beta"]);
+  assert.equal(error?.code, "usage.confirm");
+  assert.match(error?.next ?? "", /stdin carries the token or the input/);
+  assert.equal(requests.length, 0);
 });
 
-test("a variant group takes --yes when any variant confirms and not otherwise", () => {
-  const variant = (name: string, base: Descriptor): Descriptor => ({ ...base, variant: name });
-  const confirming = variantCommand([variant("a", withConfirm), variant("b", withoutConfirm)]);
-  const plain = variantCommand([variant("a", withoutConfirm), variant("b", withoutConfirm)]);
-  assert.equal((confirming.args as Record<string, { type: string }>).yes?.type, "boolean");
-  assert.equal("yes" in (plain.args as object), false);
-});
-
-test("oauth2-apps disable with --token-stdin and no --yes refuses before reading the token or sending anything", async () => {
-  const originalFetch = globalThis.fetch;
-  let sent = 0;
-  globalThis.fetch = (async () => (sent++, new Response("{}"))) as typeof fetch;
+async function helpOf(argv: string[]): Promise<string> {
+  const out: string[] = [];
+  const original = process.stdout.write;
+  process.stdout.write = ((chunk: any) => (out.push(String(chunk)), true)) as typeof process.stdout.write;
   try {
-    await assert.rejects(
-      () => run(["oauth2-apps", "disable", "--app_id", APP_ID, "--token-stdin"]),
-      (err: CliError) => err.code === "usage.confirm" && /stdin carries the token or the input/.test(err.next ?? ""),
-    );
+    await run(argv);
   } finally {
-    globalThis.fetch = originalFetch;
+    process.stdout.write = original;
   }
-  assert.equal(sent, 0);
-});
+  return out.join("");
+}
 
-test("isStdinInUse is true for --input -, --token-stdin and a piped stdin, and false for a terminal", () => {
-  assert.equal(isStdinInUse({ input: "-" }, true), true);
-  assert.equal(isStdinInUse({ "token-stdin": true }, true), true);
-  assert.equal(isStdinInUse({}, false), true);
-  assert.equal(isStdinInUse({ input: "name=x" }, true), false);
-  assert.equal(isStdinInUse({}, true), false);
-});
-
-test("a terminal run with piped stdin and no --yes refuses and names --yes", async () => {
-  const disable = manifest.descriptors.find((d) => d.command.join(" ") === "oauth2-apps disable")!;
-  await assert.rejects(
-    () => confirmDescriptor(disable, { app_id: APP_ID }, false, captureIO({ isTTY: true }), async () => true, isStdinInUse({}, false)),
-    (err: CliError) => err.code === "usage.confirm" && /--yes/.test(err.next ?? ""),
-  );
+test("--help for the confirming endpoint lists --yes in the usage line, the options and the JSON contract", async () => {
+  const human = await helpOf(["oauth2-apps", "update", APP_ID, "--status", "disabled", "--help"]);
+  assert.match(human, /USAGE  deel oauth2-apps update <app_id> --status disabled \[GLOBAL OPTIONS\] \[--yes\]/);
+  assert.match(human, /--yes   Skip the confirmation prompt/);
+  const json = JSON.parse(await helpOf(["oauth2-apps", "update", APP_ID, "--status", "disabled", "--help", "--json"]));
+  assert.deepEqual(json.confirm, { message: DISABLE_MESSAGE, flag: "yes", requiredWhenNonInteractive: true, requiredWhenStdinInUse: true });
+  assert.doesNotMatch(await helpOf(["oauth2-apps", "update", APP_ID, "--status", "enabled", "--help"]), /--yes/);
 });
