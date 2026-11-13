@@ -1,7 +1,7 @@
 // The shared vocabulary in src/core/constants.ts: the routes and fields it names must exist where it says.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { CREDENTIAL_LOG_KEYS, CREDENTIAL_LOG_WORDS, OUTCOME_ROUTES, SEND_ONCE_ROUTES, SENSITIVE_LOG_KEYS, WITHHELD_RESPONSE_FIELDS, withheldFieldFor } from "../src/core/constants.ts";
+import { CONFIRM_ROUTES, CREDENTIAL_LOG_KEYS, CREDENTIAL_LOG_WORDS, OUTCOME_ROUTES, SEND_ONCE_ROUTES, SENSITIVE_LOG_KEYS, WITHHELD_RESPONSE_FIELDS, withheldFieldFor } from "../src/core/constants.ts";
 import { isSensitiveKey, keyWords } from "../src/core/logging.ts";
 import { loadGeneratedDescriptors } from "../src/public-api/commands.ts";
 import type { CliParam } from "../src/types.ts";
@@ -9,9 +9,9 @@ import type { CliParam } from "../src/types.ts";
 // The key SEND_ONCE_ROUTES and OUTCOME_ROUTES use: "METHOD /path" with the path params as {}.
 const routeOf = (method: string, path: string) => `${method.toUpperCase()} ${path.replace(/\{[^}]+\}/g, "{}")}`;
 
-test("every send-once and outcome route is an endpoint of the committed manifest", async () => {
+test("every send-once, outcome and confirm route is an endpoint of the committed manifest", async () => {
   const routes = new Set((await loadGeneratedDescriptors()).map((descriptor) => routeOf(descriptor.method, descriptor.path)));
-  for (const route of [...SEND_ONCE_ROUTES, ...Object.keys(OUTCOME_ROUTES)]) assert.ok(routes.has(route), `${route} is not in src/public-api/manifest.json`);
+  for (const route of [...SEND_ONCE_ROUTES, ...Object.keys(OUTCOME_ROUTES), ...Object.keys(CONFIRM_ROUTES)]) assert.ok(routes.has(route), `${route} is not in src/public-api/manifest.json`);
 });
 
 test("an outcome route names a boolean field its endpoint documents in the response", async () => {
@@ -69,4 +69,12 @@ test("withheldFieldFor names the withheld field by any spelling of it, and nothi
   for (const key of ["signing_key", "signingKey", "SigningKey", "Signing_Key", "signing-key", "SIGNING_KEY", "signing.key"]) assert.equal(withheldFieldFor(key), "signing_key", key);
   for (const key of ["signing", "key", "signing_keys", "constructor", "__proto__", "toString", ""]) assert.equal(withheldFieldFor(key), undefined, key);
   assert.deepEqual(Object.keys(WITHHELD_RESPONSE_FIELDS).every((name) => withheldFieldFor(name) === name), true);
+});
+
+test("a confirm message only names parameters its endpoint takes", async () => {
+  const descriptors = await loadGeneratedDescriptors();
+  for (const [route, message] of Object.entries(CONFIRM_ROUTES)) {
+    const descriptor = descriptors.find((d) => routeOf(d.method, d.path) === route)!;
+    for (const [, name] of message.matchAll(/\{([^}]+)\}/g)) assert.ok(descriptor.params.some((param) => param.name === name), `${route}: {${name}} is not a parameter`);
+  }
 });

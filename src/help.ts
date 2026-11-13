@@ -11,6 +11,7 @@ import type { CommandDef } from "citty";
 import { withheldFieldFor } from "./core/constants.ts";
 import { domainOf, STAGE_ORDER, usageOf } from "./public-api/commands.ts";
 import { isBetaAt } from "./core/versions.ts";
+import { confirmMessage } from "./core/executor.ts";
 
 // Flattens nested object fields into dotted paths (request.amount, ...) so every
 // field is visible, however deep, without changing the CliParam shape callers rely on.
@@ -112,8 +113,9 @@ function buildUsage(descriptor: Descriptor): string {
           ? " [--input <body>]"
           : "";
   const variantFlag = descriptor.variant ? ` --${descriptor.variant}` : "";
-  if (descriptor.form) return `${usageOf(descriptor)} [GLOBAL OPTIONS]${required ? " " + required : ""}${bodyHint}`;
-  return `deel ${descriptor.command.join(" ")}${variantFlag} [GLOBAL OPTIONS]${required ? " " + required : ""}${bodyHint}`;
+  const yes = confirmMessage(descriptor) ? " [--yes]" : "";
+  if (descriptor.form) return `${usageOf(descriptor)} [GLOBAL OPTIONS]${required ? " " + required : ""}${bodyHint}${yes}`;
+  return `deel ${descriptor.command.join(" ")}${variantFlag} [GLOBAL OPTIONS]${required ? " " + required : ""}${bodyHint}${yes}`;
 }
 
 // Machine-readable form of the action contract (same content as `--help`, as JSON)
@@ -154,6 +156,7 @@ function contractOf(descriptor: Descriptor) {
           selectors: form.selectors,
         }
       : {}),
+    ...(confirmMessage(descriptor) ? { confirm: { message: confirmMessage(descriptor), flag: "yes", requiredWhenNonInteractive: true, requiredWhenStdinInUse: true } } : {}),
     beta: Boolean(descriptor.beta),
     versions: descriptor.versions ?? null,
     params: flagParams(descriptor).map((param) => ({ name: param.name, ...(param.flag ? { flag: param.flag } : {}), in: param.in, type: param.type, required: param.required, enum: param.enum, description: param.description })),
@@ -196,8 +199,10 @@ function printFormSection(descriptor: Descriptor): void {
   }
 
   const options = flagParams(descriptor);
-  if (options.length) {
+  const asksFirst = Boolean(confirmMessage(descriptor));
+  if (options.length || asksFirst) {
     out(`\nOPTIONS\n`);
+    if (asksFirst) out(`  --yes   Skip the confirmation prompt (required without a terminal, or when stdin carries the token or the input)\n`);
     for (const param of options) {
       const choices = param.enum ? `  [${param.enum.join(" | ")}]` : "";
       const requiredTag = param.required ? "  (required)" : "";

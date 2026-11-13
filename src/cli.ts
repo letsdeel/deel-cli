@@ -4,6 +4,7 @@
 // to the executor. Each handler builds a Context (io + composed transport +
 // clock/rng) and passes it down — no module reaches for process.* or a global.
 
+import { isatty } from "node:tty";
 import { defineCommand, parseArgs, runCommand, showUsage } from "citty";
 import type { ArgsDef, CommandDef } from "citty";
 import type { Descriptor } from "./types.ts";
@@ -12,7 +13,10 @@ import { acceptsFlag, argvEnables, argvMentionsFlag, flagMissingValue, flagOf, j
 export { unknownFlag };
 import { parseInput } from "./core/input.ts";
 import { createContext } from "./core/context.ts";
-import { execute } from "./core/executor.ts";
+import { confirmMessage, execute } from "./core/executor.ts";
+import { promptConfirm } from "./core/prompt.ts";
+import type { Confirm } from "./core/prompt.ts";
+import type { IOStreams } from "./core/io.ts";
 import { realIO } from "./core/io.ts";
 import { envelope, render } from "./core/output.ts";
 import { versionListing, versionTable } from "./core/versions.ts";
@@ -55,7 +59,47 @@ function argsForDescriptor(descriptor: Descriptor): ArgsDef {
     args[selector.flag] = selector.value === undefined ? { type: "boolean" } : { type: "string" };
   }
   for (const scope of descriptor.form?.scopes ?? []) args[scope.flag] = { type: "string", required: true };
+  if (confirmMessage(descriptor)) args.yes = YES_ARG;
   return args;
+}
+
+const YES_DESCRIPTION = "Skip the confirmation prompt (required without a terminal, or when stdin carries the token or the input)";
+const YES_ARG = { type: "boolean", description: YES_DESCRIPTION } as ArgsDef[string];
+
+// A command in CONFIRM_ROUTES asks before anything is sent. A terminal gets a [y/N] prompt on stderr (only y/yes goes
+// on); --yes skips it; without a terminal (no TTY, CI or an agent) --yes is required, so a script never runs the
+// command by accident. Reading the token or the body from stdin (--token-stdin, --input -) leaves nothing to answer
+// the prompt, so those runs need --yes too. Runs before the token lookup and the request.
+export async function confirmDescriptor(
+  descriptor: Descriptor,
+  flags: Record<string, string | string[]>,
+  yes: boolean,
+  io: IOStreams,
+  ask: Confirm = promptConfirm,
+  stdinInUse = false,
+  message = confirmMessage(descriptor),
+): Promise<void> {
+  if (!message || yes) return;
+  const name = descriptor.form ? usageOf(descriptor) : `deel ${descriptor.command.join(" ")}`;
+  if (stdinInUse) {
+    throw new CliError("usage.confirm", `Refusing to run \`${name}\` without confirmation`, "Pass --yes: stdin carries the token or the input, or is not a terminal, so there is no prompt to answer.");
+  }
+  if (!io.interactive) {
+    throw new CliError("usage.confirm", `Refusing to run \`${name}\` without confirmation`, "Pass --yes to run this non-interactively.");
+  }
+  const question = message.replace(/\{([^}]+)\}/g, (match, key: string) => (flags[key] !== undefined ? String(flags[key]) : match));
+  if (!(await ask(`${question} [y/N] `))) throw new CliError(`${descriptor.command[0]}.aborted`, `Aborted: \`${name}\` was not run`);
+}
+
+// stdin cannot answer the prompt when it carries the token or the body, or when it is not a terminal (a pipe would be read as the answer).
+export function isStdinInUse(args: Partial<Pick<Args, "input" | "token-stdin">>, stdinIsTTY: boolean): boolean {
+  return args.input === "-" || Boolean(args["token-stdin"]) || !stdinIsTTY;
+}
+
+// Only asks the terminal when a prompt could be needed: touching process.stdin on a pipe makes fd 0 non-blocking, which breaks the later --token-stdin read (EAGAIN).
+export function resolveStdinInUse(descriptor: Descriptor, args: Partial<Pick<Args, "input" | "token-stdin" | "yes">>, stdinIsTTY: () => boolean): boolean {
+  if (!confirmMessage(descriptor) || args.yes === true) return false;
+  return isStdinInUse(args, stdinIsTTY());
 }
 
 // Shared execution body extracted so both actionCommand and variantCommand can delegate to it. `formValues` are the
@@ -86,6 +130,8 @@ async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<st
     files: gatherFiles(cittyCtx.rawArgs),
     idempotencyKey: args["idempotency-key"] as string | undefined,
   };
+  const stdinInUse = resolveStdinInUse(descriptor, args, () => isatty(0));
+  await confirmDescriptor(descriptor, flags, args.yes === true, realIO(), promptConfirm, stdinInUse);
   // execute() sends X-Beta itself so it can drop the header on a retry; the transport must not add it back.
   const config = configFrom({ ...args, beta: false }, cittyCtx.rawArgs);
   const token = commandToken(args, config);

@@ -22,6 +22,7 @@ deel dev logs list --status_class 4xx --beta        # your organization's failed
 - [API tokens](#api-tokens)
 - [Idempotency](#idempotency)
 - [Webhooks](#webhooks)
+- [OAuth2 apps](#oauth2-apps)
 - [API versions](#api-versions)
 - [Environments](#environments)
 - [Beta endpoints](#beta-endpoints)
@@ -310,6 +311,18 @@ Like every generated command, `delete` runs as soon as it is typed: there is no 
 A webhook id can start with `-`, which the argument parser reads as a flag. Put it after `--`, which ends the options: `deel webhooks get -- -WZ1uT2DFF01`. The same works for any generated command.
 
 `test` runs the delivery from Deel's servers, so the receiver URL must be publicly reachable; it is limited to 10 simulations per hour per event type. It prints the delivery, then exits 1 when the response reports `is_success: false`. Each run sends a new event: it is sent once, with no retry and no automatic `Idempotency-Key`; the retry of a rejected beta (see [API versions](#api-versions)) does not apply to it.
+
+## OAuth2 apps
+
+`deel oauth2-apps list`, `get <app_id>` and `update <app_id>` read and change your organization's integration apps. `update <app_id> --status disabled` and `--status enabled` switch an app's API access off and on.
+
+```bash
+deel oauth2-apps update <app_id> --input name="Payroll sync" --beta   # changes only the given fields
+deel oauth2-apps update <app_id> --status disabled --beta             # asks first
+deel oauth2-apps update <app_id> --status disabled --yes --beta       # no prompt
+```
+
+Disabling revokes every consent and token of the app, and enabling does not restore them, so `--status disabled` asks `[y/N]` on stderr before it sends anything. `--yes` skips the question. Without a terminal (a script, CI or an agent) or when stdin carries the token or the body (`--token-stdin`, `--input -`) there is nobody to answer, so the command refuses without `--yes` and sends nothing. `--status enabled` and the other `oauth2-apps` commands ask nothing.
 
 ## API versions
 
