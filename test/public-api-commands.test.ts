@@ -850,3 +850,24 @@ test("the client immigration cases and the external-ID shifts are picked by a fl
     assert.throws(() => selectForm(shifts, []), new RegExp(`match no single form of 'deel time-tracking shifts ${verb}'`));
   }
 });
+
+test("run() calls the flag forms of the renamed commands, the switch last or not, and refuses the bare lines before any request", async () => {
+  const real = await loadGeneratedDescriptors();
+  const get = await callApi(["time-tracking", "shifts", "get", "s1", "--external-id"], real);
+  assert.equal(get.code, EXIT.OK, get.err);
+  assert.equal(get.sent[0].url.pathname, "/rest/time_tracking/shifts/s1");
+  const del = await callApi(["time-tracking", "shifts", "delete", "s1", "--external-id", "--raw"], real);
+  assert.equal(del.code, EXIT.OK, del.err);
+  assert.deepEqual([del.sent[0].method, del.sent[0].url.pathname], ["DELETE", "/rest/time_tracking/shifts/s1"]);
+  const client = await callApi(["immigration", "cases", "list", "--as", "client"], real);
+  assert.equal(client.code, EXIT.OK, client.err);
+  assert.equal(client.sent[0].url.pathname, "/rest/immigration/client/cases");
+  const clientGet = await callApi(["immigration", "cases", "get", "c1", "--as", "client"], real);
+  assert.equal(clientGet.sent[0].url.pathname, "/rest/immigration/client/cases/c1");
+  for (const argv of [["time-tracking", "shifts", "get", "s1"], ["immigration", "cases", "list"]]) {
+    const bare = await callApi(argv, real);
+    assert.notEqual(bare.code, EXIT.OK);
+    assert.match(bare.err, /match no single form/);
+    assert.equal(bare.sent.length, 0);
+  }
+});

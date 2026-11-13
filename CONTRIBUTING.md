@@ -27,7 +27,7 @@ Each piece on its own:
 | `npm test` | the `node --test` suite in `test/` |
 | `npm run test:coverage` | same suite with a coverage floor over `src/**` — lines ≥ 80 %, branches ≥ 75 %, functions ≥ 70 %. The floor only ever moves up. |
 | `npm run check:manifest` | `src/manifest.generated.ts` ↔ `src/commands.map.ts` stay consistent |
-| `npm run check:command-map` | every `src/public-api/commands.json` entry makes a command the CLI can call, takes no hand-picked or static name, and keeps a released command line unchanged |
+| `npm run check:command-map` | every `src/public-api/commands.json` entry makes a command the CLI can call, takes no hand-picked or static name, and keeps a released command line unchanged (a deliberate rename follows [Changing a released command](#changing-a-released-command)) |
 | `npm run check:lockfile` | `package-lock.json` still carries every bun platform binary (an `npm install` against an existing `node_modules` can silently drop them) |
 | `npm run check:version` | `package.json` and `src/version.ts` agree and are a clean `X.Y.Z` |
 | `npm run check:shell` | `packaging/install.sh` (POSIX sh — users pipe it into `sh`), build scripts and hooks pass `sh -n`/`bash -n` and shellcheck |
@@ -64,7 +64,7 @@ say a minute later.
   definitions (`scripts/generate-public-api.ts`). Every name comes from the reviewed command map,
   `src/public-api/commands.json`: an endpoint with no entry there is a generator error, so it ships only
   once it has a name (see [The command map](#the-command-map)). The generator never
-  touches the hand-picked files; it only reserves their names, and a released name never changes.
+  touches the hand-picked files; it only reserves their names, and a released name never changes by accident (see [Changing a released command](#changing-a-released-command)).
   Tests use the made-up endpoints in `test/fixtures/definitions/`.
 
 ## The command map
