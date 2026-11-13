@@ -12,7 +12,7 @@ import { EXIT } from "../src/core/errors.ts";
 import { flagOf } from "../src/core/flags.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
 import { manifest as handPicked } from "../src/manifest.generated.ts";
-import { generatedDescriptors, loadGeneratedDescriptors, matchForm, selectForm, setGeneratedDescriptorsForTests } from "../src/public-api/commands.ts";
+import { generatedDescriptors, loadGeneratedDescriptors, matchForm, selectForm, setGeneratedDescriptorsForTests, usageOf } from "../src/public-api/commands.ts";
 import { parseDefinitions } from "../scripts/public-api/definitions.ts";
 import { generate, reservedClashes } from "../scripts/public-api/generate.ts";
 
@@ -819,4 +819,18 @@ test("every README example of a command the manifest marks beta carries --beta",
   }
   assert.ok(checked >= 5, `only ${checked} beta examples found; the README check has stopped matching`);
   assert.deepEqual(missing, []);
+});
+
+test("the client immigration cases and the external-ID shifts are picked by a flag, so the bare names stay free for the endpoints that supersede them", async () => {
+  const real = await loadGeneratedDescriptors();
+  const usageFor = (method: string, path: string) => {
+    const found = real.find((descriptor) => descriptor.method === method && descriptor.path === path);
+    assert.ok(found, `${method} ${path} is in the manifest`);
+    return usageOf(found);
+  };
+  assert.equal(usageFor("GET", "/immigration/client/cases"), "deel immigration cases list --as client");
+  assert.equal(usageFor("GET", "/immigration/client/cases/{id}"), "deel immigration cases get <id> --as client");
+  assert.equal(usageFor("GET", "/time_tracking/shifts/{external_id}"), "deel time-tracking shifts get <external_id> --external-id");
+  assert.equal(usageFor("PATCH", "/time_tracking/shifts/{external_id}"), "deel time-tracking shifts update <external_id> --external-id");
+  assert.equal(usageFor("DELETE", "/time_tracking/shifts/{external_id}"), "deel time-tracking shifts delete <external_id> --external-id");
 });
