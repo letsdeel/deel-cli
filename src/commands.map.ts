@@ -13,7 +13,4 @@ export const commandMap: CommandEntry[] = [
 
   { command: "jobs list",   method: "GET", path: "/jobs" },
   { command: "jobs status", method: "GET", path: "/jobs/{job_id}" },
-
-  { command: "oauth2-apps listing get", method: "GET", path: "/oauth2-apps/{app_id}/listing" },
-  { command: "app-store categories", method: "GET", path: "/app-store/categories" },
 ];
