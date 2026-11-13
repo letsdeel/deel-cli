@@ -286,6 +286,29 @@ test("execute() sends repeated query params for an array-typed value", async () 
   assert.match(seen[0].url, /job_ids=J1&job_ids=J2/);
 });
 
+test("execute() hands the endpoint's response fields to the transport, so the log can mask the marked ones", async () => {
+  const responseFields = [{ name: "id", in: "body" as const, type: "string" as const, required: false }, { name: "note", in: "body" as const, type: "string" as const, required: false, sensitive: true as const }];
+  const desc: Descriptor = {
+    command: ["widgets", "get"],
+    method: "GET",
+    path: "/widgets/{id}",
+    async: false,
+    bodyKind: "none",
+    supportsMultipart: false,
+    bodyWrapper: "none",
+    params: [{ name: "id", in: "path", type: "string", required: true }],
+    bodyProps: [],
+    fileFields: [],
+    responseKind: "object",
+    responseFields,
+  };
+  const { ctx, seen } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { id: "w1", note: "n" } } }));
+
+  await execute(desc, { flags: { id: "w1" }, files: {} }, ctx, { output: { json: true, quiet: false, raw: false }, debug: false, form: false });
+
+  assert.deepEqual(seen[0].responseFields, responseFields);
+});
+
 test("execute() attaches multiple files to a single multipart field", async () => {
   const upload: Descriptor = {
     command: ["cases", "documents"],

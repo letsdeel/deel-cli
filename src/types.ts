@@ -16,6 +16,7 @@ export type CliParam = {
   properties?: CliParam[];
   maxItems?: number; // for type "array": max number of items the API accepts for this field
   flag?: string; // the CLI flag, when the API name clashes with a global flag (e.g. "fields-param")
+  sensitive?: true; // response fields: the spec marks it sensitive (`x-deel-sensitive`)
 };
 
 export type BodyKind = "none" | "json" | "json-array" | "multipart";

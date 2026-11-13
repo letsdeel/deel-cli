@@ -12,7 +12,7 @@ import { flagOf } from "./flags.ts";
 import { apiBaseUrl } from "./config.ts";
 import { maskUrlQuery } from "./logging.ts";
 import { envelope, render } from "./output.ts";
-import { HEADER, OUTCOME_ROUTES, SEND_ONCE_ROUTES, WITHHELD_RESPONSE_FIELDS, withheldFieldFor } from "./constants.ts";
+import { CONFIRM_ROUTES, HEADER, OUTCOME_ROUTES, SEND_ONCE_ROUTES, WITHHELD_RESPONSE_FIELDS, withheldFieldFor } from "./constants.ts";
 import type { VersionChoice, VersionFlags } from "./versions.ts";
 import { API_VERSION_NONE, BETA_ACCESS_HINT, BETA_ACCESS_HINT_NONE, BETA_ERROR, betaFallback, chooseVersion } from "./versions.ts";
 
@@ -194,6 +194,7 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
       body,
       retryable: !sendOnce && (!mutating || Boolean(idempotencyKey)),
       meta: { command: descriptor.command.join(" "), idempotency_key: idempotencyKey },
+      responseFields: descriptor.responseFields,
     });
   const debugSent = (status: number) => {
     if (!opts.debug) return;
@@ -250,8 +251,14 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
 }
 
 // The key SEND_ONCE_ROUTES and OUTCOME_ROUTES use: "METHOD /path" with the path params as {}.
-function routeOf(descriptor: Descriptor): string {
+export function routeOf(descriptor: Descriptor): string {
   return `${descriptor.method.toUpperCase()} ${descriptor.path.replace(/\{[^}]+\}/g, "{}")}`;
+}
+
+/** The question a command asks before it sends anything, or undefined when it asks none. */
+export function confirmMessage(descriptor: Descriptor): string | undefined {
+  const route = routeOf(descriptor);
+  return Object.hasOwn(CONFIRM_ROUTES, route) ? CONFIRM_ROUTES[route] : undefined;
 }
 
 // Drop the secret response fields from one record or from each record of a list, without mutating the response.

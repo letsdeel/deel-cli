@@ -22,6 +22,7 @@ deel dev logs list --status_class 4xx --beta        # your organization's failed
 - [API tokens](#api-tokens)
 - [Idempotency](#idempotency)
 - [Webhooks](#webhooks)
+- [OAuth2 apps](#oauth2-apps)
 - [API versions](#api-versions)
 - [Environments](#environments)
 - [Beta endpoints](#beta-endpoints)
@@ -311,6 +312,18 @@ A webhook id can start with `-`, which the argument parser reads as a flag. Put 
 
 `test` runs the delivery from Deel's servers, so the receiver URL must be publicly reachable; it is limited to 10 simulations per hour per event type. It prints the delivery, then exits 1 when the response reports `is_success: false`. Each run sends a new event: it is sent once, with no retry and no automatic `Idempotency-Key`; the retry of a rejected beta (see [API versions](#api-versions)) does not apply to it.
 
+## OAuth2 apps
+
+`deel oauth2-apps list`, `get <app_id>` and `update <app_id>` read and change your organization's integration apps. `update <app_id> --status disabled` and `--status enabled` switch an app's API access off and on.
+
+```bash
+deel oauth2-apps update <app_id> --input name="Payroll sync" --beta   # changes only the given fields
+deel oauth2-apps update <app_id> --status disabled --beta             # asks first
+deel oauth2-apps update <app_id> --status disabled --yes --beta       # no prompt
+```
+
+Disabling revokes every consent and token of the app, and enabling does not restore them, so `--status disabled` asks `[y/N]` on stderr before it sends anything. `--yes` skips the question. Without a terminal (a script, CI or an agent) or when stdin carries the token or the body (`--token-stdin`, `--input -`) there is nobody to answer, so the command refuses without `--yes` and sends nothing. `--status enabled` and the other `oauth2-apps` commands ask nothing.
+
 ## API versions
 
 Each command calls one version of its endpoint (sent as `X-Version`): the newest stable version, or the newest beta when nothing is stable yet (then `X-Beta: true` is sent too). `deel <command> --help` shows it.
@@ -332,6 +345,17 @@ deel <command> --version 2026-01-01
 Requests to a non-prod environment (`--env demo`) do not send `X-Version` by default, because versions might differ between environments. `--version <YYYY-MM-DD>` still sends one.
 
 If a beta graduates (or ends) after this CLI was released, the API rejects `X-Beta` before running anything; the CLI then retries once, without `X-Beta` (with the same version, or with the stable version the API names (else the newest stable one in the CLI's own list) when nothing is in beta any more and you did not pin a version with `--version`) and with the same idempotency key. `--debug` shows the retry. A command that is sent once (`webhooks test`) is never retried.
+
+### App listing
+
+An app's page in the App Store is its listing. `deel oauth2-apps listing get <app_id>` reads it: whether it is live (`status`), the revision you are working on or that is under review (`latest_revision.status` is `draft`, `in_review`, `published` or `rejected`, with the reviewer's notes when rejected), its content, categories and the logo. `deel app-store categories list` lists the category ids a listing can use. Both need `--beta`.
+
+```bash
+deel oauth2-apps listing get <app_id> --beta
+deel app-store categories list --beta
+```
+
+An app with no listing, and an app of another organization, both answer 404.
 
 ## Environments
 
@@ -384,7 +408,7 @@ All failure detail lives in the error envelope printed to stderr — never encod
 
 Each HTTP exchange is written as NDJSON to a size-capped, rotating local log (separate from any network telemetry). **By default only metadata is logged** — command, method, URL path (query string omitted), status, request id, duration, and request headers (the `Authorization` header masked to `Bearer ***`). **Response bodies are not written by default.**
 
-Opt in to full response bodies with `--log-bodies` per command, or `DEEL_LOG_BODIES=1` globally. When bodies are logged, the values of keys whose names look sensitive are masked as `***`: credentials (`token`, `password`, `secret`, `signature`), financial identifiers and pay (`iban`, `card`, `tax_id`, `salary`), government identifiers, contact and address details (`email`, `phone`, `address`, `postal_code`), and personal data of a person such as birth, family, health and the other special categories of the GDPR. A link (a key named `url`, `link`, `href`...) is logged without its query string and fragment, where a pre-signed link keeps its signature. The request URL is logged whole under `--log-bodies`, but the values of its sensitive query parameters (`?email=`, `?personal_id=`...) are masked by the same rule and its fragment is cut; the URL in `--debug` output and in a timeout or TLS error is masked the same way. Whatever its key, a value that is an email address or a JWT (a `?q=` search, a free-text `note`) is masked too. Names of people and companies, record ids, dates and amounts of a contract stay, so the log still says what was called. A response body may still contain personal data in a field the masking doesn't know, so enable this only when you need it. Disable logging entirely per-command with `--no-log`, or globally with `DEEL_LOG=off`.
+Opt in to full response bodies with `--log-bodies` per command, or `DEEL_LOG_BODIES=1` globally. When bodies are logged, these values are masked as `***`: credentials (keys such as `token`, `password`, `secret`, `signature`), and every response field the API definition marks as personal or employment data. Which fields carry that mark is decided by the owner of each endpoint, and the CLI follows it for that field of that endpoint's response, and the same name elsewhere is logged as it is. A link (a key named `url`, `link`, `href`...) is logged without its query string and fragment, where a pre-signed link keeps its signature. The request's own query string is never written to the log, with or without `--log-bodies`; the URL in `--debug` output and in a timeout or TLS error masks the values of credential query parameters. Whatever its key, a value that is an email address or a JWT (a `?q=` search, a free-text `note`) is masked too. Names of people and companies, record ids, dates and amounts of a contract stay, so the log still says what was called. A field the API definition has not marked is logged as it is, and the responses of the `auth` and `job` commands carry no field marks, so a response body may still contain personal data: enable this only when you need it. Disable logging entirely per-command with `--no-log`, or globally with `DEEL_LOG=off`.
 
 Location: `~/Library/Logs/deel/deel.log` (macOS),
 `%LOCALAPPDATA%\deel\logs` (Windows), `$XDG_STATE_HOME/deel/logs` (Linux).

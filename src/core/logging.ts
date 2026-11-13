@@ -4,6 +4,7 @@
 import { appendFileSync, mkdirSync, statSync, renameSync, existsSync } from "node:fs";
 import { homedir, platform } from "node:os";
 import { join } from "node:path";
+import type { CliParam } from "../types.ts";
 import { LOG_DIR_MODE, LOG_FILE_MODE, LOG_MAX_BYTES_DEFAULT, LOG_MAX_FILES_DEFAULT, LINK_KEY_WORDS, SENSITIVE_LOG_KEYS, SENSITIVE_LOG_WORDS, keyWords } from "./constants.ts";
 
 export { keyWords };
@@ -40,7 +41,29 @@ function logDir(): string {
 // with no separator at all.
 const RUN_TOGETHER_KEYS = [...SENSITIVE_LOG_KEYS].filter((needle) => needle.includes("_")).map((needle) => needle.replaceAll("_", ""));
 
-// Match by substring so variants (access_token, tax_id, …) are caught, not just exact keys, whichever way the key is
+// Masks the response fields the spec marks sensitive, at the position the endpoint's own fields give them: the same
+// name elsewhere, on another endpoint or beside it, is left as it is.
+export function maskMarkedFields(json: unknown, fields: CliParam[] | undefined): unknown {
+  if (!fields?.length) return json;
+  const walk = (value: unknown, level: CliParam[]): unknown => {
+    if (Array.isArray(value)) return value.map((item) => walk(item, level));
+    if (!value || typeof value !== "object") return value;
+    const byName = new Map(level.map((field) => [field.name, field]));
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, nested]) => {
+        const field = byName.get(key);
+        if (!field) return [key, nested];
+        return [key, field.sensitive ? "***" : field.properties ? walk(nested, field.properties) : nested];
+      }),
+    );
+  };
+  if (json && typeof json === "object" && !Array.isArray(json) && "data" in json) {
+    return { ...json, data: walk((json as Record<string, unknown>).data, fields) };
+  }
+  return walk(json, fields);
+}
+
+// Match by substring so variants (access_token, api_key, …) are caught, not just exact keys, whichever way the key is
 // spelled: `taxId`, `tax-id`, `TAX_ID` and `taxid` are one name. The short names that would match inside other words
 // are matched as whole words of the key.
 export function isSensitiveKey(key: string): boolean {
@@ -142,7 +165,7 @@ export function maskUrlQuery(url: string): string {
 }
 
 // `link` is true under a link key, which masks the query of the strings it holds (or lists). The entry's own top-level
-// keys are not redacted this way: its `url` is the request URL, which `withLogging` masks with `maskUrlQuery` before it gets here.
+// keys are not redacted this way: its `url` is the request URL, which `withLogging` logs without its query string.
 function redact(value: unknown, link = false): unknown {
   if (typeof value === "string") return maskPersonalText(link ? maskLink(value) : value);
   if (Array.isArray(value)) return value.map((item) => redact(item, link));

@@ -153,7 +153,11 @@
    },
    {
     "name": "oauth2-apps",
-    "description": "The organization's OAuth apps (integration apps): list, get, update, enable and disable"
+    "description": "The organization's OAuth apps (integration apps): list, get, update, enable and disable, and read an app's App Store listing"
+   },
+   {
+    "name": "app-store",
+    "description": "The App Store: the categories a listing can use"
    },
    {
     "name": "lookups",
