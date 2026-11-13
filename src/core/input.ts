@@ -13,10 +13,10 @@ export function parseInput(raw: string, bodyProps: CliParam[]): ParsedInput {
   const value = readRawValue(raw);
   const trimmed = value.trimStart();
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
-    return coerceTopLevel(parseJson(value), bodyProps);
+    return coerceTopLevel(parseJson(value), bodyProps, false);
   }
   if (value.includes("=")) {
-    return coerceTopLevel(parseShorthandObject(value), bodyProps);
+    return coerceTopLevel(parseShorthandObject(value), bodyProps, true);
   }
   throw new CliError(
     "input.unrecognized",
@@ -95,7 +95,10 @@ function parseShorthandObject(text: string): Record<string, unknown> {
     const key = unescape(pair.slice(0, equalsIndex).trim());
     const valueText = pair.slice(equalsIndex + 1).trim();
     result[key] = parseValue(valueText);
-    if (!valueText.startsWith("{") && !valueText.startsWith("[")) raw.set(key, unescape(valueText));
+    // Only a value parseValue turned into an object or list has no raw text; "[x] text" is a plain string. A later
+    // duplicate key replaces the value, so it replaces the raw text too.
+    if (isBracketed(valueText)) raw.delete(key);
+    else raw.set(key, unescape(valueText));
   }
   return result;
 }
@@ -113,6 +116,10 @@ function firstTopLevelEquals(text: string): number {
     else if (char === "=" && depth === 0) return index;
   }
   return -1;
+}
+
+function isBracketed(text: string): boolean {
+  return (text.startsWith("{") && text.endsWith("}")) || (text.startsWith("[") && text.endsWith("]"));
 }
 
 function parseValue(raw: string): unknown {
@@ -141,7 +148,8 @@ function parseScalar(text: string): unknown {
 
 // ---------------- schema coercion ----------------
 
-function coerceTopLevel(value: unknown, bodyProps: CliParam[]): unknown {
+// nullLiteral: shorthand only. JSON already has a real null, so a JSON string "null" stays text.
+function coerceTopLevel(value: unknown, bodyProps: CliParam[], nullLiteral: boolean): unknown {
   if (bodyProps.length === 0 || value === null || typeof value !== "object" || Array.isArray(value)) {
     return value;
   }
@@ -151,7 +159,7 @@ function coerceTopLevel(value: unknown, bodyProps: CliParam[]): unknown {
   for (const [key, fieldValue] of Object.entries(record)) {
     const param = paramsByName.get(key);
     if (!param) continue;
-    record[key] = coerceScalar(fieldValue, param);
+    record[key] = coerceScalar(fieldValue, param, nullLiteral);
   }
   return record;
 }
@@ -174,7 +182,8 @@ function restoreStrings(record: Record<string, unknown>, params: CliParam[]): vo
   }
 }
 
-function coerceScalar(value: unknown, param: CliParam): unknown {
+function coerceScalar(value: unknown, param: CliParam, nullLiteral: boolean): unknown {
+  if (nullLiteral && value === "null" && param.nullable) return null;
   if (typeof value !== "string") return value;
   let coerced: unknown = value;
   if (param.type === "number" || param.type === "integer") {

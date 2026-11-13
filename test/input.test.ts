@@ -93,3 +93,44 @@ test("a value with spaces for an enum string field is checked against the enum",
 test("a number sent as JSON for a string field is left as sent", () => {
   assert.deepEqual(parseInput('{"reason":7}', props), { reason: 7 });
 });
+
+test("shorthand null clears a nullable field of any type, and stays literal otherwise", () => {
+  const nullableProps: CliParam[] = [
+    { name: "note", in: "body", type: "string", required: false, nullable: true },
+    { name: "amount", in: "body", type: "number", required: false, nullable: true },
+    { name: "flag", in: "body", type: "boolean", required: false, nullable: true },
+    { name: "title", in: "body", type: "string", required: false },
+  ];
+  assert.deepEqual(parseInput("note=null,amount=null,flag=null", nullableProps), { note: null, amount: null, flag: null });
+  assert.deepEqual(parseInput("title=null", nullableProps), { title: "null" });
+  assert.deepEqual(parseInput('{"note":null}', nullableProps), { note: null });
+});
+
+test("shorthand null clears a nullable enum or integer field without enum or number checks", () => {
+  const props: CliParam[] = [
+    { name: "status", in: "body", type: "string", required: false, nullable: true, enum: ["open", "closed"] },
+    { name: "count", in: "body", type: "integer", required: false, nullable: true },
+  ];
+  assert.deepEqual(parseInput("status=null,count=null", props), { status: null, count: null });
+  assert.throws(() => parseInput("status=pending", props), /must be one of/);
+});
+
+test("a JSON string \"null\" on a nullable field stays text; only shorthand maps the literal", () => {
+  const props: CliParam[] = [{ name: "note", in: "body", type: "string", required: false, nullable: true }];
+  assert.deepEqual(parseInput('{"note":"null"}', props), { note: "null" });
+  assert.deepEqual(parseInput("note=null", props), { note: null });
+});
+
+test("a backslash escape in a string field is applied once to the text", () => {
+  assert.deepEqual(parseInput("reason=a\\,b c", props), { reason: "a,b c" });
+});
+
+test("a value that starts with a bracket but does not close it stays a string", () => {
+  assert.deepEqual(parseInput("reason=[x] text", props), { reason: "[x] text" });
+  assert.deepEqual(parseInput("reason={draft", props), { reason: "{draft" });
+});
+
+test("a later bracketed duplicate key is not overridden by the earlier plain text", () => {
+  const listed: CliParam[] = [{ name: "reason", in: "body", type: "string", required: false, properties: [] }];
+  assert.deepEqual(parseInput("reason=x,reason=[a,b]", listed), { reason: ["a", "b"] });
+});
