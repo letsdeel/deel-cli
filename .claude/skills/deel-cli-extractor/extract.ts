@@ -157,6 +157,7 @@ function propsToParams(props: AnyObj = {}, required: string[] = []): CliParam[] 
       ...(s.enum ? { enum: (s.enum as unknown[]).filter((v): v is string => v !== null) } : {}),
       ...(s.description ? { description: s.description } : {}),
       ...(properties?.length ? { properties } : {}),
+      ...(rawSchema?.["x-deel-sensitive"] === true || s["x-deel-sensitive"] === true || s.items?.["x-deel-sensitive"] === true ? { sensitive: true as const } : {}),
     };
   });
 }

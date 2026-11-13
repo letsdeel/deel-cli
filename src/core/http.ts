@@ -6,7 +6,8 @@ import { CliError } from "./errors.ts";
 import { redactHeaders } from "./auth.ts";
 import { isCertError, TLS_HINT, installCaTrust } from "./tls.ts";
 import type { Logger } from "./logging.ts";
-import { bodyLoggingEnabled, maskUrlQuery } from "./logging.ts";
+import { bodyLoggingEnabled, maskMarkedFields, maskUrlQuery } from "./logging.ts";
+import type { CliParam } from "../types.ts";
 import { HEADER, HTTP_TIMEOUT_MS, RETRY_MAX_ATTEMPTS, RETRY_BASE_DELAY_MS } from "./constants.ts";
 
 export type HttpRequest = {
@@ -17,6 +18,7 @@ export type HttpRequest = {
   timeoutMs?: number;
   retryable?: boolean;
   meta?: Record<string, unknown>; // extra fields for logging (command, idempotency key, ...)
+  responseFields?: CliParam[]; // the endpoint's response fields, so the log masks the ones the spec marks sensitive
 };
 
 export type HttpResponse = {
@@ -154,13 +156,13 @@ export function withLogging(logger: Logger, clock: () => number): Middleware {
       kind: "request",
       ...(request.meta ?? {}),
       method: request.method,
-      url: withBodies ? maskUrlQuery(request.url) : urlPath(request.url),
+      url: urlPath(request.url),
       request_id: request.headers[HEADER.requestId],
       status: response.status,
       duration_ms: clock() - startedAt,
       headers: redactHeaders(request.headers),
     };
-    if (withBodies) entry.response = response.json;
+    if (withBodies) entry.response = maskMarkedFields(response.json, request.responseFields);
     logger(entry);
     return response;
   };

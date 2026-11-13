@@ -125,7 +125,8 @@ export function mergeVariants(schema: any): any {
       for (const [name, property] of Object.entries<AnyObj>(member.properties ?? {})) {
         const before = properties[name];
         // The first variant that names a property describes it; a later one only adds enum values.
-        properties[name] = !before ? property : before.enum && property.enum ? { ...before, enum: [...new Set([...before.enum, ...property.enum])] } : before;
+        const kept = !before ? property : before.enum && property.enum ? { ...before, enum: [...new Set([...before.enum, ...property.enum])] } : before;
+        properties[name] = property?.["x-deel-sensitive"] === true && kept["x-deel-sensitive"] !== true ? { ...kept, "x-deel-sensitive": true } : kept;
       }
     }
     const requiredOf = members.map((member) => new Set<string>(member.required ?? []));
