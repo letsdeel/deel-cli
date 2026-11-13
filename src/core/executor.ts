@@ -2,12 +2,11 @@
 // transport, error mapping, output. Auth/version/request-id/retry/logging are
 // transport middlewares, so this stays focused on the request.
 
-import { readFile, stat } from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 import { basename } from "node:path";
 import type { Descriptor } from "../types.ts";
 import type { Ctx } from "./context.ts";
 import type { OutputOpts } from "./output.ts";
-import { deriveIdempotencyKey } from "./idempotency.ts";
 import { CliError } from "./errors.ts";
 import { flagOf } from "./flags.ts";
 import { apiBaseUrl } from "./config.ts";
@@ -176,16 +175,15 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
     }
   }
 
-  // A send-once call acts again every time, so a key derived from the request would make the API replay the first.
+  // A new key per run (see idempotency.ts); the retries of this request share it through `headers`.
+  // A send-once call is never retried, so it gets no automatic key.
   const route = routeOf(descriptor);
   const sendOnce = SEND_ONCE_ROUTES.has(route);
   let idempotencyKey: string | undefined;
   if (mutating) {
-    idempotencyKey =
-      call.idempotencyKey ??
-      (sendOnce ? undefined : deriveIdempotencyKey({ method: descriptor.method, path, query, body: effectiveKind === "multipart" ? await multipartFingerprint(descriptor, call) : wrapBody(descriptor, call.body) }));
+    idempotencyKey = call.idempotencyKey ?? (sendOnce ? undefined : ctx.newIdempotencyKey());
     if (idempotencyKey !== undefined) headers[HEADER.idempotencyKey] = idempotencyKey;
-    if (opts.debug && idempotencyKey !== undefined) ctx.io.err(`[debug] idempotency-key: ${idempotencyKey}${call.idempotencyKey ? " (override)" : " (derived)"}\n`);
+    if (opts.debug && idempotencyKey !== undefined) ctx.io.err(`[debug] idempotency-key: ${idempotencyKey}${call.idempotencyKey ? " (override)" : " (generated)"}\n`);
   }
 
   const send = (requestHeaders: Record<string, string>) =>
@@ -196,6 +194,7 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
       body,
       retryable: !sendOnce && (!mutating || Boolean(idempotencyKey)),
       meta: { command: descriptor.command.join(" "), idempotency_key: idempotencyKey },
+      responseFields: descriptor.responseFields,
     });
   const debugSent = (status: number) => {
     if (!opts.debug) return;
@@ -284,24 +283,6 @@ function setVersionHeaders(headers: Record<string, string>, choice: VersionChoic
   else delete headers[HEADER.apiVersion];
   if (choice.beta) headers[HEADER.beta] = "true";
   else delete headers[HEADER.beta];
-}
-
-async function multipartFingerprint(descriptor: Descriptor, call: ParsedCall): Promise<unknown> {
-  // Bytes are not hashed for multipart; use text fields + filename + size.
-  const fingerprint: Record<string, unknown> = { ...(call.body as object) };
-  for (const fileField of descriptor.fileFields) {
-    const paths = call.files[fileField];
-    if (paths?.length) {
-      fingerprint[`${fileField}__files`] = await Promise.all(paths.map(async (path) => {
-        try {
-          return { name: basename(path), size: (await stat(path)).size };
-        } catch {
-          return { name: basename(path) };
-        }
-      }));
-    }
-  }
-  return fingerprint;
 }
 
 // `code`, or the older `error_code` some endpoints document, when `code` is absent.

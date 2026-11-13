@@ -160,7 +160,7 @@ Resolution precedence (first match wins):
 
 `--token-stdin` and `DEEL_TOKEN` are pass-through and never written to disk. `deel auth login` no longer accepts a PAT: use `DEEL_TOKEN` or `--token-stdin`. A PAT saved in the keychain by an earlier version keeps working until you run `deel auth login` or `deel auth logout`, which remove it.
 
-A stored login (browser login or saved PAT) is only sent to the API of its own environment. `--base-url` without `--env` is treated as a separate environment named after its host, so nothing stored for `prod` or `demo` is sent to it. Combining `--env prod` or `--env demo` with a `--base-url` on another host is refused; use `DEEL_TOKEN` or `--token-stdin` for that.
+A stored login (browser login or saved PAT) is only sent to the API of its own environment. `--base-url` (or `DEEL_CLI_BASE_URL`) without `--env` is treated as a separate environment named after its host, so nothing stored for `prod` or `demo` is sent to it. Combining `--env prod` or `--env demo` with a `--base-url` on another host is refused; use `DEEL_TOKEN` or `--token-stdin` for that.
 
 ## Discovering commands
 
@@ -291,7 +291,9 @@ There is no confirmation prompt and no `--yes`: `revocations create` invalidates
 
 ## Idempotency
 
-Every mutating request (`POST`/`PUT`/`PATCH`/`DELETE`) carries an `Idempotency-Key`. By default it is a **deterministic UUIDv5** derived from a canonicalized form of the request (method + path + query + body), so re-running the identical command sends the identical key and the server can dedupe a retry. Override it with `--idempotency-key <value>` when you want a fresh attempt. The exception is a call that must act every time it runs, such as `deel webhooks test`: it is sent once, with no retry and no derived key (an explicit `--idempotency-key` is still sent).
+Every mutating request (`POST`/`PUT`/`PATCH`/`DELETE`) carries an `Idempotency-Key`. By default each run of a command gets a **new random key** (UUIDv4), and the CLI's own retries of that request (on `429` or `5xx`) reuse it, so a retried request runs at most once. Running the same command again is a new operation: `disable`, `enable`, `disable` ends disabled, and two identical `create` runs create two resources.
+
+To make a re-run a safe retry of an earlier run, for example after a timeout left you unsure whether it went through, pass the same key both times with `--idempotency-key <value>` (see the key with `--debug`). Within 24 hours the API then answers a repeated `POST`, `PUT` or `PATCH` with the first response instead of running it again. A key reused for a different request (another method, path or body) is rejected with `409 IDEMPOTENCY_KEY_REUSED`. The exception is a call that must act every time it runs, such as `deel webhooks test`: it is sent once, with no retry and no automatic key (an explicit `--idempotency-key` is still sent).
 
 ## Webhooks
 
@@ -308,7 +310,7 @@ Like every generated command, `delete` runs as soon as it is typed: there is no 
 
 A webhook id can start with `-`, which the argument parser reads as a flag. Put it after `--`, which ends the options: `deel webhooks get -- -WZ1uT2DFF01`. The same works for any generated command.
 
-`test` runs the delivery from Deel's servers, so the receiver URL must be publicly reachable; it is limited to 10 simulations per hour per event type. It prints the delivery, then exits 1 when the response reports `is_success: false`. Each run sends a new event: it is sent once, with no retry and no derived `Idempotency-Key`; the retry of a rejected beta (see [API versions](#api-versions)) does not apply to it.
+`test` runs the delivery from Deel's servers, so the receiver URL must be publicly reachable; it is limited to 10 simulations per hour per event type. It prints the delivery, then exits 1 when the response reports `is_success: false`. Each run sends a new event: it is sent once, with no retry and no automatic `Idempotency-Key`; the retry of a rejected beta (see [API versions](#api-versions)) does not apply to it.
 
 ## OAuth2 apps
 
@@ -395,7 +397,7 @@ All failure detail lives in the error envelope printed to stderr — never encod
 
 Each HTTP exchange is written as NDJSON to a size-capped, rotating local log (separate from any network telemetry). **By default only metadata is logged** — command, method, URL path (query string omitted), status, request id, duration, and request headers (the `Authorization` header masked to `Bearer ***`). **Response bodies are not written by default.**
 
-Opt in to full response bodies with `--log-bodies` per command, or `DEEL_LOG_BODIES=1` globally. When bodies are logged, the values of keys whose names look sensitive are masked as `***`: credentials (`token`, `password`, `secret`, `signature`), financial identifiers and pay (`iban`, `card`, `tax_id`, `salary`), government identifiers, contact and address details (`email`, `phone`, `address`, `postal_code`), and personal data of a person such as birth, family, health and the other special categories of the GDPR. A link (a key named `url`, `link`, `href`...) is logged without its query string and fragment, where a pre-signed link keeps its signature. The request URL is logged whole under `--log-bodies`, but the values of its sensitive query parameters (`?email=`, `?personal_id=`...) are masked by the same rule and its fragment is cut; the URL in `--debug` output and in a timeout or TLS error is masked the same way. Whatever its key, a value that is an email address or a JWT (a `?q=` search, a free-text `note`) is masked too. Names of people and companies, record ids, dates and amounts of a contract stay, so the log still says what was called. A response body may still contain personal data in a field the masking doesn't know, so enable this only when you need it. Disable logging entirely per-command with `--no-log`, or globally with `DEEL_LOG=off`.
+Opt in to full response bodies with `--log-bodies` per command, or `DEEL_LOG_BODIES=1` globally. When bodies are logged, these values are masked as `***`: credentials (keys such as `token`, `password`, `secret`, `signature`), and every response field the API definition marks as personal or employment data. Which fields carry that mark is decided by the owner of each endpoint, and the CLI follows it for that field of that endpoint's response, and the same name elsewhere is logged as it is. A link (a key named `url`, `link`, `href`...) is logged without its query string and fragment, where a pre-signed link keeps its signature. The request's own query string is never written to the log, with or without `--log-bodies`; the URL in `--debug` output and in a timeout or TLS error masks the values of credential query parameters. Whatever its key, a value that is an email address or a JWT (a `?q=` search, a free-text `note`) is masked too. Names of people and companies, record ids, dates and amounts of a contract stay, so the log still says what was called. A field the API definition has not marked is logged as it is, and the responses of the `auth` and `job` commands carry no field marks, so a response body may still contain personal data: enable this only when you need it. Disable logging entirely per-command with `--no-log`, or globally with `DEEL_LOG=off`.
 
 Location: `~/Library/Logs/deel/deel.log` (macOS),
 `%LOCALAPPDATA%\deel\logs` (Windows), `$XDG_STATE_HOME/deel/logs` (Linux).
@@ -406,6 +408,7 @@ Location: `~/Library/Logs/deel/deel.log` (macOS),
 | ------------------- | ----------------------------------------------------------- |
 | `DEEL_TOKEN`        | PAT value                                                   |
 | `DEEL_ENV`          | Default environment (`prod` / `demo`)                       |
+| `DEEL_CLI_BASE_URL` | Override the API base URL (https only); `--base-url` beats it, it beats `--env`/`DEEL_ENV` |
 | `DEEL_LOG`          | `off` to disable local logging                              |
 | `DEEL_LOG_BODIES`   | `1` to include response bodies in the local log (off by default) |
 | `DEEL_LOG_DIR`      | Override the log directory                                  |

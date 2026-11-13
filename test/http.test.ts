@@ -27,11 +27,11 @@ test("withAuth adds nothing when there is no token", async () => {
   assert.equal(a.seen[0].headers["authorization"], undefined);
 });
 
-test("an error that names the request URL masks its sensitive query values", async () => {
+test("an error that names the request URL masks its credential query values", async () => {
   const a = capturing();
   await assert.rejects(
-    () => withAuth("tok")(a.next)(req({ url: "http://x/people?email=a%40b.co&personal_id=P123&page=2" })),
-    (error: Error) => /non-https URL: http:\/\/x\/people\?email=\*\*\*&personal_id=\*\*\*&page=2$/.test(error.message),
+    () => withAuth("tok")(a.next)(req({ url: "http://x/people?api_key=k123&access_token=t&page=2" })),
+    (error: Error) => /non-https URL: http:\/\/x\/people\?api_key=\*\*\*&access_token=\*\*\*&page=2$/.test(error.message),
   );
   assert.equal(a.seen.length, 0);
 });

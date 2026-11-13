@@ -1,8 +1,19 @@
-import { test } from "node:test";
+import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 import { apiBaseUrl, resolveConfig, requireIssuer, ENVIRONMENTS } from "../src/core/config.ts";
 import { configFrom } from "../src/commands/shared.ts";
 import type { CliError } from "../src/core/errors.ts";
+
+// DEEL_CLI_BASE_URL overrides the base URL for every test below, so a developer who exports it must not break them.
+let savedBaseUrlVar: string | undefined;
+before(() => {
+  savedBaseUrlVar = process.env.DEEL_CLI_BASE_URL;
+  delete process.env.DEEL_CLI_BASE_URL;
+});
+after(() => {
+  if (savedBaseUrlVar === undefined) delete process.env.DEEL_CLI_BASE_URL;
+  else process.env.DEEL_CLI_BASE_URL = savedBaseUrlVar;
+});
 
 test("defaults to prod", () => {
   const config = resolveConfig({});
@@ -153,4 +164,64 @@ test("SCIM commands call the sibling /scim base path", () => {
 test("REST and hand-picked commands keep the configured base path", () => {
   assert.equal(apiBaseUrl(ENVIRONMENTS.prod.baseUrl, "rest"), ENVIRONMENTS.prod.baseUrl);
   assert.equal(apiBaseUrl(ENVIRONMENTS.prod.baseUrl, undefined), ENVIRONMENTS.prod.baseUrl);
+});
+
+test("DEEL_CLI_BASE_URL is used when no --base-url is passed", () => {
+  withEnvVars({ DEEL_CLI_BASE_URL: "https://example.test/rest" }, () => {
+    assert.equal(resolveConfig({}).baseUrl, "https://example.test/rest");
+  });
+});
+
+test("--base-url beats DEEL_CLI_BASE_URL", () => {
+  withEnvVars({ DEEL_CLI_BASE_URL: "https://env.test/rest" }, () => {
+    assert.equal(resolveConfig({ baseUrl: "https://flag.test/rest" }).baseUrl, "https://flag.test/rest");
+  });
+});
+
+test("DEEL_CLI_BASE_URL beats --env and DEEL_ENV for the URL", () => {
+  withEnvVars({ DEEL_CLI_BASE_URL: "https://env.test/rest", DEEL_ENV: "demo" }, () => {
+    assert.equal(resolveConfig({}).baseUrl, "https://env.test/rest");
+    assert.equal(resolveConfig({ env: "demo" }).baseUrl, "https://env.test/rest");
+  });
+});
+
+test("an empty or whitespace-only DEEL_CLI_BASE_URL is ignored", () => {
+  for (const value of ["", "   "]) {
+    withEnvVars({ DEEL_CLI_BASE_URL: value }, () => {
+      assert.equal(resolveConfig({ env: "demo" }).baseUrl, ENVIRONMENTS.demo.baseUrl);
+    });
+  }
+});
+
+test("DEEL_CLI_BASE_URL is trimmed and its trailing slash stripped", () => {
+  withEnvVars({ DEEL_CLI_BASE_URL: " https://env.test/rest/ " }, () => {
+    assert.equal(resolveConfig({}).baseUrl, "https://env.test/rest");
+  });
+});
+
+test("DEEL_CLI_BASE_URL without --env or DEEL_ENV is its own environment, named after its host", () => {
+  withEnvVars({ DEEL_CLI_BASE_URL: "https://env.test:8443/rest", DEEL_ENV: undefined }, () => {
+    const config = resolveConfig({});
+    assert.equal(config.env, "env.test:8443");
+    assert.equal(config.oauthBaseUrlOk, true);
+  });
+});
+
+test("an invalid DEEL_CLI_BASE_URL names the variable", () => {
+  withEnvVars({ DEEL_CLI_BASE_URL: "not a url" }, () => {
+    assert.throws(() => resolveConfig({}), /Invalid DEEL_CLI_BASE_URL/);
+  });
+});
+
+test("a non-https DEEL_CLI_BASE_URL is rejected and names the variable", () => {
+  withEnvVars({ DEEL_CLI_BASE_URL: "http://localhost:8787/rest" }, () => {
+    assert.throws(() => resolveConfig({}), /DEEL_CLI_BASE_URL must use https/);
+  });
+});
+
+test("errors for a bad --base-url name the flag even when DEEL_CLI_BASE_URL is set", () => {
+  withEnvVars({ DEEL_CLI_BASE_URL: "https://env.test/rest" }, () => {
+    assert.throws(() => resolveConfig({ baseUrl: "http://localhost:8787/rest" }), /--base-url must use https/);
+    assert.throws(() => resolveConfig({ baseUrl: "not a url" }), /Invalid --base-url/);
+  });
 });

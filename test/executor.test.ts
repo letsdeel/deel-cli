@@ -72,13 +72,43 @@ test("execute() drives the injected transport + IOStreams (DI)", async () => {
   assert.equal(req.headers["authorization"], "Bearer tok_SECRET");
   assert.ok(req.headers["x-deel-cli-version"]);
   assert.equal(req.headers["x-request-id"], "req-fixed-id");
-  assert.match(req.headers["idempotency-key"], /^[0-9a-f-]{36}$/);
+  assert.match(req.headers["idempotency-key"], /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
   assert.equal(req.headers["x-version"], createDescriptor.version);
 
   // Output went through IOStreams, not process.stdout.
   const parsed = JSON.parse(io.stdout.join(""));
   assert.equal(parsed.data.id, "adj_1");
   assert.ok(!("kind" in parsed));
+});
+
+const RUN_OPTS = { output: { json: true, quiet: false, raw: false }, debug: false, form: false };
+const CREATE_CALL = { flags: { contract_id: "AC1" }, body: { amount: 5000 }, files: {} };
+const created = (): HttpResponse => ({ status: 201, headers: {}, text: "", json: { data: { id: "adj_1" } } });
+
+test("execute() reuses one idempotency key across the transport's retries of a request", async () => {
+  let calls = 0;
+  const { ctx, seen } = ctxWith(() => (++calls === 1 ? { status: 503, headers: { "retry-after": "0" }, text: "", json: undefined } : created()));
+  await execute(createDescriptor, CREATE_CALL, ctx, RUN_OPTS);
+  assert.equal(seen.length, 2);
+  assert.ok(seen[0].headers["idempotency-key"]);
+  assert.equal(seen[1].headers["idempotency-key"], seen[0].headers["idempotency-key"]);
+});
+
+test("execute() sends a new idempotency key for each run of an identical command", async () => {
+  // A deliberate repeat (disable, enable, disable; two identical creates) must reach the API, not replay the first response.
+  const { ctx, seen } = ctxWith(created);
+  await execute(createDescriptor, CREATE_CALL, ctx, RUN_OPTS);
+  await execute(createDescriptor, CREATE_CALL, ctx, RUN_OPTS);
+  assert.equal(seen.length, 2);
+  assert.notEqual(seen[0].headers["idempotency-key"], seen[1].headers["idempotency-key"]);
+});
+
+test("execute() sends the --idempotency-key override exactly, on every run", async () => {
+  const { ctx, seen } = ctxWith(created);
+  await execute(createDescriptor, { ...CREATE_CALL, idempotencyKey: "my-key" }, ctx, RUN_OPTS);
+  await execute(createDescriptor, { ...CREATE_CALL, idempotencyKey: "my-key" }, ctx, RUN_OPTS);
+  assert.deepEqual(seen.map((req) => req.headers["idempotency-key"]), ["my-key", "my-key"]);
+  assert.equal(seen[0].meta?.idempotency_key, "my-key");
 });
 
 test("execute() surfaces Deel's compliant { errors: [...] } array messages", async () => {
@@ -254,6 +284,29 @@ test("execute() sends repeated query params for an array-typed value", async () 
   );
 
   assert.match(seen[0].url, /job_ids=J1&job_ids=J2/);
+});
+
+test("execute() hands the endpoint's response fields to the transport, so the log can mask the marked ones", async () => {
+  const responseFields = [{ name: "id", in: "body" as const, type: "string" as const, required: false }, { name: "note", in: "body" as const, type: "string" as const, required: false, sensitive: true as const }];
+  const desc: Descriptor = {
+    command: ["widgets", "get"],
+    method: "GET",
+    path: "/widgets/{id}",
+    async: false,
+    bodyKind: "none",
+    supportsMultipart: false,
+    bodyWrapper: "none",
+    params: [{ name: "id", in: "path", type: "string", required: true }],
+    bodyProps: [],
+    fileFields: [],
+    responseKind: "object",
+    responseFields,
+  };
+  const { ctx, seen } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: { id: "w1", note: "n" } } }));
+
+  await execute(desc, { flags: { id: "w1" }, files: {} }, ctx, { output: { json: true, quiet: false, raw: false }, debug: false, form: false });
+
+  assert.deepEqual(seen[0].responseFields, responseFields);
 });
 
 test("execute() attaches multiple files to a single multipart field", async () => {
@@ -551,7 +604,7 @@ const simulateDescriptor: Descriptor = {
 const simulateCall = { flags: { webhook_id: "wh_1" }, body: { event_type: "contract.created" }, files: {} };
 const quiet = { output: { json: true, quiet: false, raw: false }, debug: false, form: false };
 
-test("a send-once call goes out once, with no derived Idempotency-Key, so a repeat acts again", async () => {
+test("a send-once call goes out once, with no automatic Idempotency-Key, so a repeat acts again", async () => {
   const failing = ctxWith(() => ({ status: 503, headers: {}, text: "", json: { error: { message: "busy" } } }));
   await assert.rejects(execute(simulateDescriptor, simulateCall, failing.ctx, quiet));
   assert.equal(failing.seen.length, 1);
