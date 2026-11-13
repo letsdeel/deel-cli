@@ -346,6 +346,17 @@ Requests to a non-prod environment (`--env demo`) do not send `X-Version` by def
 
 If a beta graduates (or ends) after this CLI was released, the API rejects `X-Beta` before running anything; the CLI then retries once, without `X-Beta` (with the same version, or with the stable version the API names (else the newest stable one in the CLI's own list) when nothing is in beta any more and you did not pin a version with `--version`) and with the same idempotency key. `--debug` shows the retry. A command that is sent once (`webhooks test`) is never retried.
 
+### App listing
+
+An app's page in the App Store is its listing. `deel oauth2-apps listing get <app_id>` reads it: whether it is live (`status`), the revision you are working on or that is under review (`latest_revision.status` is `draft`, `in_review`, `published` or `rejected`, with the reviewer's notes when rejected), its content, categories and the logo. `deel app-store categories list` lists the category ids a listing can use. Both need `--beta`.
+
+```bash
+deel oauth2-apps listing get <app_id> --beta
+deel app-store categories list --beta
+```
+
+An app with no listing, and an app of another organization, both answer 404.
+
 ## Environments
 
 | `--env`          | Base URL                                       |

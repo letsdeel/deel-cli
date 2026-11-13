@@ -336,6 +336,8 @@
  {"method": "PATCH", "path": "/oauth2-apps/{app_id}", "command": "deel oauth2-apps update <app_id>"},
  {"method": "POST", "path": "/oauth2-apps/{app_id}/disable", "command": "deel oauth2-apps update <app_id> --status disabled"},
  {"method": "POST", "path": "/oauth2-apps/{app_id}/enable", "command": "deel oauth2-apps update <app_id> --status enabled"},
+ {"method": "GET", "path": "/oauth2-apps/{app_id}/listing", "command": "deel oauth2-apps listing get <app_id>"},
+ {"method": "GET", "path": "/app-store/categories", "command": "deel app-store categories list"},
  {"method": "GET", "path": "/eor/contracts/{contract_id}/offboarding/attachments/{attachment_id}", "command": "deel offboarding attachments get <contract_id> <attachment_id> [--worker-type eor]"},
  {"method": "POST", "path": "/eor/contracts/{contract_id}/offboarding/review-client-sign-offs", "command": "deel offboarding client-sign-offs reviews create <contract_id> [--worker-type eor]"},
  {"method": "POST", "path": "/eor/contracts/{contract_id}/offboarding/review-employee-sign-offs", "command": "deel offboarding employee-sign-offs reviews create <contract_id> [--worker-type eor]"},
