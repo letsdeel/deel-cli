@@ -118,14 +118,30 @@ function firstTopLevelEquals(text: string): number {
   return -1;
 }
 
+// True only when the bracket that opens at index 0 is the one that closes at the last character, so "[WIP] fix [urgent]"
+// and "{a} and {b}" are plain text, not a list or an object. Escaped characters don't count.
 function isBracketed(text: string): boolean {
-  return (text.startsWith("{") && text.endsWith("}")) || (text.startsWith("[") && text.endsWith("]"));
+  if (!(text.startsWith("{") || text.startsWith("["))) return false;
+  let depth = 0;
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index];
+    if (char === "\\") {
+      index++;
+      continue;
+    }
+    if (char === "{" || char === "[") depth++;
+    else if (char === "}" || char === "]") {
+      depth--;
+      if (depth === 0) return index === text.length - 1 && (text[0] === "{" ? char === "}" : char === "]");
+    }
+  }
+  return false;
 }
 
 function parseValue(raw: string): unknown {
   const value = raw.trim();
-  if (value.startsWith("{") && value.endsWith("}")) return parseShorthandObject(value.slice(1, -1));
-  if (value.startsWith("[") && value.endsWith("]")) {
+  if (isBracketed(value)) {
+    if (value.startsWith("{")) return parseShorthandObject(value.slice(1, -1));
     return splitTopLevel(value.slice(1, -1), ",")
       .filter((item) => item.trim() !== "")
       .map((item) => parseValue(item));
@@ -154,6 +170,12 @@ function coerceTopLevel(value: unknown, bodyProps: CliParam[], nullLiteral: bool
     return value;
   }
   const record = value as Record<string, unknown>;
+  // Already wrapped as data={...}: the fields to restore and coerce are inside it (executor.wrapBody leaves it as is).
+  const inner = record.data;
+  if (Object.keys(record).length === 1 && inner !== null && typeof inner === "object" && !Array.isArray(inner) && !bodyProps.some((param) => param.name === "data")) {
+    coerceTopLevel(inner, bodyProps, nullLiteral);
+    return record;
+  }
   restoreStrings(record, bodyProps);
   const paramsByName = new Map(bodyProps.map((param) => [param.name, param]));
   for (const [key, fieldValue] of Object.entries(record)) {

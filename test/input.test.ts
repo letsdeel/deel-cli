@@ -134,3 +134,24 @@ test("a later bracketed duplicate key is not overridden by the earlier plain tex
   const listed: CliParam[] = [{ name: "reason", in: "body", type: "string", required: false, properties: [] }];
   assert.deepEqual(parseInput("reason=x,reason=[a,b]", listed), { reason: ["a", "b"] });
 });
+
+test("text that starts and ends with a bracket but is not one bracketed value stays a string", () => {
+  assert.deepEqual(parseInput("reason=[WIP] fix [urgent]", props), { reason: "[WIP] fix [urgent]" });
+  assert.deepEqual(parseInput("reason={a} and {b}", props), { reason: "{a} and {b}" });
+});
+
+test("a real list or object still parses when a bracket appears inside it", () => {
+  const listed: CliParam[] = [{ name: "tags", in: "body", type: "array", required: false }];
+  assert.deepEqual(parseInput("tags=[a,[b,c],d]", listed), { tags: ["a", ["b", "c"], "d"] });
+});
+
+test("a string inside an already wrapped data={..} body keeps its spaces and numbers", () => {
+  assert.deepEqual(parseInput("data={reason=Payroll sync,amount=5}", props), { data: { reason: "Payroll sync", amount: 5 } });
+  assert.deepEqual(parseInput("data={reason=007}", props), { data: { reason: "007" } });
+  assert.throws(() => parseInput("data={currency=US D}", props), /currency must be one of/);
+});
+
+test("a body with a declared data field is not treated as already wrapped", () => {
+  const withData: CliParam[] = [{ name: "data", in: "body", type: "string", required: false }];
+  assert.deepEqual(parseInput("data=a b c", withData), { data: "a b c" });
+});
