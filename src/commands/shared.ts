@@ -28,7 +28,7 @@ export const commonArgs: ArgsDef = {
   env: { type: "string", description: "Environment: prod | demo (default prod)" },
   "ca-cert": { type: "string", description: "Extra CA certificate (PEM) to trust, on top of the OS store — e.g. an internal/dev root" },
   "token-stdin": { type: "boolean", description: "Read the PAT from stdin" },
-  "idempotency-key": { type: "string", description: "Override the auto-derived idempotency key" },
+  "idempotency-key": { type: "string", description: "Idempotency key to send (default: a new random key per run); reuse a run's key to retry it safely" },
   version: { type: "string", description: "API version to call (YYYY-MM-DD), or none to let the API pick its oldest stable one" },
   beta: { type: "boolean", description: "Call the newest beta version of the endpoint (sends X-Beta: true)" },
   versions: { type: "boolean", description: "List the endpoint's API versions with beta and sunset dates, and exit" },
