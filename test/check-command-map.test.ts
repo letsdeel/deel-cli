@@ -77,6 +77,13 @@ test("a confirmPrompt may name only path IDs of its endpoint, which every call f
   ]);
 });
 
+test("a confirmPrompt on an entry collapsed into an earlier one fails, since only the first is called", () => {
+  const first = entry("GET", "/things/{thing_id}/a", "deel things get <thing_id>", { collapse: "k" });
+  const second = entry("GET", "/things/{thing_id}/b", "deel things get <thing_id>", { collapse: "k", confirmPrompt: "Go {thing_id}?" });
+  assert.ok(failures([first, second]).some((m) => /confirmPrompt is on an entry collapsed into \/things\/\{thing_id\}\/a/.test(m)), failures([first, second]).join("\n"));
+  assert.deepEqual(failures([{ ...first, confirmPrompt: "Go {thing_id}?" }, { ...second, confirmPrompt: undefined }]).filter((m) => /confirmPrompt/.test(m)), []);
+});
+
 test("a flag that picks an endpoint never takes a global flag's name", () => {
   assert.match(failures([entry("POST", "/shifts/raw", "deel shifts create --raw")]).join(), /--raw is a global flag/);
   assert.match(failures([entry("GET", "/x/{id}", "deel things get --json <id>")]).join(), /--json is a global flag/);

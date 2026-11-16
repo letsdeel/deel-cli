@@ -84,13 +84,8 @@ async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<st
       if (value !== undefined) flags[param.name] = String(value);
     }
   }
-  const call = {
-    flags,
-    body: args.input !== undefined ? parseInput(String(args.input), descriptor.bodyProps) : undefined,
-    files: gatherFiles(cittyCtx.rawArgs),
-    idempotencyKey: args["idempotency-key"] as string | undefined,
-  };
-  // Before the token is read and before any request (src/core/confirm.ts).
+  // Before --input and --file are read, the token is looked up or any request is sent (src/core/confirm.ts): a refusal
+  // never waits on a body from stdin, and isn't hidden behind an input error.
   await requireConfirmation({
     name: commandName(descriptor),
     group: descriptor.command[0],
@@ -100,6 +95,12 @@ async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<st
     io: realIO(),
     stdinInUse: resolveStdinInUse(descriptor.confirmPrompt, args),
   });
+  const call = {
+    flags,
+    body: args.input !== undefined ? parseInput(String(args.input), descriptor.bodyProps) : undefined,
+    files: gatherFiles(cittyCtx.rawArgs),
+    idempotencyKey: args["idempotency-key"] as string | undefined,
+  };
   // execute() sends X-Beta itself so it can drop the header on a retry; the transport must not add it back.
   const config = configFrom({ ...args, beta: false }, cittyCtx.rawArgs);
   const token = commandToken(args, config);

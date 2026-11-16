@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
-import { bindForm, parseCommand, readCommandMap } from "./public-api/command-map.ts";
+import { bindForm, parseCommand, pathParams, readCommandMap } from "./public-api/command-map.ts";
 import type { MapEntry, ParsedCommand } from "./public-api/command-map.ts";
 import { GLOBAL_FLAGS, readGeneratedManifest, reservedClashes } from "./public-api/generate.ts";
 import type { Reserved } from "./public-api/generate.ts";
@@ -67,7 +67,7 @@ export function checkMap(entries: MapEntry[], options: CheckOptions = {}): { fai
 
     // The prompt is filled from the call before it is asked, and only a path ID is sure to be in every call: any other
     // {name} would be printed as typed, so the person would confirm without seeing what the command acts on.
-    const pathIds = new Set([...entry.path.matchAll(/\{([^}]+)\}/g)].map((m) => m[1]));
+    const pathIds = new Set(pathParams(entry.path));
     for (const [, name] of (entry.confirmPrompt ?? "").matchAll(/\{([^}]+)\}/g)) {
       if (!pathIds.has(name)) fail(`confirmPrompt names {${name}}, which is not a path ID of ${entry.path}`);
     }
@@ -83,6 +83,10 @@ export function checkMap(entries: MapEntry[], options: CheckOptions = {}): { fai
 
     const key = lineKey(command);
     const before = lines.get(key);
+    // A collapsed line calls its first entry, so a prompt on a later one would never be asked.
+    if (before && entry.collapse && entry.collapse === before.collapse && entry.confirmPrompt) {
+      fail(`confirmPrompt is on an entry collapsed into ${before.path}, which the command calls; put it on that first entry`);
+    }
     if (!before) lines.set(key, entry);
     else if (entry.collapse && entry.collapse === before.collapse) warnings.push({ entry: tagOf(entry), message: `collapsed with ${before.path}: one command, two endpoints` });
     else fail(`same command line as ${before.path}`);

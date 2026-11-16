@@ -1,6 +1,6 @@
 // Confirmation before a command acts. A command that asks first declares its question (a generated command through
-// its command-map entry's `confirmPrompt`, a static one through `confirmable`), and every one of them goes through
-// requireConfirmation: same prompt, same refusals, same --confirm.
+// its command-map entry's `confirmPrompt`), and every one of them goes through requireConfirmation: same prompt,
+// same refusals, same --confirm. A hand-written command that needs one calls requireConfirmation before it acts.
 //
 // - A person at a terminal (stdin and stderr are TTYs, no agent or CI signal) is asked `[y/N]` on stderr. Only y or yes,
 //   in any case, goes on; no, an empty line, a closed input and no answer within CONFIRM_TIMEOUT_MS all abort.
@@ -9,13 +9,10 @@
 // - Anywhere nobody can answer (no terminal, CI, an agent, or stdin carrying the token or the body) the command is
 //   refused without --confirm, before the token is read and before any request.
 
-import { defineCommand } from "citty";
-import type { ArgsDef, CommandDef } from "citty";
 import { isatty } from "node:tty";
 import { CONFIRM_TIMEOUT_MS } from "./constants.ts";
 import { CliError } from "./errors.ts";
 import type { IOStreams } from "./io.ts";
-import { realIO } from "./io.ts";
 import { acceptsFlag } from "./flags.ts";
 import { promptConfirm } from "./prompt.ts";
 import type { Confirm } from "./prompt.ts";
@@ -72,30 +69,4 @@ export function retiredFlagError(unknown: string | undefined): CliError | undefi
   const key = unknown.slice(2);
   if (!acceptsFlag("yes", key) && !(key.startsWith("no-") && acceptsFlag("yes", key.slice(3)))) return undefined;
   return new CliError("usage.flag", `${unknown} was renamed to --confirm.`, "Pass --confirm to run without the confirmation prompt. Nothing was sent.");
-}
-
-// A hand-written citty command that asks `prompt` before its run, the way a generated command asks its confirmPrompt.
-// Takes a command of any args shape: the wrapper only adds --confirm to it.
-export function confirmable(command: CommandDef<any>, prompt: string, deps: { io?: () => IOStreams; ask?: Confirm; stdinIsTTY?: () => boolean } = {}): CommandDef {
-  const meta = command.meta as { name?: string } | undefined;
-  const name = `deel ${meta?.name ?? ""}`.trim();
-  const args: ArgsDef = { ...(command.args as ArgsDef | undefined), [CONFIRM_FLAG]: { type: "boolean", description: CONFIRM_DESCRIPTION } };
-  return defineCommand({
-    ...command,
-    args,
-    async run(ctx) {
-      const given = ctx.args as Record<string, unknown>;
-      await requireConfirmation({
-        name,
-        group: meta?.name ?? "command",
-        prompt,
-        values: given,
-        confirmed: given[CONFIRM_FLAG] === true,
-        io: (deps.io ?? realIO)(),
-        stdinInUse: resolveStdinInUse(prompt, given, deps.stdinIsTTY),
-        ask: deps.ask,
-      });
-      return command.run?.(ctx as never);
-    },
-  });
 }

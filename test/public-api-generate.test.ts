@@ -464,3 +464,20 @@ test("an entry's confirmPrompt is carried into its descriptor, and an entry with
   assert.equal(byMethod.DELETE.confirmPrompt, "Delete thing {thing_id}? It cannot be restored.");
   assert.equal("confirmPrompt" in byMethod.GET, false);
 });
+
+test("a confirmPrompt placeholder must be a path param as the definition spells it", () => {
+  const definitions = parseDefinitions([def("DELETE", "/things/{thing_id}")]);
+  const map = [{ ...plainEntry(definitions[0]), path: "/things/{id}", command: "deel things delete <id>", confirmPrompt: "Delete thing {id}?" }];
+  const { errors } = generate(definitions, options({ map }));
+  assert.ok(errors.some((e) => /confirmPrompt names \{id\}, which the call fills as \{thing_id\}/.test(e)), errors.join("\n"));
+});
+
+test("a confirmPrompt on an endpoint collapsed into another is an error, since it would never be asked", () => {
+  const definitions = parseDefinitions([def("GET", "/things/{thing_id}/a"), def("GET", "/things/{thing_id}/b")]);
+  const map = [
+    { ...plainEntry(definitions[0]), command: "deel things get <thing_id>", collapse: "k" },
+    { ...plainEntry(definitions[1]), command: "deel things get <thing_id>", collapse: "k", confirmPrompt: "Get {thing_id}?" },
+  ];
+  const { errors } = generate(definitions, options({ map }));
+  assert.ok(errors.some((e) => /GET \/things\/\{thing_id\}\/b has a confirmPrompt but is collapsed into/.test(e)), errors.join("\n"));
+});

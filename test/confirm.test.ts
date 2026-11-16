@@ -1,8 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { defineCommand, runCommand } from "citty";
 import { run } from "../src/cli.ts";
-import { confirmable, fillPrompt, isStdinInUse, requireConfirmation, resolveStdinInUse, retiredFlagError } from "../src/core/confirm.ts";
+import { fillPrompt, isStdinInUse, requireConfirmation, resolveStdinInUse, retiredFlagError } from "../src/core/confirm.ts";
 import type { ConfirmationRequest } from "../src/core/confirm.ts";
 import { captureIO } from "../src/core/io.ts";
 import { CliError } from "../src/core/errors.ts";
@@ -130,25 +129,6 @@ test("retiredFlagError names --confirm for --yes in any spelling the parser read
   for (const flag of [undefined, "--yess", "--confirm", "-y"]) assert.equal(retiredFlagError(flag), undefined, String(flag));
 });
 
-test("confirmable asks before a static command's run, and --confirm skips the question", async () => {
-  let runs = 0;
-  const base = defineCommand({ meta: { name: "purge" }, args: { target: { type: "string" } }, run: () => void runs++ });
-  const questions: string[] = [];
-  const asking = confirmable(base, "Purge {target}? This cannot be undone.", { io: person, ask: async (q) => (questions.push(q), true), stdinIsTTY: () => true });
-  await runCommand(asking, { rawArgs: ["--target", "cache"] });
-  assert.deepEqual(questions, ["Purge cache? This cannot be undone. [y/N] "]);
-  assert.equal(runs, 1);
-
-  const refusing = confirmable(base, "Purge {target}?", { io: nobody, ask: never, stdinIsTTY: () => false });
-  await assert.rejects(() => runCommand(refusing, { rawArgs: [] }), (err: CliError) => err.code === "usage.confirm");
-  await runCommand(refusing, { rawArgs: ["--confirm"] });
-  assert.equal(runs, 2);
-
-  const declining = confirmable(base, "Purge?", { io: person, ask: async () => false, stdinIsTTY: () => true });
-  await assert.rejects(() => runCommand(declining, { rawArgs: [] }), (err: CliError) => err.code === "purge.aborted");
-  assert.equal(runs, 2);
-});
-
 // End to end through run(): the test process has no TTY, so nobody can answer a prompt.
 async function runWithFetch(argv: string[]): Promise<{ requests: { method: string; url: string }[]; error?: CliError; out: string }> {
   const requests: { method: string; url: string }[] = [];
@@ -214,6 +194,14 @@ test("--yes on a command that asks nothing is refused too, so an old script neve
   assert.equal(error?.code, "usage.flag");
   assert.match(error?.message ?? "", /renamed to --confirm/);
   assert.equal(requests.length, 0);
+});
+
+test("a confirming command refuses before it reads --input, so a bad or stdin body never hides the refusal", async () => {
+  for (const input of ["-", "not a valid body", "file:///nonexistent/body.json"]) {
+    const { requests, error } = await runWithFetch(["dev", "tokens", "revocations", "create", "tok_1", "--input", input, "--beta"]);
+    assert.equal(error?.code, "usage.confirm", input);
+    assert.equal(requests.length, 0, input);
+  }
 });
 
 test("--token-stdin on a confirming command refuses before reading the token or sending anything", async () => {
