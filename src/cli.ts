@@ -13,7 +13,7 @@ export { unknownFlag };
 import { parseInput } from "./core/input.ts";
 import { createContext } from "./core/context.ts";
 import { execute } from "./core/executor.ts";
-import { requireConfirmation, resolveStdinInUse, retiredFlagError } from "./core/confirm.ts";
+import { CONFIRM_DESCRIPTION, CONFIRM_FLAG, requireConfirmation, resolveStdinInUse, retiredFlagError } from "./core/confirm.ts";
 import { realIO } from "./core/io.ts";
 import { envelope, render } from "./core/output.ts";
 import { versionListing, versionTable } from "./core/versions.ts";
@@ -56,6 +56,8 @@ function argsForDescriptor(descriptor: Descriptor): ArgsDef {
     args[selector.flag] = selector.value === undefined ? { type: "boolean" } : { type: "string" };
   }
   for (const scope of descriptor.form?.scopes ?? []) args[scope.flag] = { type: "string", required: true };
+  // Only a command that asks first takes --confirm; on any other one it is an unknown flag, refused like any other.
+  if (descriptor.confirmPrompt) args[CONFIRM_FLAG] = { type: "boolean", description: CONFIRM_DESCRIPTION };
   return args;
 }
 
@@ -118,7 +120,7 @@ async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<st
 // those of `descriptor`, such as the selectors of its variants; --base-url is hidden from help but always accepted.
 function refuseUnknownFlag(rawArgs: string[], descriptor: Descriptor, extra: string[] = []): void {
   const unknown = unknownFlag(rawArgs, [...Object.keys(argsForDescriptor(descriptor)), ...extra, "base-url"]);
-  const retired = retiredFlagError(unknown);
+  const retired = descriptor.confirmPrompt ? retiredFlagError(unknown) : undefined;
   if (retired) throw retired;
   if (unknown) {
     const named = descriptor.variant ? ` --${descriptor.variant}` : "";
@@ -204,7 +206,7 @@ function formCommand(descriptors: Descriptor[]): CommandDef {
       // flag only a sibling endpoint takes is not: it would be accepted and then dropped, and the call would run without it.
       const siblingSwitches = descriptors.flatMap((d) => (d.form?.selectors ?? []).filter((s) => s.value === undefined).map((s) => s.flag));
       const unknown = unknownFlag(rawArgs, [...Object.keys(defs), ...siblingSwitches]);
-      const retired = retiredFlagError(unknown);
+      const retired = descriptor.confirmPrompt ? retiredFlagError(unknown) : undefined;
       if (retired) throw retired;
       if (unknown) {
         const owner = descriptors.find((d) => d !== descriptor && unknownFlag([unknown], Object.keys(argsForDescriptor(d))) === undefined);

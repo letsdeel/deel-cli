@@ -219,7 +219,6 @@ export function printGlobalOptions(): void {
   const out = process.stdout.write.bind(process.stdout);
   out(`\nGLOBAL OPTIONS (available on every action)\n`);
   for (const [name, argDef] of Object.entries(commonArgs)) {
-    if (name === CONFIRM_FLAG) continue; // listed on the commands that ask first
     const def = argDef as { type?: string; description?: string };
     const hint = def.type === "string" ? `=<${name.replace(/-/g, "_")}>` : "";
     out(`  ${`--${name}${hint}`.padEnd(24)}  ${def.description ?? ""}\n`);

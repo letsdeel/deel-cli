@@ -41,7 +41,8 @@ export type GenerateOptions = {
 
 // Flags every command already has. A query param with one of these names keeps
 // its API name but gets the flag "<name>-param" (e.g. a `fields` query param).
-export const GLOBAL_FLAGS = new Set([...Object.keys(commonArgs), "help", "h", "version", "v", "base-url", "beta", "versions"]);
+// `confirm` is not in commonArgs (only a command that asks first takes it) but stays reserved, so no endpoint param can take its name.
+export const GLOBAL_FLAGS = new Set([...Object.keys(commonArgs), "help", "h", "version", "v", "base-url", "beta", "versions", "confirm"]);
 
 function mapType(schema: AnyObj | undefined): ScalarType {
   const type = schema?.type;

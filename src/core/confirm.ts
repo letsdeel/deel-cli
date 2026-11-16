@@ -4,8 +4,8 @@
 //
 // - A person at a terminal (stdin and stderr are TTYs, no agent or CI signal) is asked `[y/N]` on stderr. Only y or yes,
 //   in any case, goes on; no, an empty line, a closed input and no answer within CONFIRM_TIMEOUT_MS all abort.
-// - --confirm treats the question as answered yes, in every environment. It is a global flag, a no-op on a command
-//   that asks nothing, so a script or an agent can always pass it.
+// - --confirm treats the question as answered yes, in every environment. Only a command that asks first takes it;
+//   any other command refuses it as an unknown flag, so --confirm never reads as having done something.
 // - Anywhere nobody can answer (no terminal, CI, an agent, or stdin carrying the token or the body) the command is
 //   refused without --confirm, before the token is read and before any request.
 
@@ -62,8 +62,8 @@ export function resolveStdinInUse(prompt: string | undefined, args: { input?: un
   return isStdinInUse(args, stdinIsTTY());
 }
 
-// --yes was the flag before --confirm. A script that still passes it is refused with the new name instead of being
-// told only that the flag is unknown; it is never read as a yes.
+// --yes was the flag before --confirm, on the commands that ask first. A script that still passes it to one of them is
+// refused with the new name instead of being told only that the flag is unknown; it is never read as a yes.
 export function retiredFlagError(unknown: string | undefined): CliError | undefined {
   if (!unknown?.startsWith("--")) return undefined;
   const key = unknown.slice(2);

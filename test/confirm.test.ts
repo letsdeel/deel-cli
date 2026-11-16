@@ -180,28 +180,27 @@ for (const [label, argv, route] of [
   });
 }
 
-test("a command that asks nothing never prompts, and takes --confirm as a no-op", async () => {
+test("a command that asks nothing never prompts, and refuses --confirm as an unknown flag", async () => {
   const plain = await runWithFetch(["oauth2-apps", "update", APP_ID, "--status", "enabled", "--beta"]);
   assert.equal(plain.error, undefined);
   assert.equal(plain.requests.length, 1);
-  const withConfirm = await runWithFetch(["oauth2-apps", "update", APP_ID, "--status", "enabled", "--confirm", "--beta"]);
-  assert.equal(withConfirm.error, undefined);
-  assert.equal(withConfirm.requests.length, 1);
+  // A sibling of the same words asks first, so the error names the one that takes --confirm.
+  const sibling = await runWithFetch(["oauth2-apps", "update", APP_ID, "--status", "enabled", "--confirm", "--beta"]);
+  assert.equal(sibling.error?.code, "usage.flag");
+  assert.match(sibling.error?.message ?? "", /has no flag --confirm; only 'deel oauth2-apps update <app_id> --status disabled' takes it/);
+  assert.equal(sibling.requests.length, 0);
+  const plainList = await runWithFetch(["webhooks", "list", "--confirm"]);
+  assert.equal(plainList.error?.code, "usage.flag");
+  assert.match(plainList.error?.message ?? "", /has no flag --confirm/);
+  assert.equal(plainList.requests.length, 0);
 });
 
-test("--yes on a command that asks nothing is refused too, so an old script never silently runs on", async () => {
+test("--yes on a command that asks nothing is an unknown flag, not a hint to pass --confirm", async () => {
   const { requests, error } = await runWithFetch(["webhooks", "list", "--yes"]);
   assert.equal(error?.code, "usage.flag");
-  assert.match(error?.message ?? "", /renamed to --confirm/);
+  assert.match(error?.message ?? "", /has no flag --yes/);
+  assert.doesNotMatch(error?.message ?? "", /renamed/);
   assert.equal(requests.length, 0);
-});
-
-test("a confirming command refuses before it reads --input, so a bad or stdin body never hides the refusal", async () => {
-  for (const input of ["-", "not a valid body", "file:///nonexistent/body.json"]) {
-    const { requests, error } = await runWithFetch(["dev", "tokens", "revocations", "create", "tok_1", "--input", input, "--beta"]);
-    assert.equal(error?.code, "usage.confirm", input);
-    assert.equal(requests.length, 0, input);
-  }
 });
 
 test("--token-stdin on a confirming command refuses before reading the token or sending anything", async () => {

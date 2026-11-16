@@ -300,9 +300,9 @@ Delete webhook wh_123? Deel stops sending its events, and the subscription canno
 
 Only `y` or `yes` (any case) goes on. `n`, an empty line, Ctrl-D, or no answer within 60 seconds aborts the command, and nothing is sent. Today these commands ask first: `deel webhooks delete`, `deel dev tokens revocations create` and `deel oauth2-apps update --status disabled`. `--help` on each shows its question under ASKS FIRST, and `--help --json` gives it as `confirmPrompt`.
 
-`--confirm` answers the question in advance: the command runs without asking. A script, a CI job or an agent passes it, because nobody there can answer. Without a terminal (stdin or stderr is not a TTY), in CI, under an agent (`CLAUDE_CODE`, `CURSOR`, `CODEX`), or when stdin carries the token or the body (`--token-stdin`, `--input -`), a command that asks first refuses without `--confirm`. It refuses before the token is read and before any request. Every command accepts `--confirm`, and a command that asks nothing ignores it, so a script can always pass it. Piping stdout (`| jq`) still prompts, because the question and the answer go through stderr and stdin.
+`--confirm` answers the question in advance: the command runs without asking. A script, a CI job or an agent passes it, because nobody there can answer. Without a terminal (stdin or stderr is not a TTY), in CI, under an agent (`CLAUDE_CODE`, `CURSOR`, `CODEX`), or when stdin carries the token or the body (`--token-stdin`, `--input -`), a command that asks first refuses without `--confirm`. It refuses before the token is read and before any request. Only a command that asks first takes `--confirm`. Any other command refuses it as an unknown flag, like any flag it doesn't take, so a script never passes `--confirm` to a command that wouldn't have asked. Piping stdout (`| jq`) still prompts, because the question and the answer go through stderr and stdin.
 
-`--confirm` replaces `--yes`. A command given `--yes` fails with a hint that names `--confirm`, and nothing is sent.
+`--confirm` replaces `--yes`. A command that asks first and is given `--yes` fails with a hint that names `--confirm`, and nothing is sent.
 
 ## Idempotency
 

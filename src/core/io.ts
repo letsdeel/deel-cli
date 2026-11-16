@@ -15,8 +15,15 @@ export type IOStreams = {
   canPrompt: boolean; // a person can answer a [y/N] question: stdin and stderr are terminals and no agent/CI signal is set
 };
 
-function isAgentEnv(env: NodeJS.ProcessEnv): boolean {
+export function isAgentEnv(env: NodeJS.ProcessEnv): boolean {
   return AGENT_ENV_SIGNALS.some((signal) => (signal === "CI" ? env.CI === "true" : Boolean(env[signal])));
+}
+
+// Whether a person can answer a [y/N] question: the answer is read from stdin and the question is asked on stderr, so
+// both must be terminals, and nobody answers under CI or an agent even when it gives the CLI a pty. stdout doesn't
+// count: `| jq` still prompts.
+export function canPromptFrom(stdinIsTTY: boolean, stderrIsTTY: boolean, env: NodeJS.ProcessEnv): boolean {
+  return stdinIsTTY && stderrIsTTY && !isAgentEnv(env);
 }
 
 // Real streams backed by the process. Interactive only on a TTY with no agent/CI signal. A prompt is read from stdin
@@ -31,7 +38,7 @@ export function realIO(): IOStreams {
     readStdin: () => readFileSync(0, "utf8"),
     isTTY,
     interactive: isTTY && !agent,
-    canPrompt: isatty(0) && isatty(2) && !agent,
+    canPrompt: canPromptFrom(isatty(0), isatty(2), process.env),
   };
 }
 

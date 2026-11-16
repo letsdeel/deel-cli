@@ -342,3 +342,21 @@ test("a flag that takes a value, typed with none, stops every command before any
   }
   assert.equal(sent, 0);
 });
+
+test("every auth and job subcommand refuses a flag it doesn't declare, --confirm included, before it runs", async () => {
+  const fetches: string[] = [];
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string) => (fetches.push(String(url)), new Response("{}", { status: 200 }))) as typeof fetch;
+  try {
+    for (const argv of [["auth", "status"], ["auth", "login", "--no-browser"], ["auth", "logout"], ["job", "list"], ["job", "status", "j_1"]]) {
+      for (const flag of ["--confirm", "--bogus"]) {
+        const { error } = await capture([...argv, flag]);
+        assert.equal(error?.code, "usage.flag", `${argv.join(" ")} ${flag}`);
+        assert.equal(error?.message, `'deel ${argv.slice(0, 2).join(" ")}' has no flag ${flag}.`);
+      }
+    }
+    assert.deepEqual(fetches, []);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
