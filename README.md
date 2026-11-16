@@ -348,10 +348,10 @@ If a beta graduates (or ends) after this CLI was released, the API rejects `X-Be
 
 ### App listing
 
-An app's page in the App Store is its listing. `deel oauth2-apps listing get <app_id>` reads it: whether it is live (`status`), the revision you are working on or that is under review (`latest_revision.status` is `draft`, `in_review`, `published` or `rejected`, with the reviewer's notes when rejected), its content, categories and the logo. `deel app-store categories list` lists the category ids a listing can use. Both need `--beta`.
+An app's page in the App Store is its listing. `deel oauth2-apps listings get <app_id>` reads it: whether it is live (`status`), the revision you are working on or that is under review (`latest_revision.status` is `draft`, `in_review`, `published` or `rejected`, with the reviewer's notes when rejected), its content, categories and the logo. `deel app-store categories list` lists the category ids a listing can use. Both need `--beta`.
 
 ```bash
-deel oauth2-apps listing get <app_id> --beta
+deel oauth2-apps listings get <app_id> --beta
 deel app-store categories list --beta
 ```
 

@@ -35,7 +35,7 @@ function ctxWith(handler: (req: HttpRequest) => HttpResponse) {
   return { ctx, io, seen, out: () => JSON.parse(io.stdout.join("")) };
 }
 
-test("oauth2-apps listing get puts the app id in the path and prints the listing with its nullable fields", async () => {
+test("oauth2-apps listings get puts the app id in the path and prints the listing with its nullable fields", async () => {
   const listing = { app_id: APP_ID, status: "published", latest_revision: { status: "rejected", review_notes: "Add a demo video." }, logo_url: null };
   const { ctx, seen, out } = ctxWith(() => ({ status: 200, headers: {}, text: "", json: { data: listing } }));
   await execute(descriptor("GET", "/oauth2-apps/{app_id}/listing"), { flags: { app_id: APP_ID }, files: {} }, ctx, { output: OUTPUT, debug: false, form: false });
@@ -52,6 +52,6 @@ test("app-store categories list prints the categories", async () => {
 });
 
 test("the listing commands are named by the command map", () => {
-  assert.deepEqual(descriptor("GET", "/oauth2-apps/{app_id}/listing").command, ["oauth2-apps", "listing", "get"]);
+  assert.deepEqual(descriptor("GET", "/oauth2-apps/{app_id}/listing").command, ["oauth2-apps", "listings", "get"]);
   assert.deepEqual(descriptor("GET", "/app-store/categories").command, ["app-store", "categories", "list"]);
 });

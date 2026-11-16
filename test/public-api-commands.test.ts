@@ -388,10 +388,11 @@ test("--help after the arguments shows the endpoint that command line calls, the
   assert.equal(json.usage, "deel ships get <ship> [GLOBAL OPTIONS]");
 });
 
-test("--generate-input needs the endpoint picked first when several share the words", async () => {
-  const group = await callApi(["ships", "reviews", "create", "--generate-input"], fleet.manifest.descriptors);
-  assert.notEqual(group.code, EXIT.OK);
-  assert.match(group.err, /Specify a variant first: \n  deel ships reviews create --bulk/);
+test("--generate-input on words several endpoints share reads the form the bare line calls", async () => {
+  // `deel ships reviews create` with no picking flag calls the single-ship form, so that is the skeleton it prints.
+  const group = await capture(["ships", "reviews", "create", "--generate-input"], fleet.manifest.descriptors);
+  assert.equal(group.code, EXIT.OK);
+  assert.deepEqual(JSON.parse(group.out), { note: "" });
   const picked = await capture(["ships", "reviews", "create", "--bulk", "--generate-input"], fleet.manifest.descriptors);
   assert.equal(picked.code, EXIT.OK);
   assert.deepEqual(JSON.parse(picked.out), { note: "" });
@@ -897,4 +898,13 @@ test("the legacy shifts list and create are picked by --legacy, so the bare line
   const bare = await callApi(["time-tracking", "shifts", "list", "--from", "2026-01-01", "--to", "2026-01-31"], real);
   assert.equal(bare.code, EXIT.OK, bare.err);
   assert.equal(bare.sent[0].url.pathname, "/rest/time-tracking/shifts");
+  // --versions and --generate-input read the form the bare line calls (the beta one); --legacy reads the older one.
+  const versions = await capture(["time-tracking", "shifts", "list", "--versions"], real);
+  assert.equal(versions.code, EXIT.OK, versions.err);
+  assert.equal(JSON.parse(versions.out).data.version, "2026-11-13");
+  const legacyVersions = await capture(["time-tracking", "shifts", "list", "--legacy", "--versions"], real);
+  assert.equal(JSON.parse(legacyVersions.out).data.version, "2026-01-01");
+  const skeleton = await capture(["time-tracking", "shifts", "create", "--generate-input"], real);
+  assert.equal(skeleton.code, EXIT.OK, skeleton.err);
+  assert.ok(Object.keys(JSON.parse(skeleton.out)).length > 0, "the beta create form has a body to skeleton");
 });

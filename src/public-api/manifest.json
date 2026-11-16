@@ -138612,7 +138612,7 @@
   {
    "command": [
     "oauth2-apps",
-    "listing",
+    "listings",
     "get"
    ],
    "method": "GET",
