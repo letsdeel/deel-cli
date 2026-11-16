@@ -152,6 +152,28 @@ test("a string inside an already wrapped data={..} body keeps its spaces and num
 });
 
 test("a body with a declared data field is not treated as already wrapped", () => {
-  const withData: CliParam[] = [{ name: "data", in: "body", type: "string", required: false }];
-  assert.deepEqual(parseInput("data=a b c", withData), { data: "a b c" });
+  const withData: CliParam[] = [
+    { name: "data", in: "body", type: "object", required: false, properties: [{ name: "reason", in: "body", type: "string", required: false }] },
+  ];
+  // Restored through the declared field's own properties; unwrapping it against the top-level params would leave a list.
+  assert.deepEqual(parseInput("data={reason=a b}", withData), { data: { reason: "a b" } });
+});
+
+test("only a body that is just data={..} is unwrapped, so a sibling field is still checked", () => {
+  assert.throws(() => parseInput("data={reason=Payroll sync},currency=US D", props), /currency must be one of/);
+});
+
+test("an already wrapped JSON body is coerced and checked like an unwrapped one", () => {
+  assert.deepEqual(parseInput('{"data":{"amount":"5"}}', props), { data: { amount: 5 } });
+  assert.throws(() => parseInput('{"data":{"amount":"abc"}}', props), /amount expects a number/);
+  assert.throws(() => parseInput('{"data":{"currency":"YEN"}}', props), /currency must be one of/);
+});
+
+test("a value whose closing bracket is not the opening one's pair stays a string", () => {
+  assert.deepEqual(parseInput("reason={a]", props), { reason: "{a]" });
+  assert.deepEqual(parseInput("reason=[a}", props), { reason: "[a}" });
+});
+
+test("an escaped closing bracket does not close the value", () => {
+  assert.deepEqual(parseInput("reason=[a\\]", props), { reason: "[a]" });
 });

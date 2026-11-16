@@ -111,7 +111,7 @@
   "test/help.test.ts": "43b9b527cf3dbcd1f99276afeaf932120879cf400d4852b84bc27dd607115015",
   "test/http.test.ts": "de440abb96de971194039898371b3a4e6ff71cb8fc3dbef6e96b93780e15188a",
   "test/idempotency.test.ts": "bd8acc0105b3b361ba2f43e5622de651628574beab487c14bfc6a0fd91cb1618",
-  "test/input.test.ts": "2a1177aa088e8722554a33d1a000f24cf0d73ecf5fcccfa59be8c3622df084bc",
+  "test/input.test.ts": "b18c3c155937a36f83648e2cf83c2848aab17a05490a61135fdd5611ac446a56",
   "test/install.test.ts": "f68a3ee5f08eb2172e9c12823ed46e120ea156fc2695abc77626e32dd57b826e",
   "test/jobs.test.ts": "0a37b7204e5c5f9c2ffef3efa062256f6d1e061885189b2809698c3baf36bc13",
   "test/keychain.test.ts": "0f1fad8ae0d351ffecc051e551f0c5ad6e9be263e6ff1246589eae2dbf2f8856",
