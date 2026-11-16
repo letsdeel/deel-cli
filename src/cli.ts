@@ -241,8 +241,10 @@ function formCommand(descriptors: Descriptor[]): CommandDef {
           owner ? "Pick that endpoint's flags, or drop the flag. Nothing was sent." : "Run it with --help to see its flags.",
         );
       }
-      // A flag that takes a value and has none would swallow the next flag as its value (or send it empty).
-      const missing = flagMissingValue(rawArgs, [...descriptor.params.filter((param) => param.type !== "boolean").map(flagOf), ...form.scopes.map((scope) => scope.flag), ...form.selectors.filter((s) => s.value !== undefined).map((s) => s.flag)]);
+      // A flag that takes a value and has none would swallow the next flag as its value (or send it empty). A path
+      // parameter is an argument, not a flag, so a switch selector named like it (--external-id) is not one of them.
+      const positional = new Set(form.positionals.map((p) => p.param));
+      const missing = flagMissingValue(rawArgs, [...descriptor.params.filter((param) => param.type !== "boolean" && !positional.has(param.name)).map(flagOf), ...form.scopes.map((scope) => scope.flag), ...form.selectors.filter((s) => s.value !== undefined).map((s) => s.flag)]);
       if (missing) throw new CliError("usage.flag_value", `--${missing} needs a value.`, `Write --${missing}=<value>; run it with --help to see the values.`);
       const args = parseArgs(rawArgs, defs) as Args & { _: string[] };
       const given = args._.map(String);

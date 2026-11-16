@@ -12,7 +12,7 @@ import { EXIT } from "../src/core/errors.ts";
 import { flagOf } from "../src/core/flags.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
 import { manifest as handPicked } from "../src/manifest.generated.ts";
-import { generatedDescriptors, loadGeneratedDescriptors, matchForm, selectForm, setGeneratedDescriptorsForTests } from "../src/public-api/commands.ts";
+import { generatedDescriptors, loadGeneratedDescriptors, matchForm, selectForm, setGeneratedDescriptorsForTests, usageOf } from "../src/public-api/commands.ts";
 import { parseDefinitions } from "../scripts/public-api/definitions.ts";
 import { generate, reservedClashes } from "../scripts/public-api/generate.ts";
 
@@ -819,4 +819,55 @@ test("every README example of a command the manifest marks beta carries --beta",
   }
   assert.ok(checked >= 5, `only ${checked} beta examples found; the README check has stopped matching`);
   assert.deepEqual(missing, []);
+});
+
+test("the client immigration cases and the external-ID shifts are picked by a flag, so the bare names stay free for the endpoints that supersede them", async () => {
+  const real = await loadGeneratedDescriptors();
+  const group = (words: string) => real.filter((descriptor) => descriptor.command.join(" ") === words);
+  const usageFor = (method: string, path: string) => {
+    const found = real.find((descriptor) => descriptor.method === method && descriptor.path === path);
+    assert.ok(found, `${method} ${path} is in the manifest`);
+    return usageOf(found);
+  };
+  assert.equal(usageFor("GET", "/immigration/client/cases"), "deel immigration cases list --as client");
+  assert.equal(usageFor("GET", "/immigration/client/cases/{id}"), "deel immigration cases get <id> --as client");
+  assert.equal(usageFor("GET", "/time_tracking/shifts/{external_id}"), "deel time-tracking shifts get <external_id> --external-id");
+  assert.equal(usageFor("PATCH", "/time_tracking/shifts/{external_id}"), "deel time-tracking shifts update <external_id> --external-id");
+  assert.equal(usageFor("DELETE", "/time_tracking/shifts/{external_id}"), "deel time-tracking shifts delete <external_id> --external-id");
+
+  // The flag form calls the endpoint, and the bare line is refused until an endpoint takes the bare words.
+  const cases = group("immigration cases list");
+  assert.equal(selectForm(cases, ["--as", "client"]).path, "/immigration/client/cases");
+  assert.equal(selectForm(cases, ["--as", "worker"]).path, "/immigration/workers/cases");
+  assert.throws(() => selectForm(cases, []), /match no single form of 'deel immigration cases list'/);
+  const caseGets = group("immigration cases get");
+  assert.equal(selectForm(caseGets, ["--as", "client"]).path, "/immigration/client/cases/{id}");
+  assert.throws(() => selectForm(caseGets, []), /match no single form of 'deel immigration cases get'/);
+  for (const [verb, method] of [["get", "GET"], ["update", "PATCH"], ["delete", "DELETE"]] as const) {
+    const shifts = group(`time-tracking shifts ${verb}`);
+    const picked = selectForm(shifts, ["--external-id"]);
+    assert.deepEqual([picked.method, picked.path], [method, "/time_tracking/shifts/{external_id}"]);
+    assert.throws(() => selectForm(shifts, []), new RegExp(`match no single form of 'deel time-tracking shifts ${verb}'`));
+  }
+});
+
+test("run() calls the flag forms of the renamed commands, the switch last or not, and refuses the bare lines before any request", async () => {
+  const real = await loadGeneratedDescriptors();
+  const get = await callApi(["time-tracking", "shifts", "get", "s1", "--external-id"], real);
+  assert.equal(get.code, EXIT.OK, get.err);
+  assert.equal(get.sent[0].url.pathname, "/rest/time_tracking/shifts/s1");
+  const del = await callApi(["time-tracking", "shifts", "delete", "s1", "--external-id", "--raw"], real);
+  assert.equal(del.code, EXIT.OK, del.err);
+  assert.deepEqual([del.sent[0].method, del.sent[0].url.pathname], ["DELETE", "/rest/time_tracking/shifts/s1"]);
+  const client = await callApi(["immigration", "cases", "list", "--as", "client"], real);
+  assert.equal(client.code, EXIT.OK, client.err);
+  assert.equal(client.sent[0].url.pathname, "/rest/immigration/client/cases");
+  const clientGet = await callApi(["immigration", "cases", "get", "c1", "--as", "client"], real);
+  assert.equal(clientGet.sent[0].url.pathname, "/rest/immigration/client/cases/c1");
+  for (const argv of [["time-tracking", "shifts", "get", "s1"], ["immigration", "cases", "list"]]) {
+    const bare = await callApi(argv, real);
+    assert.notEqual(bare.code, EXIT.OK);
+    assert.match(bare.err, /match no single form/);
+    assert.equal(bare.sent.length, 0);
+  }
 });
