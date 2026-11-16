@@ -272,6 +272,8 @@ const fleetDefinitions = parseDefinitions(
     ["POST", "/fleet/{ship_id}/reviews", []],
     ["GET", "/fleet/benefits", [{ name: "country_code", in: "query", required: true, schema: { type: "string" } }, { name: "team", in: "query", schema: { type: "string" } }]],
     ["GET", "/gp/crews/{crew_id}/ships", []],
+    ["GET", "/fleet/{ship_id}/memos", []],
+    ["GET", "/fleet/crews/{crew_id}/memos", []],
     ["GET", "/fleet/{ship_id}/logs", [
       { name: "since", in: "query", required: true, schema: { type: "string" } },
       { name: "level", in: "query", schema: { type: "string", enum: ["info", "error"] } },
@@ -293,13 +295,15 @@ const fleet = generate(fleetDefinitions, {
     { method: "POST", path: "/fleet/{ship_id}/reviews", command: "deel ships reviews create <ship>" },
     { method: "GET", path: "/fleet/benefits", command: "deel ships benefits list --country <country>" },
     { method: "GET", path: "/gp/crews/{crew_id}/ships", command: "deel ships list --crew <crew> [--worker-type gp]" },
+    { method: "GET", path: "/fleet/{ship_id}/memos", command: "deel ships memos list --ship <ship>" },
+    { method: "GET", path: "/fleet/crews/{crew_id}/memos", command: "deel ships memos list --crew <crew>" },
     { method: "GET", path: "/fleet/{ship_id}/logs", command: "deel ships logs list <ship>" },
   ],
 });
 
 test("the fleet fixture generates cleanly", () => {
   assert.deepEqual(fleet.errors, []);
-  assert.equal(fleet.manifest.descriptors.length, 8);
+  assert.equal(fleet.manifest.descriptors.length, 10);
 });
 
 test("the bare command calls the endpoint whose path names no worker type, and --worker-type picks the typed one", async () => {
@@ -906,5 +910,22 @@ test("the legacy shifts list and create are picked by --legacy, so the bare line
   assert.equal(JSON.parse(legacyVersions.out).data.version, "2026-01-01");
   const skeleton = await capture(["time-tracking", "shifts", "create", "--generate-input"], real);
   assert.equal(skeleton.code, EXIT.OK, skeleton.err);
-  assert.ok(Object.keys(JSON.parse(skeleton.out)).length > 0, "the beta create form has a body to skeleton");
+  assert.ok("breaks" in JSON.parse(skeleton.out), "the bare line reads the beta form, which takes one shift's fields");
+  const legacySkeleton = await capture(["time-tracking", "shifts", "create", "--legacy", "--generate-input"], real);
+  assert.deepEqual(Object.keys(JSON.parse(legacySkeleton.out)).sort(), ["contract_id", "shifts"], "--legacy reads the older form, which takes a list of shifts");
+});
+
+test("--versions and --generate-input still ask for a flag when every form needs one, and --help still lists the forms", async () => {
+  // `deel ships memos list` has no form without a picking flag, so there is no bare line to read.
+  const versions = await callApi(["ships", "memos", "list", "--versions"], fleet.manifest.descriptors);
+  assert.notEqual(versions.code, EXIT.OK);
+  assert.match(versions.err, /has several endpoints; pick one with the flags of one of:\n {2}deel ships memos list --crew <crew>\n {2}deel ships memos list --ship <ship>/);
+  const skeleton = await callApi(["ships", "memos", "list", "--generate-input"], fleet.manifest.descriptors);
+  assert.notEqual(skeleton.code, EXIT.OK);
+  assert.match(skeleton.err, /Specify a variant first: \n {2}deel ships memos list --crew <crew>\n {2}deel ships memos list --ship <ship>/);
+  // With --help on the line the words list every form, also next to --versions.
+  const help = await capture(["ships", "get", "--help", "--versions"], fleet.manifest.descriptors);
+  assert.equal(help.code, EXIT.OK, help.err);
+  assert.match(help.out, /deel ships get <ship> --worker-type eor/);
+  assert.match(help.out, /deel ships get <ship>\n/);
 });

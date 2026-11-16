@@ -377,8 +377,10 @@ function descriptorFor(positionals: string[], matched: number, argv: string[]): 
     const valued = candidates.flatMap((d) => valuedFlags(argsForDescriptor(d)));
     if (picked || wordsOf(normalized, valued).length > matched) return matchForm(candidates, normalized);
     // --versions and --generate-input print about one endpoint, and the bare line calls the form that takes no
-    // flag, so they read that form (when there is one) instead of refusing the words alone. --help still lists every form.
-    return argvEnables(argv, "versions") || argvEnables(argv, "generate-input") ? matchForm(candidates, normalized) : undefined;
+    // flag, so they read that form (when there is one) instead of refusing the words alone. With --help on the line
+    // the words still list every form.
+    const help = argv.includes("--help") || argv.includes("-h");
+    return !help && (argvEnables(argv, "versions") || argvEnables(argv, "generate-input")) ? matchForm(candidates, normalized) : undefined;
   }
   for (const candidate of candidates) {
     if (candidate.variant && argvEnables(argv, candidate.variant)) return candidate;
