@@ -871,3 +871,30 @@ test("run() calls the flag forms of the renamed commands, the switch last or not
     assert.equal(bare.sent.length, 0);
   }
 });
+
+test("the legacy shifts list and create are picked by --legacy, so the bare lines call the kebab-case endpoints", async () => {
+  const real = await loadGeneratedDescriptors();
+  const group = (words: string) => real.filter((descriptor) => descriptor.command.join(" ") === words);
+  const usageFor = (method: string, path: string) => {
+    const found = real.find((descriptor) => descriptor.method === method && descriptor.path === path);
+    assert.ok(found, `${method} ${path} is in the manifest`);
+    return usageOf(found);
+  };
+  assert.equal(usageFor("GET", "/v2/time_tracking/shifts"), "deel time-tracking shifts list --legacy");
+  assert.equal(usageFor("POST", "/v2/time_tracking/shifts"), "deel time-tracking shifts create --legacy");
+  assert.equal(usageFor("GET", "/time-tracking/shifts"), "deel time-tracking shifts list");
+  assert.equal(usageFor("POST", "/time-tracking/shifts"), "deel time-tracking shifts create");
+  for (const [verb, legacy, current] of [["list", "GET", "GET"], ["create", "POST", "POST"]] as const) {
+    const shifts = group(`time-tracking shifts ${verb}`);
+    assert.deepEqual(shifts.map((descriptor) => descriptor.method), [legacy, current]);
+    assert.equal(selectForm(shifts, ["--legacy"]).path, "/v2/time_tracking/shifts");
+    assert.equal(selectForm(shifts, []).path, "/time-tracking/shifts");
+  }
+  // run() sends the legacy line to the v2 path and the bare line to the kebab-case one.
+  const legacy = await callApi(["time-tracking", "shifts", "list", "--legacy"], real);
+  assert.equal(legacy.code, EXIT.OK, legacy.err);
+  assert.equal(legacy.sent[0].url.pathname, "/rest/v2/time_tracking/shifts");
+  const bare = await callApi(["time-tracking", "shifts", "list", "--from", "2026-01-01", "--to", "2026-01-31"], real);
+  assert.equal(bare.code, EXIT.OK, bare.err);
+  assert.equal(bare.sent[0].url.pathname, "/rest/time-tracking/shifts");
+});
