@@ -51824,7 +51824,8 @@
     ],
     "scopes": [],
     "selectors": []
-   }
+   },
+   "confirmPrompt": "Invalidate token {token_id}? It stops working at once and cannot be restored."
   },
   {
    "command": [
@@ -139304,7 +139305,8 @@
       "value": "disabled"
      }
     ]
-   }
+   },
+   "confirmPrompt": "Disable app {app_id}? This revokes all consents and tokens; enable does not restore them."
   },
   {
    "command": [
@@ -188025,7 +188027,8 @@
     ],
     "scopes": [],
     "selectors": []
-   }
+   },
+   "confirmPrompt": "Delete webhook {id}? Deel stops sending its events, and the subscription cannot be restored."
   },
   {
    "command": [

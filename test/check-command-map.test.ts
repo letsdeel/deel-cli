@@ -69,6 +69,14 @@ test("an argument is named after the path param it fills, ignoring case", () => 
   assert.deepEqual(failures([entry("GET", "/benefits", "deel benefits offerings list --country <country_code>")]), []);
 });
 
+test("a confirmPrompt may name only path IDs of its endpoint, which every call fills", () => {
+  assert.deepEqual(failures([entry("DELETE", "/things/{thing_id}", "deel things delete <thing_id>", { confirmPrompt: "Delete thing {thing_id}? It cannot be restored." })]), []);
+  assert.deepEqual(failures([entry("DELETE", "/things/{thing_id}", "deel things delete <thing_id>", { confirmPrompt: "Delete {thing} for {owner}?" })]), [
+    "confirmPrompt names {thing}, which is not a path ID of /things/{thing_id}",
+    "confirmPrompt names {owner}, which is not a path ID of /things/{thing_id}",
+  ]);
+});
+
 test("a flag that picks an endpoint never takes a global flag's name", () => {
   assert.match(failures([entry("POST", "/shifts/raw", "deel shifts create --raw")]).join(), /--raw is a global flag/);
   assert.match(failures([entry("GET", "/x/{id}", "deel things get --json <id>")]).join(), /--json is a global flag/);

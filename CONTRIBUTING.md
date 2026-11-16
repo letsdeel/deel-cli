@@ -74,12 +74,13 @@ Each entry in `src/public-api/commands.json` names one endpoint:
 A command line is `deel <domain> <resources…> <verb>`, then one `<param>` per path ID in path order, named as the API path names it, then
 any flags that pick this endpoint among those sharing the words: a scope flag with a label
 (`--contract <contract_id>`), a fixed selector (`--worker-type eor`, `--as worker`), or an optional one in
-brackets (`[--worker-type eor]`, or a switch, `[--bulk]`): the command picks the endpoint with or without it. Two more keys are allowed:
+brackets (`[--worker-type eor]`, or a switch, `[--bulk]`): the command picks the endpoint with or without it. Three more keys are allowed:
 
 | Key | Meaning |
 |-----|---------|
 | `api` | `"scim"` for a SCIM endpoint; REST when absent |
 | `collapse` | entries with the same key are one operation under one command line; the first is called |
+| `confirmPrompt` | the question the command asks `[y/N]` before it sends anything (`--confirm` skips it). Give it to a call that cannot be undone, and say what it does and that it cannot be undone: `"Delete webhook {id}? Deel stops sending its events, and the subscription cannot be restored."`. A `{name}` must be a path ID of the entry, and is filled from the call. The generator copies it into the manifest |
 
 `npm run check:command-map` checks that every entry makes a command the CLI can call: the line parses,
 every path ID has an argument in path order, no flag takes a global flag's name, command lines and

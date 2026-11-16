@@ -16,9 +16,10 @@ export type MapEntry = {
   command: string; // "deel <domain> <resources> <verb> <positionals> [flags]"
   api?: Api; // "rest" when absent
   collapse?: string; // entries with the same key are one command: the first in the map is called
+  confirmPrompt?: string; // the question asked [y/N] before the call is sent: its impact, and whether it can be undone
 };
 
-const ENTRY_FIELDS = new Set(["method", "path", "command", "api", "collapse"]);
+const ENTRY_FIELDS = new Set(["method", "path", "command", "api", "collapse", "confirmPrompt"]);
 
 // Why one parsed map entry can't be used, or undefined: the fields MapEntry types, each as the generator reads it.
 export function entryShapeError(item: unknown): string | undefined {
@@ -29,6 +30,7 @@ export function entryShapeError(item: unknown): string | undefined {
   if (!(entry.path as string).startsWith("/")) return "has a path that does not start with /";
   if (entry.api !== undefined && !isApi(entry.api)) return `has an api that is neither ${Object.keys(APIS).map((api) => `"${api}"`).join(" nor ")}`;
   if (entry.collapse !== undefined && (typeof entry.collapse !== "string" || !entry.collapse)) return "has a collapse that is not a non-empty string";
+  if (entry.confirmPrompt !== undefined && (typeof entry.confirmPrompt !== "string" || !entry.confirmPrompt.trim())) return "has a confirmPrompt that is not a non-empty string";
   const unknown = Object.keys(entry).filter((field) => !ENTRY_FIELDS.has(field));
   return unknown.length > 0 ? `has unknown field(s) ${unknown.join(", ")} (a mistyped name would be ignored)` : undefined;
 }

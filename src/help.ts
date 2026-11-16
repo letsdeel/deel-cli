@@ -11,7 +11,7 @@ import type { CommandDef } from "citty";
 import { withheldFieldFor } from "./core/constants.ts";
 import { domainOf, STAGE_ORDER, usageOf } from "./public-api/commands.ts";
 import { isBetaAt } from "./core/versions.ts";
-import { confirmMessage } from "./core/executor.ts";
+import { CONFIRM_DESCRIPTION, CONFIRM_FLAG } from "./core/confirm.ts";
 
 // Flattens nested object fields into dotted paths (request.amount, ...) so every
 // field is visible, however deep, without changing the CliParam shape callers rely on.
@@ -113,9 +113,9 @@ function buildUsage(descriptor: Descriptor): string {
           ? " [--input <body>]"
           : "";
   const variantFlag = descriptor.variant ? ` --${descriptor.variant}` : "";
-  const yes = confirmMessage(descriptor) ? " [--yes]" : "";
-  if (descriptor.form) return `${usageOf(descriptor)} [GLOBAL OPTIONS]${required ? " " + required : ""}${bodyHint}${yes}`;
-  return `deel ${descriptor.command.join(" ")}${variantFlag} [GLOBAL OPTIONS]${required ? " " + required : ""}${bodyHint}${yes}`;
+  const confirm = descriptor.confirmPrompt ? ` [--${CONFIRM_FLAG}]` : "";
+  if (descriptor.form) return `${usageOf(descriptor)} [GLOBAL OPTIONS]${required ? " " + required : ""}${bodyHint}${confirm}`;
+  return `deel ${descriptor.command.join(" ")}${variantFlag} [GLOBAL OPTIONS]${required ? " " + required : ""}${bodyHint}${confirm}`;
 }
 
 // Machine-readable form of the action contract (same content as `--help`, as JSON)
@@ -156,7 +156,7 @@ function contractOf(descriptor: Descriptor) {
           selectors: form.selectors,
         }
       : {}),
-    ...(confirmMessage(descriptor) ? { confirm: { message: confirmMessage(descriptor), flag: "yes", requiredWhenNonInteractive: true, requiredWhenStdinInUse: true } } : {}),
+    ...(descriptor.confirmPrompt ? { confirmPrompt: { message: descriptor.confirmPrompt, flag: CONFIRM_FLAG, requiredWhenNonInteractive: true, requiredWhenStdinInUse: true } } : {}),
     beta: Boolean(descriptor.beta),
     versions: descriptor.versions ?? null,
     params: flagParams(descriptor).map((param) => ({ name: param.name, ...(param.flag ? { flag: param.flag } : {}), in: param.in, type: param.type, required: param.required, enum: param.enum, description: param.description })),
@@ -199,10 +199,10 @@ function printFormSection(descriptor: Descriptor): void {
   }
 
   const options = flagParams(descriptor);
-  const asksFirst = Boolean(confirmMessage(descriptor));
-  if (options.length || asksFirst) {
+  if (descriptor.confirmPrompt) out(`\nASKS FIRST\n  ${descriptor.confirmPrompt} [y/N]\n`);
+  if (options.length || descriptor.confirmPrompt) {
     out(`\nOPTIONS\n`);
-    if (asksFirst) out(`  --yes   Skip the confirmation prompt (required without a terminal, or when stdin carries the token or the input)\n`);
+    if (descriptor.confirmPrompt) out(`  --${CONFIRM_FLAG}   ${CONFIRM_DESCRIPTION}\n`);
     for (const param of options) {
       const choices = param.enum ? `  [${param.enum.join(" | ")}]` : "";
       const requiredTag = param.required ? "  (required)" : "";
@@ -219,6 +219,7 @@ export function printGlobalOptions(): void {
   const out = process.stdout.write.bind(process.stdout);
   out(`\nGLOBAL OPTIONS (available on every action)\n`);
   for (const [name, argDef] of Object.entries(commonArgs)) {
+    if (name === CONFIRM_FLAG) continue; // listed on the commands that ask first
     const def = argDef as { type?: string; description?: string };
     const hint = def.type === "string" ? `=<${name.replace(/-/g, "_")}>` : "";
     out(`  ${`--${name}${hint}`.padEnd(24)}  ${def.description ?? ""}\n`);

@@ -454,3 +454,13 @@ test("readGeneratedManifest refuses a damaged manifest by name, not with a TypeE
   writeFileSync(manifest, "not json");
   assert.throws(() => readGeneratedManifest(manifest), /manifest\.json: /);
 });
+
+test("an entry's confirmPrompt is carried into its descriptor, and an entry without one asks nothing", () => {
+  const definitions = parseDefinitions([def("DELETE", "/things/{thing_id}"), def("GET", "/things/{thing_id}")]);
+  const map = definitions.map((d) => (d.method === "DELETE" ? { ...plainEntry(d), confirmPrompt: "Delete thing {thing_id}? It cannot be restored." } : plainEntry(d)));
+  const { manifest, errors } = generate(definitions, options({ map }));
+  assert.deepEqual(errors, []);
+  const byMethod = Object.fromEntries(manifest.descriptors.map((d) => [d.method, d]));
+  assert.equal(byMethod.DELETE.confirmPrompt, "Delete thing {thing_id}? It cannot be restored.");
+  assert.equal("confirmPrompt" in byMethod.GET, false);
+});

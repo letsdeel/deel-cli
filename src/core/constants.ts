@@ -58,10 +58,9 @@ export const OUTCOME_ROUTES: Record<string, { field: string; hint: string }> = {
   "POST /webhooks/{}/simulate": { field: "is_success", hint: "The test delivery did not succeed; the printed response shows what the receiver answered." },
 };
 
-// Endpoints that ask before anything is sent, keyed like SEND_ONCE_ROUTES. {param} is filled from the flags and arguments given.
-export const CONFIRM_ROUTES: Record<string, string> = {
-  "POST /oauth2-apps/{}/disable": "Disable app {app_id}? This revokes all consents and tokens; enable does not restore them.",
-};
+// How long a confirmation prompt waits for an answer before it counts as "no". A terminal nobody answers (an agent
+// harness that gives the CLI a pty but sets none of AGENT_ENV_SIGNALS) then ends the run instead of hanging it.
+export const CONFIRM_TIMEOUT_MS = 60_000;
 
 // --- Environment detection ---
 // Presence of any of these (CI must equal "true") forces non-interactive mode.

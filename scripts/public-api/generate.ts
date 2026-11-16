@@ -242,6 +242,7 @@ export function generate(definitions: Definition[], options: GenerateOptions): G
       const bound = bindForm(parsed, primary.path, descriptor.params.filter((p) => p.in === "query").map((p) => p.name));
       if (bound.error) throw new Error(`${mapped.entry.command}: ${bound.error}`);
       descriptor.form = bound.form;
+      if (mapped.entry.confirmPrompt) descriptor.confirmPrompt = mapped.entry.confirmPrompt;
     } catch (error) {
       errors.push((error as Error).message);
       continue;

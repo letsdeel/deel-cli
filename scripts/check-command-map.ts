@@ -65,6 +65,13 @@ export function checkMap(entries: MapEntry[], options: CheckOptions = {}): { fai
     const order = (bound.form?.positionals ?? []).map((p) => entry.path.indexOf(`{${p.param}}`));
     if (order.some((at, i) => i > 0 && at < order[i - 1])) fail("arguments must follow the path order of their IDs");
 
+    // The prompt is filled from the call before it is asked, and only a path ID is sure to be in every call: any other
+    // {name} would be printed as typed, so the person would confirm without seeing what the command acts on.
+    const pathIds = new Set([...entry.path.matchAll(/\{([^}]+)\}/g)].map((m) => m[1]));
+    for (const [, name] of (entry.confirmPrompt ?? "").matchAll(/\{([^}]+)\}/g)) {
+      if (!pathIds.has(name)) fail(`confirmPrompt names {${name}}, which is not a path ID of ${entry.path}`);
+    }
+
     for (const flag of [...command.labels.filter((l) => l.flag).map((l) => l.flag!), ...command.selectors.map((s) => s.flag)]) {
       if (GLOBAL_FLAGS.has(flag)) fail(`--${flag} is a global flag, so it can't pick an endpoint`);
     }

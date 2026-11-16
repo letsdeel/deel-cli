@@ -8,6 +8,7 @@ import { resolveConfig } from "../core/config.ts";
 import type { Config } from "../core/config.ts";
 import { CliError } from "../core/errors.ts";
 import { acceptsFlag, flagMissingValue } from "../core/flags.ts";
+import { CONFIRM_DESCRIPTION, CONFIRM_FLAG } from "../core/confirm.ts";
 import { authFor, resolveToken } from "../core/auth.ts";
 import type { TokenProvider } from "../core/http.ts";
 import type { CredentialStore } from "../core/keychain.ts";
@@ -36,6 +37,8 @@ export const commonArgs: ArgsDef = {
   "log-bodies": { type: "boolean", description: "Include full response bodies in the local log (off by default; also DEEL_LOG_BODIES=1)" },
   debug: { type: "boolean", description: "Print request diagnostics to stderr" },
   "generate-input": { type: "boolean", description: "Print a JSON body skeleton and exit" },
+  // Listed in --help only on the commands that ask first (src/core/confirm.ts); accepted, and a no-op, everywhere else.
+  [CONFIRM_FLAG]: { type: "boolean", description: CONFIRM_DESCRIPTION },
 };
 
 // --fields and --jq are text. A bare one reaches here as `true`; it is refused before the request (refuseMissingValues),
