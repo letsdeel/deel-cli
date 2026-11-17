@@ -840,23 +840,21 @@ test("the client immigration cases and the external-ID shifts are picked by a fl
   assert.equal(usageFor("PATCH", "/time_tracking/shifts/{external_id}"), "deel time-tracking shifts update <external_id> --external-id");
   assert.equal(usageFor("DELETE", "/time_tracking/shifts/{external_id}"), "deel time-tracking shifts delete <external_id> --external-id");
 
-  // The flag form calls the endpoint, and the bare line is refused until an endpoint takes the bare words.
+  // The flag form calls the older endpoint. What the bare line does depends on whether an endpoint has taken the bare
+  // words yet (the sync names those), so it is not asserted here; the forms mechanism has its own tests.
   const cases = group("immigration cases list");
   assert.equal(selectForm(cases, ["--as", "client"]).path, "/immigration/client/cases");
   assert.equal(selectForm(cases, ["--as", "worker"]).path, "/immigration/workers/cases");
-  assert.throws(() => selectForm(cases, []), /match no single form of 'deel immigration cases list'/);
   const caseGets = group("immigration cases get");
   assert.equal(selectForm(caseGets, ["--as", "client"]).path, "/immigration/client/cases/{id}");
-  assert.throws(() => selectForm(caseGets, []), /match no single form of 'deel immigration cases get'/);
   for (const [verb, method] of [["get", "GET"], ["update", "PATCH"], ["delete", "DELETE"]] as const) {
     const shifts = group(`time-tracking shifts ${verb}`);
     const picked = selectForm(shifts, ["--external-id"]);
     assert.deepEqual([picked.method, picked.path], [method, "/time_tracking/shifts/{external_id}"]);
-    assert.throws(() => selectForm(shifts, []), new RegExp(`match no single form of 'deel time-tracking shifts ${verb}'`));
   }
 });
 
-test("run() calls the flag forms of the renamed commands, the switch last or not, and refuses the bare lines before any request", async () => {
+test("run() calls the flag forms of the renamed commands, the switch last or not", async () => {
   const real = await loadGeneratedDescriptors();
   const get = await callApi(["time-tracking", "shifts", "get", "s1", "--external-id"], real);
   assert.equal(get.code, EXIT.OK, get.err);
@@ -869,12 +867,6 @@ test("run() calls the flag forms of the renamed commands, the switch last or not
   assert.equal(client.sent[0].url.pathname, "/rest/immigration/client/cases");
   const clientGet = await callApi(["immigration", "cases", "get", "c1", "--as", "client"], real);
   assert.equal(clientGet.sent[0].url.pathname, "/rest/immigration/client/cases/c1");
-  for (const argv of [["time-tracking", "shifts", "get", "s1"], ["immigration", "cases", "list"]]) {
-    const bare = await callApi(argv, real);
-    assert.notEqual(bare.code, EXIT.OK);
-    assert.match(bare.err, /match no single form/);
-    assert.equal(bare.sent.length, 0);
-  }
 });
 
 test("the legacy shifts list and create are picked by --legacy, so the bare lines call the kebab-case endpoints", async () => {
