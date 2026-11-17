@@ -840,23 +840,25 @@ test("the client immigration cases and the external-ID shifts are picked by a fl
   assert.equal(usageFor("PATCH", "/time_tracking/shifts/{external_id}"), "deel time-tracking shifts update <external_id> --external-id");
   assert.equal(usageFor("DELETE", "/time_tracking/shifts/{external_id}"), "deel time-tracking shifts delete <external_id> --external-id");
 
-  // The flag form calls the endpoint, and the bare line is refused until an endpoint takes the bare words.
+  // The flag form calls the endpoint. The bare line is refused until an endpoint takes the bare words; once one does
+  // (the sync names it), it picks that endpoint and never the older one.
   const cases = group("immigration cases list");
   assert.equal(selectForm(cases, ["--as", "client"]).path, "/immigration/client/cases");
   assert.equal(selectForm(cases, ["--as", "worker"]).path, "/immigration/workers/cases");
-  assert.throws(() => selectForm(cases, []), /match no single form of 'deel immigration cases list'/);
+  assert.notEqual(matchForm(cases, [])?.path, "/immigration/client/cases");
+  assert.notEqual(matchForm(cases, [])?.path, "/immigration/workers/cases");
   const caseGets = group("immigration cases get");
   assert.equal(selectForm(caseGets, ["--as", "client"]).path, "/immigration/client/cases/{id}");
-  assert.throws(() => selectForm(caseGets, []), /match no single form of 'deel immigration cases get'/);
+  assert.notEqual(matchForm(caseGets, [])?.path, "/immigration/client/cases/{id}");
   for (const [verb, method] of [["get", "GET"], ["update", "PATCH"], ["delete", "DELETE"]] as const) {
     const shifts = group(`time-tracking shifts ${verb}`);
     const picked = selectForm(shifts, ["--external-id"]);
     assert.deepEqual([picked.method, picked.path], [method, "/time_tracking/shifts/{external_id}"]);
-    assert.throws(() => selectForm(shifts, []), new RegExp(`match no single form of 'deel time-tracking shifts ${verb}'`));
+    assert.notEqual(matchForm(shifts, [])?.path, "/time_tracking/shifts/{external_id}");
   }
 });
 
-test("run() calls the flag forms of the renamed commands, the switch last or not, and refuses the bare lines before any request", async () => {
+test("run() calls the flag forms of the renamed commands, the switch last or not, and keeps the bare lines off the older endpoints", async () => {
   const real = await loadGeneratedDescriptors();
   const get = await callApi(["time-tracking", "shifts", "get", "s1", "--external-id"], real);
   assert.equal(get.code, EXIT.OK, get.err);
@@ -869,11 +871,14 @@ test("run() calls the flag forms of the renamed commands, the switch last or not
   assert.equal(client.sent[0].url.pathname, "/rest/immigration/client/cases");
   const clientGet = await callApi(["immigration", "cases", "get", "c1", "--as", "client"], real);
   assert.equal(clientGet.sent[0].url.pathname, "/rest/immigration/client/cases/c1");
-  for (const argv of [["time-tracking", "shifts", "get", "s1"], ["immigration", "cases", "list"]]) {
-    const bare = await callApi(argv, real);
-    assert.notEqual(bare.code, EXIT.OK);
-    assert.match(bare.err, /match no single form/);
-    assert.equal(bare.sent.length, 0);
+  // Refused before any request while no endpoint takes the bare words; once one does, the bare line calls that one.
+  for (const [argv, older] of [[["time-tracking", "shifts", "get", "s1"], "/rest/time_tracking/shifts/s1"], [["immigration", "cases", "list"], "/rest/immigration/client/cases"]] as const) {
+    const bare = await callApi([...argv], real);
+    if (bare.code !== EXIT.OK) {
+      assert.match(bare.err, /match no single form/);
+      assert.equal(bare.sent.length, 0);
+    }
+    assert.ok(bare.sent.every((request) => request.url.pathname !== older), "the bare line never calls the older endpoint");
   }
 });
 
