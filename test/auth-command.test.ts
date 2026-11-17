@@ -51,7 +51,7 @@ function memoryStore() {
 function captureIO() {
   const out: string[] = [];
   const err: string[] = [];
-  const io: IOStreams = { out: (text) => out.push(text), err: (text) => err.push(text), readStdin: () => "", isTTY: false, interactive: false };
+  const io: IOStreams = { out: (text) => out.push(text), err: (text) => err.push(text), readStdin: () => "", isTTY: false, interactive: false, canPrompt: false };
   return { io, data: () => (JSON.parse(out.join("")) as { data: Record<string, unknown> }).data, err: () => err.join("") };
 }
 

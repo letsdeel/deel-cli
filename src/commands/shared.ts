@@ -7,7 +7,7 @@ import type { OutputOpts } from "../core/output.ts";
 import { resolveConfig } from "../core/config.ts";
 import type { Config } from "../core/config.ts";
 import { CliError } from "../core/errors.ts";
-import { acceptsFlag, flagMissingValue } from "../core/flags.ts";
+import { acceptsFlag, flagMissingValue, unknownFlag } from "../core/flags.ts";
 import { authFor, resolveToken } from "../core/auth.ts";
 import type { TokenProvider } from "../core/http.ts";
 import type { CredentialStore } from "../core/keychain.ts";
@@ -103,6 +103,14 @@ export function valuedFlags(defs: ArgsDef = commonArgs): string[] {
 // A flag that takes a value, typed with none (`--base-url=`, as the last word, or followed by another flag), must stop
 // the command before anything is sent: citty reads it as `true` or as nothing, so the call would go to prod, carry a
 // made-up key, or fail on `--fields`/`--jq` only after the request has been made (and a write has happened).
+// A hand-written command takes only the flags it declares (plus the hidden --base-url). Any other one is refused
+// before it runs, as the generated commands do: a mistyped or misplaced flag, such as --confirm on a command that asks
+// nothing, would otherwise be dropped and the command run without it.
+export function refuseUnknownFlags(rawArgs: string[], defs: ArgsDef, command: string): void {
+  const unknown = unknownFlag(rawArgs, [...Object.keys(defs), "base-url"]);
+  if (unknown) throw new CliError("usage.flag", `'deel ${command}' has no flag ${unknown}.`, "Run it with --help to see its flags.");
+}
+
 export function refuseMissingValues(rawArgs: string[], defs: ArgsDef = commonArgs): void {
   const missing = flagMissingValue(rawArgs, valuedFlags(defs));
   if (missing) throw new CliError("usage.flag_value", `--${missing} needs a value.`, `Write --${missing}=<value>. Nothing was sent.`);

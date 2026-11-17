@@ -43,6 +43,7 @@ export type Descriptor = {
   beta?: boolean;
   versions?: VersionInfo[]; // every live version of the endpoint, oldest first
   form?: CommandForm; // how the command line picks this endpoint and fills its path params
+  confirmPrompt?: string; // asked [y/N] before anything is sent (--confirm skips it); {param} is filled from the call. From the command map's entry
 };
 
 // Which of Deel's two API surfaces an endpoint belongs to; the only place the pair is spelled out.

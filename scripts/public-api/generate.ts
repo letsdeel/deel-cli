@@ -41,7 +41,8 @@ export type GenerateOptions = {
 
 // Flags every command already has. A query param with one of these names keeps
 // its API name but gets the flag "<name>-param" (e.g. a `fields` query param).
-export const GLOBAL_FLAGS = new Set([...Object.keys(commonArgs), "help", "h", "version", "v", "base-url", "beta", "versions"]);
+// `confirm` is not in commonArgs (only a command that asks first takes it) but stays reserved, so no endpoint param can take its name.
+export const GLOBAL_FLAGS = new Set([...Object.keys(commonArgs), "help", "h", "version", "v", "base-url", "beta", "versions", "confirm"]);
 
 function mapType(schema: AnyObj | undefined): ScalarType {
   const type = schema?.type;
@@ -242,6 +243,13 @@ export function generate(definitions: Definition[], options: GenerateOptions): G
       const bound = bindForm(parsed, primary.path, descriptor.params.filter((p) => p.in === "query").map((p) => p.name));
       if (bound.error) throw new Error(`${mapped.entry.command}: ${bound.error}`);
       descriptor.form = bound.form;
+      if (mapped.entry.confirmPrompt) {
+        // The prompt is filled from the call's own param names, which are the definition's and may be spelled unlike the map's path.
+        const pathNames = descriptor.params.filter((p) => p.in === "path").map((p) => p.name);
+        const unknown = [...mapped.entry.confirmPrompt.matchAll(/\{([^}]+)\}/g)].map((m) => m[1]).filter((name) => !pathNames.includes(name));
+        if (unknown.length) throw new Error(`${mapped.entry.command}: confirmPrompt names ${unknown.map((n) => `{${n}}`).join(", ")}, which the call fills as ${pathNames.map((n) => `{${n}}`).join(", ") || "no path ID"}`);
+        descriptor.confirmPrompt = mapped.entry.confirmPrompt;
+      }
     } catch (error) {
       errors.push((error as Error).message);
       continue;
@@ -277,6 +285,8 @@ export function generate(definitions: Definition[], options: GenerateOptions): G
     }
     const [kept, ...rest] = [...group].sort((a, b) => mapIndex.get(a)! - mapIndex.get(b)!);
     for (const dropped of rest) {
+      // Only the first endpoint of the line is called, so a prompt on another one would never be asked.
+      if (dropped.confirmPrompt) errors.push(`${keyOf(dropped)} has a confirmPrompt but is collapsed into ${keyOf(kept)}, which "${line}" calls; put the confirmPrompt on the first entry`);
       descriptors.splice(descriptors.indexOf(dropped), 1);
       warnings.push(`${keyOf(dropped)} is collapsed into ${keyOf(kept)}: "${line}" calls ${kept.path}`);
     }

@@ -283,11 +283,26 @@ deel jobs list --quiet
 ```bash
 deel dev tokens list --beta                            # newest first; --limit/--cursor to page
 deel dev tokens get <token_id> --beta
-deel dev tokens revocations create <token_id> --input reason=rotated --beta   # invalidates the token; there is no undo
+deel dev tokens revocations create <token_id> --input reason=rotated --beta   # asks first: invalidates the token; there is no undo
 deel dev logs tokens list --beta                       # what each token has been used for
 ```
 
-There is no confirmation prompt and no `--yes`: `revocations create` invalidates the token as soon as it is typed. Check the ID with `deel dev tokens get <token_id> --beta` first.
+`revocations create` asks `[y/N]` before it sends anything, because an invalidated token cannot be restored. `--confirm` skips the question (see [Commands that ask first](#commands-that-ask-first)).
+
+## Commands that ask first
+
+A command whose call cannot be undone asks `[y/N]` on stderr before it sends anything, with the impact in the question:
+
+```text
+$ deel webhooks delete wh_123
+Delete webhook wh_123? Deel stops sending its events, and the subscription cannot be restored. [y/N]
+```
+
+Only `y` or `yes` (any case) goes on. `n`, an empty line, Ctrl-D, or no answer within 60 seconds aborts the command, and nothing is sent. Today these commands ask first: `deel webhooks delete`, `deel dev tokens revocations create` and `deel oauth2-apps update --status disabled`. `--help` on each shows its question under ASKS FIRST, and `--help --json` gives it as `confirmPrompt`.
+
+`--confirm` answers the question in advance: the command runs without asking. A script, a CI job or an agent passes it, because nobody there can answer. Without a terminal (stdin or stderr is not a TTY), in CI, under an agent (`CLAUDE_CODE`, `CURSOR`, `CODEX`), or when stdin carries the token or the body (`--token-stdin`, `--input -`), a command that asks first refuses without `--confirm`. It refuses before the token is read and before any request. Only a command that asks first takes `--confirm`. Any other command refuses it as an unknown flag, like any flag it doesn't take, so a script never passes `--confirm` to a command that wouldn't have asked. Piping stdout (`| jq`) still prompts, because the question and the answer go through stderr and stdin.
+
+`--confirm` replaces `--yes`. A command that asks first and is given `--yes` fails with a hint that names `--confirm`, and nothing is sent.
 
 ## Idempotency
 
@@ -302,11 +317,11 @@ To make a re-run a safe retry of an earlier run, for example after a timeout lef
 ```bash
 deel webhooks create --input file://webhook.json             # deel webhooks create --generate-input for the fields
 deel webhooks update <id> --input status=disabled       # changes only the given fields
-deel webhooks delete <id>
+deel webhooks delete <id>                               # asks first; --confirm skips the question
 deel webhooks test <webhook_id> --input event_type=contract.created --beta   # Deel delivers a test event to the receiver
 ```
 
-Like every generated command, `delete` runs as soon as it is typed: there is no confirmation prompt and no `--yes`, so check the ID with `deel webhooks get <id>` first.
+`delete` asks `[y/N]` before it sends anything, because a deleted subscription cannot be restored. `--confirm` skips the question (see [Commands that ask first](#commands-that-ask-first)).
 
 A webhook id can start with `-`, which the argument parser reads as a flag. Put it after `--`, which ends the options: `deel webhooks get -- -WZ1uT2DFF01`. The same works for any generated command.
 
@@ -319,10 +334,10 @@ A webhook id can start with `-`, which the argument parser reads as a flag. Put 
 ```bash
 deel oauth2-apps update <app_id> --input name="Payroll sync" --beta   # changes only the given fields
 deel oauth2-apps update <app_id> --status disabled --beta             # asks first
-deel oauth2-apps update <app_id> --status disabled --yes --beta       # no prompt
+deel oauth2-apps update <app_id> --status disabled --confirm --beta   # no prompt
 ```
 
-Disabling revokes every consent and token of the app, and enabling does not restore them, so `--status disabled` asks `[y/N]` on stderr before it sends anything. `--yes` skips the question. Without a terminal (a script, CI or an agent) or when stdin carries the token or the body (`--token-stdin`, `--input -`) there is nobody to answer, so the command refuses without `--yes` and sends nothing. `--status enabled` and the other `oauth2-apps` commands ask nothing.
+Disabling revokes every consent and token of the app, and enabling does not restore them, so `--status disabled` asks `[y/N]` before it sends anything. `--confirm` skips the question (see [Commands that ask first](#commands-that-ask-first)). `--status enabled` and the other `oauth2-apps` commands ask nothing.
 
 ## API versions
 

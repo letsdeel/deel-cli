@@ -313,7 +313,7 @@ test("a renamed path param still matches its map entry, its released name and it
 });
 
 test("a param named like a global flag in any spelling the parser knows gets the -param flag", () => {
-  for (const name of ["help", "h", "version", "v", "base-url", "base_url", "beta", "versions", "json", "fields"]) {
+  for (const name of ["help", "h", "version", "v", "base-url", "base_url", "beta", "versions", "json", "fields", "confirm"]) {
     const { manifest, errors } = generate(parseDefinitions([gadget({ operation: gadgetOp({ parameters: [{ name, in: "query", schema: { type: "string" } }] }) })]), options());
     assert.deepEqual(errors, [], name);
     assert.equal(manifest.descriptors[0].params.find((param) => param.name === name)!.flag, `${name}-param`, name);
@@ -453,4 +453,31 @@ test("readGeneratedManifest refuses a damaged manifest by name, not with a TypeE
   assert.throws(() => readGeneratedManifest(join(dir, "nope.json")), /nope\.json/);
   writeFileSync(manifest, "not json");
   assert.throws(() => readGeneratedManifest(manifest), /manifest\.json: /);
+});
+
+test("an entry's confirmPrompt is carried into its descriptor, and an entry without one asks nothing", () => {
+  const definitions = parseDefinitions([def("DELETE", "/things/{thing_id}"), def("GET", "/things/{thing_id}")]);
+  const map = definitions.map((d) => (d.method === "DELETE" ? { ...plainEntry(d), confirmPrompt: "Delete thing {thing_id}? It cannot be restored." } : plainEntry(d)));
+  const { manifest, errors } = generate(definitions, options({ map }));
+  assert.deepEqual(errors, []);
+  const byMethod = Object.fromEntries(manifest.descriptors.map((d) => [d.method, d]));
+  assert.equal(byMethod.DELETE.confirmPrompt, "Delete thing {thing_id}? It cannot be restored.");
+  assert.equal("confirmPrompt" in byMethod.GET, false);
+});
+
+test("a confirmPrompt placeholder must be a path param as the definition spells it", () => {
+  const definitions = parseDefinitions([def("DELETE", "/things/{thing_id}")]);
+  const map = [{ ...plainEntry(definitions[0]), path: "/things/{id}", command: "deel things delete <id>", confirmPrompt: "Delete thing {id}?" }];
+  const { errors } = generate(definitions, options({ map }));
+  assert.ok(errors.some((e) => /confirmPrompt names \{id\}, which the call fills as \{thing_id\}/.test(e)), errors.join("\n"));
+});
+
+test("a confirmPrompt on an endpoint collapsed into another is an error, since it would never be asked", () => {
+  const definitions = parseDefinitions([def("GET", "/things/{thing_id}/a"), def("GET", "/things/{thing_id}/b")]);
+  const map = [
+    { ...plainEntry(definitions[0]), command: "deel things get <thing_id>", collapse: "k" },
+    { ...plainEntry(definitions[1]), command: "deel things get <thing_id>", collapse: "k", confirmPrompt: "Get {thing_id}?" },
+  ];
+  const { errors } = generate(definitions, options({ map }));
+  assert.ok(errors.some((e) => /GET \/things\/\{thing_id\}\/b has a confirmPrompt but is collapsed into/.test(e)), errors.join("\n"));
 });

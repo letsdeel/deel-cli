@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { configFrom, gatherFlagValues, gatherFiles, outputOpts, readHidden, refuseMissingValues } from "../src/commands/shared.ts";
+import { commonArgs, configFrom, gatherFlagValues, gatherFiles, outputOpts, readHidden, refuseMissingValues, refuseUnknownFlags } from "../src/commands/shared.ts";
+import type { CliError } from "../src/core/errors.ts";
 
 test("gatherFlagValues reads a repeatable flag in every spelling the parser accepts, in the order typed", () => {
   assert.deepEqual(gatherFlagValues(["--job-ids", "a", "--job-ids=b"], "job_ids"), ["a", "b"]);
@@ -81,4 +82,11 @@ test("outputOpts refuses a --fields or --jq that arrived as `true`, instead of r
   assert.throws(() => outputOpts({ json: true, jq: true }), (err: any) => err.code === "usage.flag_value" && /--jq needs a value/.test(err.message));
   assert.deepEqual(outputOpts({ json: true, fields: "id", jq: ".id", raw: true }), { json: true, fields: "id", jq: ".id", raw: true, quiet: false });
   assert.deepEqual(outputOpts({ json: true }), { json: true, fields: undefined, jq: undefined, raw: false, quiet: false });
+});
+
+test("refuseUnknownFlags takes the declared flags, their --no- forms and the hidden --base-url, and refuses any other", () => {
+  refuseUnknownFlags(["--json", "--no-log", "--env", "demo", "--base-url", "https://x.example/rest", "positional"], commonArgs, "auth status");
+  for (const flag of ["--confirm", "--yes", "--bogus"]) {
+    assert.throws(() => refuseUnknownFlags([flag], commonArgs, "auth status"), (err: CliError) => err.code === "usage.flag" && err.message === `'deel auth status' has no flag ${flag}.`, flag);
+  }
 });

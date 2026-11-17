@@ -46,23 +46,24 @@ test("bindForm binds a label to the path param whose name holds it, then the res
   assert.deepEqual(bound("deel offerings list --country <country>", "/benefits", ["country_code", "team_id"]).form!.scopes, [{ flag: "country", label: "country", param: "country_code", in: "query" }]);
 });
 
-test("the committed manifest binds every entry's arguments as the command map says", () => {
+test("the committed manifest binds every entry's arguments, and carries its confirmPrompt, as the command map says", () => {
   const read = (file: string) => JSON.parse(readFileSync(new URL(`../src/public-api/${file}`, import.meta.url), "utf8"));
-  const descriptors: { method: string; path: string; params: { name: string; in: string }[]; form: unknown }[] = read("manifest.json").descriptors;
+  const descriptors: { method: string; path: string; params: { name: string; in: string }[]; form: unknown; confirmPrompt?: string }[] = read("manifest.json").descriptors;
   let checked = 0;
-  for (const entry of read("commands.json") as { method: string; path: string; command: string }[]) {
+  for (const entry of read("commands.json") as { method: string; path: string; command: string; confirmPrompt?: string }[]) {
     // An entry collapsed into another one's command has no descriptor of its own.
     const descriptor = descriptors.find((d) => d.method === entry.method && d.path === entry.path);
     if (!descriptor) continue;
     const query = descriptor.params.filter((param) => param.in === "query").map((param) => param.name);
     assert.deepEqual(bindForm(parseCommand(entry.command), entry.path, query).form, descriptor.form, entry.command);
+    assert.equal(descriptor.confirmPrompt, entry.confirmPrompt, `${entry.command}: the manifest's confirmPrompt is the map's`);
     checked++;
   }
   assert.ok(checked > 500, `${checked} entries checked`);
 });
 
 test("mapShapeError accepts a well-formed map and names the first entry that is not one", () => {
-  assert.equal(mapShapeError([entry("GET", "/a", "deel a list"), { ...entry("GET", "/b", "deel b list"), collapse: "k", api: "scim" }]), undefined);
+  assert.equal(mapShapeError([entry("GET", "/a", "deel a list"), { ...entry("GET", "/b", "deel b list"), collapse: "k", api: "scim", confirmPrompt: "Go?" }]), undefined);
   assert.match(mapShapeError({ method: "GET" }) ?? "", /must be a JSON array/);
   const bads: Array<[unknown[], RegExp]> = [
     [[null], /^entry 0 must be an object/],
@@ -78,6 +79,9 @@ test("mapShapeError accepts a well-formed map and names the first entry that is 
     [[{ ...entry("GET", "/a", "deel a list"), collapse: 3 }], /^entry 0 has a collapse that is not a non-empty string/],
     [[{ ...entry("GET", "/a", "deel a list"), collapse: "" }], /^entry 0 has a collapse/],
     [[{ ...entry("GET", "/a", "deel a list"), colapse: "k" }], /^entry 0 has unknown field\(s\) colapse/],
+    [[{ ...entry("GET", "/a", "deel a list"), confirmPrompt: true }], /^entry 0 has a confirmPrompt that is not a non-empty string/],
+    [[{ ...entry("GET", "/a", "deel a list"), confirmPrompt: "  " }], /^entry 0 has a confirmPrompt that is not a non-empty string/],
+    [[{ ...entry("GET", "/a", "deel a list"), confirm: "Delete?" }], /^entry 0 has unknown field\(s\) confirm/],
   ];
   for (const [bad, message] of bads) assert.match(mapShapeError(bad) ?? "", message, JSON.stringify(bad));
 });

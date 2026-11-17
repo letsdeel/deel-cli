@@ -8,7 +8,7 @@ import { setLoggingEnabled, setLogBodiesEnabled } from "../core/logging.ts";
 import { fetchJob } from "../core/jobs.ts";
 import { CliError } from "../core/errors.ts";
 import { HEADER } from "../core/constants.ts";
-import { commandToken, commonArgs, configFrom, outputOpts } from "./shared.ts";
+import { commandToken, commonArgs, configFrom, outputOpts, refuseUnknownFlags } from "./shared.ts";
 import type { Args } from "./shared.ts";
 
 export const jobCommand = defineCommand({
@@ -18,6 +18,7 @@ export const jobCommand = defineCommand({
       meta: { name: "status", description: "Poll job status: deel job status <id>[,<id>]" },
       args: { id: { type: "positional", required: false, description: "Job id(s), comma-separated" }, ...commonArgs },
       async run(cittyCtx) {
+        refuseUnknownFlags(cittyCtx.rawArgs, commonArgs, "job status");
         const args = cittyCtx.args as Args;
         setLoggingEnabled(args.log !== false);
         setLogBodiesEnabled(args["log-bodies"] === true);
@@ -34,6 +35,7 @@ export const jobCommand = defineCommand({
       meta: { name: "list", description: "List recent jobs" },
       args: commonArgs,
       async run(cittyCtx) {
+        refuseUnknownFlags(cittyCtx.rawArgs, commonArgs, "job list");
         const args = cittyCtx.args as Args;
         setLoggingEnabled(args.log !== false);
         setLogBodiesEnabled(args["log-bodies"] === true);
