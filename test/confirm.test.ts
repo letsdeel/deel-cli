@@ -203,6 +203,23 @@ test("--yes on a command that asks nothing is an unknown flag, not a hint to pas
   assert.equal(requests.length, 0);
 });
 
+test("--yes and --confirm on a hand-picked command are unknown flags, not a hint to pass --confirm", async () => {
+  for (const flag of ["--yes", "--confirm"]) {
+    const { requests, error } = await runWithFetch(["adjustments", "create", "--invoice", flag]);
+    assert.equal(error?.code, "usage.flag", flag);
+    assert.doesNotMatch(error?.message ?? "", /renamed/, flag);
+    assert.equal(requests.length, 0, flag);
+  }
+});
+
+test("a confirming command refuses before it reads --input, so a bad or stdin body never hides the refusal", async () => {
+  for (const input of ["-", "not a valid body", "file:///nonexistent/body.json"]) {
+    const { requests, error } = await runWithFetch(["dev", "tokens", "revocations", "create", "tok_1", "--input", input, "--beta"]);
+    assert.equal(error?.code, "usage.confirm", input);
+    assert.equal(requests.length, 0, input);
+  }
+});
+
 test("--token-stdin on a confirming command refuses before reading the token or sending anything", async () => {
   const { requests, error } = await runWithFetch(["oauth2-apps", "update", APP_ID, "--status", "disabled", "--token-stdin", "--beta"]);
   assert.equal(error?.code, "usage.confirm");

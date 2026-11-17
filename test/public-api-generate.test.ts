@@ -313,7 +313,7 @@ test("a renamed path param still matches its map entry, its released name and it
 });
 
 test("a param named like a global flag in any spelling the parser knows gets the -param flag", () => {
-  for (const name of ["help", "h", "version", "v", "base-url", "base_url", "beta", "versions", "json", "fields"]) {
+  for (const name of ["help", "h", "version", "v", "base-url", "base_url", "beta", "versions", "json", "fields", "confirm"]) {
     const { manifest, errors } = generate(parseDefinitions([gadget({ operation: gadgetOp({ parameters: [{ name, in: "query", schema: { type: "string" } }] }) })]), options());
     assert.deepEqual(errors, [], name);
     assert.equal(manifest.descriptors[0].params.find((param) => param.name === name)!.flag, `${name}-param`, name);
