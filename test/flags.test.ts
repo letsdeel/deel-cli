@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { acceptsFlag, argvEnables, argvHasFlag, argvMentionsFlag, flagMissingValue, flagOf, argvAttachesValue } from "../src/core/flags.ts";
+import { acceptsFlag, argvEnables, argvHasFlag, argvMentionsFlag, flagMissingValue, flagOf, flagRepeated, argvAttachesValue } from "../src/core/flags.ts";
 
 test("acceptsFlag follows the parser: written, camelCase and kebab-case spellings, acronyms included", () => {
   assert.equal(acceptsFlag("widget_id", "widget_id"), true);
@@ -62,4 +62,18 @@ test("flagMissingValue names the first valued flag typed bare, empty or before a
   // Flags it was not asked about, switches and everything after -- are left alone.
   assert.equal(flagMissingValue(["--json", "--env"], flags), undefined);
   assert.equal(flagMissingValue(["--", "--limit"], flags), undefined);
+});
+
+test("flagRepeated names the first flag typed twice, in any mix of spellings and forms, as it was typed the second time", () => {
+  const flags = ["env", "idempotency-key", "contract_types"];
+  assert.equal(flagRepeated(["--env", "demo", "--idempotency-key=k", "--json"], flags), undefined);
+  assert.equal(flagRepeated(["--env", "demo", "--env", "prod"], flags), "env");
+  // The values are not compared: the same value twice is refused as well.
+  assert.equal(flagRepeated(["--env=demo", "--env", "demo"], flags), "env");
+  assert.equal(flagRepeated(["--idempotency-key", "a", "--idempotencyKey=b"], flags), "idempotencyKey");
+  assert.equal(flagRepeated(["--contract-types", "a", "--contract_types", "b"], flags), "contract_types");
+  // Two different flags once each, a flag it was not asked about, and everything after -- are left alone.
+  assert.equal(flagRepeated(["--env", "demo", "--contract-types", "a"], flags), undefined);
+  assert.equal(flagRepeated(["--fields", "a", "--fields", "b"], flags), undefined);
+  assert.equal(flagRepeated(["--env", "demo", "--", "--env", "prod"], flags), undefined);
 });

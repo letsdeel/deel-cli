@@ -107,7 +107,7 @@ test("a repeated array param is sent whole in any spelling of its flag", async (
   }
 });
 
-type Sent = { method: string; url: URL; body: unknown };
+type Sent = { method: string; url: URL; body: unknown; headers: Record<string, string> };
 
 async function callApi(argv: string[], descriptors = manifest.descriptors) {
   const sent: Sent[] = [];
@@ -115,7 +115,7 @@ async function callApi(argv: string[], descriptors = manifest.descriptors) {
   const realToken = process.env.DEEL_TOKEN;
   process.env.DEEL_TOKEN = "tok_test";
   globalThis.fetch = (async (input: unknown, init: RequestInit = {}) => {
-    sent.push({ method: init.method ?? "GET", url: new URL(String(input)), body: init.body ? JSON.parse(String(init.body)) : undefined });
+    sent.push({ method: init.method ?? "GET", url: new URL(String(input)), body: init.body ? JSON.parse(String(init.body)) : undefined, headers: Object.fromEntries(new Headers(init.headers)) });
     return Response.json({ data: [] });
   }) as typeof fetch;
   try {
@@ -635,7 +635,7 @@ function valuedFlagsOf(descriptor: Descriptor): string[] {
 // flag under test is missing a value.
 function argvFor(descriptor: Descriptor, flag: string): string[] {
   const form = descriptor.form;
-  const given = form ? spellings(form).bare.filter((_, index, all) => !all.slice(index - 1, index + 1).includes(`--${flag}`)) : [];
+  const given = form ? spellings(form).bare.filter((_, index, all) => !all.slice(Math.max(0, index - 1), index + 1).includes(`--${flag}`)) : [];
   return [...descriptor.command, ...(descriptor.variant ? [`--${descriptor.variant}`] : []), ...given];
 }
 
@@ -920,4 +920,68 @@ test("--versions and --generate-input still ask for a flag when every form needs
   assert.equal(help.code, EXIT.OK, help.err);
   assert.match(help.out, /deel ships get <ship> --worker-type eor/);
   assert.match(help.out, /deel ships get <ship>\n/);
+});
+
+// ---------------- a single-value flag given twice ----------------
+
+test("every single-value flag of every generated command, given twice, stops before any request", async () => {
+  const lists: Array<{ walk: Descriptor[]; generated: Descriptor[] }> = [{ walk: handPicked.descriptors, generated: [] }, { walk: await loadGeneratedDescriptors(), generated: await loadGeneratedDescriptors() }];
+  let tried = 0;
+  for (const { walk, generated } of lists) {
+    for (const descriptor of walk) {
+      const arrays = new Set(descriptor.params.filter((param) => param.type === "array").map(flagOf));
+      for (const flag of new Set(valuedFlagsOf(descriptor))) {
+        if (arrays.has(flag)) continue;
+        const value = descriptor.params.find((param) => flagOf(param) === flag)?.enum?.[0] ?? "v1";
+        const called = await callApi([...argvFor(descriptor, flag), `--${flag}`, value, `--${flag}=${value}`], generated);
+        const where = `${descriptor.command.join(" ")} ${descriptor.variant ? `--${descriptor.variant} ` : ""}--${flag} twice`;
+        assert.equal(called.sent.length, 0, `${where} sent a request`);
+        assert.equal(called.code, EXIT.ERROR, where);
+        assert.match(called.err, new RegExp(`--${flag} is given more than once`), `${where}: ${called.err}`);
+        tried++;
+      }
+    }
+  }
+  assert.ok(tried > 500, `only ${tried} flags tried`);
+});
+
+test("a global flag, the hidden --base-url and a picking flag given twice are refused; repeatable ones still collect every value", async () => {
+  const committed = await loadGeneratedDescriptors();
+  for (const argv of [
+    ["access", "managers", "list", "--env", "demo", "--env", "prod"],
+    ["access", "managers", "list", "--fields", "id", "--fields=name"],
+    ["access", "managers", "list", "--idempotency-key", "a", "--idempotencyKey", "b"],
+    // callApi adds a --base-url of its own, so this one is the second.
+    ["access", "managers", "list", "--base-url", "https://other.test/rest"],
+    ["contracts", "amendments", "get", "c1", "a1", "--worker-type", "eor", "--worker-type", "eor"],
+  ]) {
+    const called = await callApi(argv, committed);
+    assert.equal(called.code, EXIT.ERROR, argv.join(" "));
+    assert.match(called.err, /is given more than once/, `${argv.join(" ")}: ${called.err}`);
+    assert.equal(called.sent.length, 0, argv.join(" "));
+  }
+  const arrays = await callApi(["adjustments", "categories", "list", "--contract-types", "a", "--contract-types=b"], committed);
+  assert.equal(arrays.code, EXIT.OK, arrays.err);
+  assert.deepEqual(arrays.sent[0].url.searchParams.getAll("contract_types"), ["a", "b"]);
+});
+
+// ---------------- the headers a whole command sends ----------------
+
+test("--idempotency-key is sent as the Idempotency-Key of a write, and each run without it sends a new one", async () => {
+  const given = await callApi(["widgets", "create", "--input", "name=w"]);
+  assert.equal(given.code, EXIT.OK, given.err);
+  const keyed = await callApi(["widgets", "create", "--input", "name=w", "--idempotency-key", "run-1"]);
+  assert.equal(keyed.code, EXIT.OK, keyed.err);
+  assert.equal(keyed.sent[0].headers["idempotency-key"], "run-1");
+  const again = await callApi(["widgets", "create", "--input", "name=w"]);
+  assert.ok(given.sent[0].headers["idempotency-key"], "a write without --idempotency-key still carries a key");
+  assert.notEqual(given.sent[0].headers["idempotency-key"], again.sent[0].headers["idempotency-key"]);
+});
+
+test("--beta is sent as X-Beta: true, and without it no X-Beta goes out", async () => {
+  const beta = await callApi(["widgets", "list", "--beta"]);
+  assert.equal(beta.code, EXIT.OK, beta.err);
+  assert.equal(beta.sent[0].headers["x-beta"], "true");
+  const plain = await callApi(["widgets", "list"]);
+  assert.equal(plain.sent[0].headers["x-beta"], undefined);
 });

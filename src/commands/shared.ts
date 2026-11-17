@@ -7,7 +7,7 @@ import type { OutputOpts } from "../core/output.ts";
 import { resolveConfig } from "../core/config.ts";
 import type { Config } from "../core/config.ts";
 import { CliError } from "../core/errors.ts";
-import { acceptsFlag, flagMissingValue, unknownFlag } from "../core/flags.ts";
+import { acceptsFlag, flagMissingValue, flagRepeated, unknownFlag } from "../core/flags.ts";
 import { authFor, resolveToken } from "../core/auth.ts";
 import type { TokenProvider } from "../core/http.ts";
 import type { CredentialStore } from "../core/keychain.ts";
@@ -116,8 +116,22 @@ export function refuseMissingValues(rawArgs: string[], defs: ArgsDef = commonArg
   if (missing) throw new CliError("usage.flag_value", `--${missing} needs a value.`, `Write --${missing}=<value>. Nothing was sent.`);
 }
 
+// The global flags read once per occurrence from the raw args: every --file part (gatherFiles) and every --ca-cert
+// (src/core/tls.ts).
+export const REPEATABLE_FLAGS = ["file", "ca-cert"];
+
+// A flag that takes one value, typed twice, must stop the command before anything is sent: citty keeps the last value
+// and readHidden the first, so the call could go to the other environment or carry the other key. `repeatable` are the
+// flags of `defs` that collect every value (array parameters); the global REPEATABLE_FLAGS always do.
+export function refuseRepeatedValues(rawArgs: string[], defs: ArgsDef = commonArgs, repeatable: string[] = []): void {
+  const single = valuedFlags(defs).filter((flag) => !REPEATABLE_FLAGS.includes(flag) && !repeatable.includes(flag));
+  const repeated = flagRepeated(rawArgs, single);
+  if (repeated) throw new CliError("usage.flag", `--${repeated} is given more than once.`, `Give --${repeated} once. Nothing was sent.`);
+}
+
 export function configFrom(args: Args, rawArgs: string[]): Config {
   refuseMissingValues(rawArgs);
+  refuseRepeatedValues(rawArgs);
   return resolveConfig({ env: args.env as string | undefined, baseUrl: readHidden(rawArgs, "base-url"), beta: Boolean(args.beta) });
 }
 

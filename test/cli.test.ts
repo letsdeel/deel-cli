@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { run, unknownFlag } from "../src/cli.ts";
 import { CliError, EXIT } from "../src/core/errors.ts";
-import { commonArgs, valuedFlags } from "../src/commands/shared.ts";
+import { commonArgs, REPEATABLE_FLAGS, refuseRepeatedValues, valuedFlags } from "../src/commands/shared.ts";
 import { printContract, printContractJson } from "../src/help.ts";
 import type { Descriptor } from "../src/types.ts";
 import { RESERVED_COMMANDS } from "../src/core/constants.ts";
@@ -340,6 +340,49 @@ test("a flag that takes a value, typed with none, stops every command before any
   for (const argv of [["legal-entities", "list", "--limit"], ["legal-entities", "list", "--cursor="], ["webhooks", "list", "--limit", "--json"], ["auth", "login", "--scopes"], ["auth", "login", "--scopes="]]) {
     await assert.rejects(() => run(argv), (error: unknown) => error instanceof CliError && error.code === "usage.flag_value", argv.join(" "));
   }
+  assert.equal(sent, 0);
+});
+
+test("a single-value flag given twice stops every command before any request, a prompt or the token lookup", async (t) => {
+  let sent = 0;
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async () => {
+    sent++;
+    return new Response("{}", { status: 200, headers: { "content-type": "application/json" } });
+  }) as typeof fetch;
+  const saved = { token: process.env.DEEL_TOKEN, log: process.env.DEEL_LOG };
+  process.env.DEEL_TOKEN = "a-token";
+  process.env.DEEL_LOG = "off";
+  t.after(() => {
+    globalThis.fetch = realFetch;
+    for (const [key, value] of [["DEEL_TOKEN", saved.token], ["DEEL_LOG", saved.log]] as const) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  });
+  const refused = (flag: string) => (error: unknown) => error instanceof CliError && error.code === "usage.flag" && error.message === `--${flag} is given more than once.`;
+  // Every global single-value flag (--file and --ca-cert are repeatable), on a generated command and on the static ones. A static
+  // command refuses --version before it reads a value, so the version flag is tried on the generated ones only.
+  const flags = valuedFlags().filter((flag) => !REPEATABLE_FLAGS.includes(flag));
+  const commands = [["legal-entities", "list"], ["webhooks", "list"], ["dev", "tokens", "list"], ["job", "status", "j1"], ["job", "list"], ["auth", "status"], ["auth", "logout"]];
+  for (const command of commands) {
+    for (const flag of flags) {
+      if (flag === "version" && Object.hasOwn(staticCommands, command[0])) continue;
+      const argv = [...command, `--${flag}`, "v1", `--${flag}=v2`];
+      await assert.rejects(() => run(argv), refused(flag), argv.join(" "));
+    }
+  }
+  // The flags of a static command itself, and a confirmable command, which refuses before it asks anything.
+  for (const [argv, flag] of [
+    [["auth", "login", "--scopes", "a", "--scopes", "b"], "scopes"],
+    [["commands", "--filter", "a", "--filter=b"], "filter"],
+    [["webhooks", "delete", "wh_1", "--fields", "id", "--fields", "url"], "fields"],
+  ] as Array<[string[], string]>) {
+    await assert.rejects(() => run(argv), refused(flag), argv.join(" "));
+  }
+  // --file and --ca-cert collect every value, and so does a flag named repeatable, so none of them is a repeat.
+  assert.doesNotThrow(() => refuseRepeatedValues(["--file", "a=@x", "--file", "b=@y", "--ca-cert", "a.pem", "--ca-cert=b.pem"]));
+  assert.doesNotThrow(() => refuseRepeatedValues(["--ids", "a", "--ids", "b"], { ids: { type: "string" } }, ["ids"]));
   assert.equal(sent, 0);
 });
 
