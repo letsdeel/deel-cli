@@ -558,10 +558,10 @@ test("--versions on a hand-picked command (no version list) is a usage error", a
   assert.equal(error.code, "usage.versions");
 });
 
-test("--versions on words several endpoints share needs one picked first", async () => {
-  const { error } = await cli(["widgets", "notes", "list", "--versions"]);
-  assert.equal(error.code, "usage.versions");
-  assert.match(error.message, /has several endpoints; pick one with the flags of one of:\n {2}deel widgets notes list\n {2}deel widgets notes list --widget <widget>/);
+test("--versions on words several endpoints share reads the form the bare line calls", async () => {
+  const bare = await cli(["widgets", "notes", "list", "--versions"]);
+  assert.equal(bare.code, EXIT.OK);
+  assert.equal(bare.error, undefined);
   const picked = await cli(["widgets", "notes", "list", "--widget", "w1", "--versions"]);
   assert.equal(picked.code, EXIT.OK);
 });

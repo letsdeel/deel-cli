@@ -216,8 +216,10 @@ function formCommand(descriptors: Descriptor[]): CommandDef {
           owner ? "Pick that endpoint's flags, or drop the flag. Nothing was sent." : "Run it with --help to see its flags.",
         );
       }
-      // A flag that takes a value and has none would swallow the next flag as its value (or send it empty).
-      const missing = flagMissingValue(rawArgs, [...descriptor.params.filter((param) => param.type !== "boolean").map(flagOf), ...form.scopes.map((scope) => scope.flag), ...form.selectors.filter((s) => s.value !== undefined).map((s) => s.flag)]);
+      // A flag that takes a value and has none would swallow the next flag as its value (or send it empty). A path
+      // parameter is an argument, not a flag, so a switch selector named like it (--external-id) is not one of them.
+      const positional = new Set(form.positionals.map((p) => p.param));
+      const missing = flagMissingValue(rawArgs, [...descriptor.params.filter((param) => param.type !== "boolean" && !positional.has(param.name)).map(flagOf), ...form.scopes.map((scope) => scope.flag), ...form.selectors.filter((s) => s.value !== undefined).map((s) => s.flag)]);
       if (missing) throw new CliError("usage.flag_value", `--${missing} needs a value.`, `Write --${missing}=<value>; run it with --help to see the values.`);
       const args = parseArgs(rawArgs, defs) as Args & { _: string[] };
       const given = args._.map(String);
@@ -348,7 +350,12 @@ function descriptorFor(positionals: string[], matched: number, argv: string[]): 
     const picked = candidates.some((d) => pickingFlags(d.form!).some((flag) => argvMentionsFlag(normalized, flag)));
     // A flag's value (--env demo, --limit 5) is not an argument.
     const valued = candidates.flatMap((d) => valuedFlags(argsForDescriptor(d)));
-    return picked || wordsOf(normalized, valued).length > matched ? matchForm(candidates, normalized) : undefined;
+    if (picked || wordsOf(normalized, valued).length > matched) return matchForm(candidates, normalized);
+    // --versions and --generate-input print about one endpoint, and the bare line calls the form that takes no
+    // flag, so they read that form (when there is one) instead of refusing the words alone. With --help on the line
+    // the words still list every form.
+    const help = argv.includes("--help") || argv.includes("-h");
+    return !help && (argvEnables(argv, "versions") || argvEnables(argv, "generate-input")) ? matchForm(candidates, normalized) : undefined;
   }
   for (const candidate of candidates) {
     if (candidate.variant && argvEnables(argv, candidate.variant)) return candidate;

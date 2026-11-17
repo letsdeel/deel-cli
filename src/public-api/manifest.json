@@ -60400,7 +60400,12 @@
      }
     ],
     "scopes": [],
-    "selectors": []
+    "selectors": [
+     {
+      "flag": "as",
+      "value": "client"
+     }
+    ]
    }
   },
   {
@@ -60634,7 +60639,12 @@
    "form": {
     "positionals": [],
     "scopes": [],
-    "selectors": []
+    "selectors": [
+     {
+      "flag": "as",
+      "value": "client"
+     }
+    ]
    }
   },
   {
@@ -138603,7 +138613,7 @@
   {
    "command": [
     "oauth2-apps",
-    "listing",
+    "listings",
     "get"
    ],
    "method": "GET",
@@ -182820,6 +182830,364 @@
     "create"
    ],
    "method": "POST",
+   "path": "/time-tracking/shifts",
+   "summary": "Create a shift for a contract",
+   "version": "2026-11-13",
+   "async": false,
+   "bodyKind": "json",
+   "supportsMultipart": false,
+   "bodyWrapper": "data",
+   "params": [],
+   "bodyProps": [
+    {
+     "name": "end",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Shift end as the local clock time where the work happened, without a UTC offset. Send with start; after start."
+    },
+    {
+     "name": "date",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "description": "Shift day, the local date the shift belongs to. Required for duration-only and DAY_TRACKING shifts; taken from start when omitted otherwise."
+    },
+    {
+     "name": "type",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "REGULAR",
+      "OVERTIME",
+      "ON_CALL",
+      "KEEP_IN_TOUCH",
+      "DAY_TRACKING"
+     ],
+     "description": "Kind of time the shift records. Which types a contract accepts depends on its time tracking policy."
+    },
+    {
+     "name": "start",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Shift start as the local clock time where the work happened, without a UTC offset (not UTC). Send with end; null or omitted for duration-only and DAY_TRACKING shifts. Stored as sent."
+    },
+    {
+     "name": "breaks",
+     "in": "body",
+     "type": "array",
+     "required": false,
+     "description": "Breaks inside the shift, without overlaps. Not accepted on duration-only shifts.",
+     "maxItems": 20
+    },
+    {
+     "name": "status",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "PENDING",
+      "APPROVED"
+     ],
+     "description": "Approval status to set. PENDING sends the shift to approval. APPROVED is accepted from organization tokens only; worker tokens get 403."
+    },
+    {
+     "name": "timezone",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "IANA time zone the shift was worked in, stored as sent and not checked. When omitted or null, it is filled from the requester's profile, as in the app. Start and end are never converted to it."
+    },
+    {
+     "name": "call_outs",
+     "in": "body",
+     "type": "array",
+     "required": false,
+     "description": "Call-outs inside an ON_CALL shift, without overlaps. Accepted only on ON_CALL shifts.",
+     "maxItems": 20
+    },
+    {
+     "name": "project_id",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "Project the time was spent on. Must belong to the contract."
+    },
+    {
+     "name": "contract_id",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Deel contract the shift is recorded on. Cannot change after the shift is created."
+    },
+    {
+     "name": "description",
+     "in": "body",
+     "type": "string",
+     "required": false,
+     "nullable": true,
+     "description": "What the worker did. Required when the time tracking policy requires a work description."
+    },
+    {
+     "name": "is_half_day",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Whether a DAY_TRACKING shift counts as half a day. Accepted only on DAY_TRACKING shifts."
+    },
+    {
+     "name": "worked_hours",
+     "in": "body",
+     "type": "number",
+     "required": false,
+     "description": "Hours worked. Required for duration-only shifts (no start or end); not accepted when start and end are sent, as Deel calculates it."
+    },
+    {
+     "name": "is_meal_break_waived",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Whether the worker waived the meal break. Accepted only when the time tracking policy allows waiving."
+    }
+   ],
+   "fileFields": [],
+   "responseKind": "object",
+   "responseFields": [
+    {
+     "name": "id",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Deel ID of the shift; the shift_id path parameter."
+    },
+    {
+     "name": "end",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Shift end as local clock time, without a UTC offset; null for duration-only and DAY_TRACKING shifts."
+    },
+    {
+     "name": "date",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Shift day, the local date the shift belongs to."
+    },
+    {
+     "name": "type",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "enum": [
+      "REGULAR",
+      "OVERTIME",
+      "ON_CALL",
+      "KEEP_IN_TOUCH",
+      "DAY_TRACKING"
+     ],
+     "description": "Kind of time the shift records. Which types a contract accepts depends on its time tracking policy."
+    },
+    {
+     "name": "start",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Shift start as local clock time, without a UTC offset; null for duration-only and DAY_TRACKING shifts."
+    },
+    {
+     "name": "breaks",
+     "in": "body",
+     "type": "array",
+     "required": true,
+     "description": "Breaks inside the shift; empty when there are none.",
+     "properties": [
+      {
+       "name": "end",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Break end, local time (no UTC offset). After start and not after the shift end."
+      },
+      {
+       "name": "type",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "enum": [
+        "BREAK",
+        "MEAL_BREAK",
+        "REST_BREAK",
+        "LACTATION_BREAK"
+       ],
+       "description": "Kind of break. BREAK is a generic break; use MEAL_BREAK or REST_BREAK when known, and LACTATION_BREAK where the time tracking policy offers it."
+      },
+      {
+       "name": "start",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Break start, local time where the work happened (no UTC offset)."
+      }
+     ]
+    },
+    {
+     "name": "origin",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "enum": [
+      "PLATFORM",
+      "MOBILE",
+      "ADMIN",
+      "AUTO_SUBMIT",
+      "INTERNAL_INTEGRATION",
+      "EXTERNAL_INTEGRATION",
+      "SLACK"
+     ],
+     "description": "Channel the shift was entered through. PLATFORM is the Deel web app, ADMIN is Deel staff, AUTO_SUBMIT is automatic submission, INTERNAL_INTEGRATION is another Deel product, EXTERNAL_INTEGRATION is this API; null when the channel was not recorded."
+    },
+    {
+     "name": "status",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "enum": [
+      "PENDING",
+      "APPROVED",
+      "REJECTED"
+     ],
+     "description": "Approval status of the shift. On a pay-as-you-go contract it follows the hourly report: APPROVED also covers hourly reports being processed, paid or marked not payable."
+    },
+    {
+     "name": "timezone",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "IANA time zone the shift was worked in: as sent, or filled from the requester's profile when it was not sent; null when neither had one."
+    },
+    {
+     "name": "call_outs",
+     "in": "body",
+     "type": "array",
+     "required": true,
+     "description": "Call-outs inside an ON_CALL shift; empty for other types.",
+     "properties": [
+      {
+       "name": "end",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Call-out end, local time (no UTC offset). After start and not after the shift end."
+      },
+      {
+       "name": "start",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Call-out start, local time where the work happened (no UTC offset)."
+      }
+     ]
+    },
+    {
+     "name": "created_at",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "When the shift was created, in UTC."
+    },
+    {
+     "name": "project_id",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Project the time was spent on; null when none."
+    },
+    {
+     "name": "updated_at",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "When the shift last changed, in UTC."
+    },
+    {
+     "name": "break_hours",
+     "in": "body",
+     "type": "number",
+     "required": true,
+     "description": "Hours spent on breaks."
+    },
+    {
+     "name": "contract_id",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Deel contract the shift is recorded on."
+    },
+    {
+     "name": "description",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "What the worker did; null when none."
+    },
+    {
+     "name": "is_half_day",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Whether a DAY_TRACKING shift counts as half a day. Present only on DAY_TRACKING shifts."
+    },
+    {
+     "name": "total_hours",
+     "in": "body",
+     "type": "number",
+     "required": true,
+     "description": "Hours from start to end, breaks included."
+    },
+    {
+     "name": "worked_hours",
+     "in": "body",
+     "type": "number",
+     "required": true,
+     "description": "Hours worked, total hours minus break hours."
+    },
+    {
+     "name": "is_meal_break_waived",
+     "in": "body",
+     "type": "boolean",
+     "required": true,
+     "description": "Whether the worker waived the meal break."
+    }
+   ],
+   "api": "rest",
+   "beta": true,
+   "versions": [
+    {
+     "version": "2026-11-13",
+     "beta_until": "2027-02-13T00:00:00.000Z",
+     "sunset_at": null
+    }
+   ],
+   "form": {
+    "positionals": [],
+    "scopes": [],
+    "selectors": []
+   }
+  },
+  {
+   "command": [
+    "time-tracking",
+    "shifts",
+    "create"
+   ],
+   "method": "POST",
    "path": "/v2/time_tracking/shifts",
    "summary": "Create shifts",
    "version": "2026-01-01",
@@ -183144,7 +183512,11 @@
    "form": {
     "positionals": [],
     "scopes": [],
-    "selectors": []
+    "selectors": [
+     {
+      "flag": "legacy"
+     }
+    ]
    }
   },
   {
@@ -183244,7 +183616,11 @@
      }
     ],
     "scopes": [],
-    "selectors": []
+    "selectors": [
+     {
+      "flag": "external-id"
+     }
+    ]
    }
   },
   {
@@ -183577,6 +183953,322 @@
       "param": "external_id"
      }
     ],
+    "scopes": [],
+    "selectors": [
+     {
+      "flag": "external-id"
+     }
+    ]
+   }
+  },
+  {
+   "command": [
+    "time-tracking",
+    "shifts",
+    "list"
+   ],
+   "method": "GET",
+   "path": "/time-tracking/shifts",
+   "summary": "List shifts in an organization",
+   "version": "2026-11-13",
+   "async": false,
+   "bodyKind": "none",
+   "supportsMultipart": false,
+   "bodyWrapper": "none",
+   "params": [
+    {
+     "name": "from",
+     "in": "query",
+     "type": "string",
+     "required": true,
+     "description": "First shift day of the range, inclusive. The range spans at most 31 days."
+    },
+    {
+     "name": "to",
+     "in": "query",
+     "type": "string",
+     "required": true,
+     "description": "Last shift day of the range, inclusive. The range spans at most 31 days."
+    },
+    {
+     "name": "contract_ids",
+     "in": "query",
+     "type": "array",
+     "required": false,
+     "description": "Return only shifts on these contracts. Repeat the key for several values. Worker tokens only see their own contracts; other contracts return no shifts."
+    },
+    {
+     "name": "statuses",
+     "in": "query",
+     "type": "array",
+     "required": false,
+     "description": "Return only shifts in these approval statuses. Repeat the key for several values. A pay-as-you-go shift is matched on its own approval status, which can differ from the status it shows when its hourly report has moved on."
+    },
+    {
+     "name": "types",
+     "in": "query",
+     "type": "array",
+     "required": false,
+     "description": "Return only shifts of these types. Repeat the key for several values."
+    },
+    {
+     "name": "origins",
+     "in": "query",
+     "type": "array",
+     "required": false,
+     "description": "Return only shifts entered through these channels. Repeat the key for several values."
+    },
+    {
+     "name": "contract_types",
+     "in": "query",
+     "type": "array",
+     "required": false,
+     "description": "Return only shifts on contracts of these types. Repeat the key for several values."
+    },
+    {
+     "name": "project_id",
+     "in": "query",
+     "type": "string",
+     "required": false,
+     "description": "Return only shifts recorded against this project. Pay-as-you-go shifts are not matched by this filter yet."
+    },
+    {
+     "name": "limit",
+     "in": "query",
+     "type": "integer",
+     "required": false,
+     "description": "Maximum number of shifts in the page."
+    },
+    {
+     "name": "cursor",
+     "in": "query",
+     "type": "string",
+     "required": false,
+     "description": "Opaque cursor from the previous page's next_cursor. Send it with the same filters, in the same order, and the same limit as the first page."
+    }
+   ],
+   "bodyProps": [],
+   "fileFields": [],
+   "responseKind": "array",
+   "responseFields": [
+    {
+     "name": "id",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Deel ID of the shift; the shift_id path parameter."
+    },
+    {
+     "name": "end",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Shift end as local clock time, without a UTC offset; null for duration-only and DAY_TRACKING shifts."
+    },
+    {
+     "name": "date",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Shift day, the local date the shift belongs to."
+    },
+    {
+     "name": "type",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "enum": [
+      "REGULAR",
+      "OVERTIME",
+      "ON_CALL",
+      "KEEP_IN_TOUCH",
+      "DAY_TRACKING"
+     ],
+     "description": "Kind of time the shift records. Which types a contract accepts depends on its time tracking policy."
+    },
+    {
+     "name": "start",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Shift start as local clock time, without a UTC offset; null for duration-only and DAY_TRACKING shifts."
+    },
+    {
+     "name": "breaks",
+     "in": "body",
+     "type": "array",
+     "required": true,
+     "description": "Breaks inside the shift; empty when there are none.",
+     "properties": [
+      {
+       "name": "end",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Break end, local time (no UTC offset). After start and not after the shift end."
+      },
+      {
+       "name": "type",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "enum": [
+        "BREAK",
+        "MEAL_BREAK",
+        "REST_BREAK",
+        "LACTATION_BREAK"
+       ],
+       "description": "Kind of break. BREAK is a generic break; use MEAL_BREAK or REST_BREAK when known, and LACTATION_BREAK where the time tracking policy offers it."
+      },
+      {
+       "name": "start",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Break start, local time where the work happened (no UTC offset)."
+      }
+     ]
+    },
+    {
+     "name": "origin",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "enum": [
+      "PLATFORM",
+      "MOBILE",
+      "ADMIN",
+      "AUTO_SUBMIT",
+      "INTERNAL_INTEGRATION",
+      "EXTERNAL_INTEGRATION",
+      "SLACK"
+     ],
+     "description": "Channel the shift was entered through. PLATFORM is the Deel web app, ADMIN is Deel staff, AUTO_SUBMIT is automatic submission, INTERNAL_INTEGRATION is another Deel product, EXTERNAL_INTEGRATION is this API; null when the channel was not recorded."
+    },
+    {
+     "name": "status",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "enum": [
+      "PENDING",
+      "APPROVED",
+      "REJECTED"
+     ],
+     "description": "Approval status of the shift. On a pay-as-you-go contract it follows the hourly report: APPROVED also covers hourly reports being processed, paid or marked not payable."
+    },
+    {
+     "name": "timezone",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "IANA time zone the shift was worked in: as sent, or filled from the requester's profile when it was not sent; null when neither had one."
+    },
+    {
+     "name": "call_outs",
+     "in": "body",
+     "type": "array",
+     "required": true,
+     "description": "Call-outs inside an ON_CALL shift; empty for other types.",
+     "properties": [
+      {
+       "name": "end",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Call-out end, local time (no UTC offset). After start and not after the shift end."
+      },
+      {
+       "name": "start",
+       "in": "body",
+       "type": "string",
+       "required": true,
+       "description": "Call-out start, local time where the work happened (no UTC offset)."
+      }
+     ]
+    },
+    {
+     "name": "created_at",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "When the shift was created, in UTC."
+    },
+    {
+     "name": "project_id",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Project the time was spent on; null when none."
+    },
+    {
+     "name": "updated_at",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "When the shift last changed, in UTC."
+    },
+    {
+     "name": "break_hours",
+     "in": "body",
+     "type": "number",
+     "required": true,
+     "description": "Hours spent on breaks."
+    },
+    {
+     "name": "contract_id",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "Deel contract the shift is recorded on."
+    },
+    {
+     "name": "description",
+     "in": "body",
+     "type": "string",
+     "required": true,
+     "description": "What the worker did; null when none."
+    },
+    {
+     "name": "is_half_day",
+     "in": "body",
+     "type": "boolean",
+     "required": false,
+     "description": "Whether a DAY_TRACKING shift counts as half a day. Present only on DAY_TRACKING shifts."
+    },
+    {
+     "name": "total_hours",
+     "in": "body",
+     "type": "number",
+     "required": true,
+     "description": "Hours from start to end, breaks included."
+    },
+    {
+     "name": "worked_hours",
+     "in": "body",
+     "type": "number",
+     "required": true,
+     "description": "Hours worked, total hours minus break hours."
+    },
+    {
+     "name": "is_meal_break_waived",
+     "in": "body",
+     "type": "boolean",
+     "required": true,
+     "description": "Whether the worker waived the meal break."
+    }
+   ],
+   "api": "rest",
+   "beta": true,
+   "versions": [
+    {
+     "version": "2026-11-13",
+     "beta_until": "2027-02-13T00:00:00.000Z",
+     "sunset_at": null
+    }
+   ],
+   "form": {
+    "positionals": [],
     "scopes": [],
     "selectors": []
    }
@@ -183942,7 +184634,11 @@
    "form": {
     "positionals": [],
     "scopes": [],
-    "selectors": []
+    "selectors": [
+     {
+      "flag": "legacy"
+     }
+    ]
    }
   },
   {
@@ -184834,7 +185530,11 @@
      }
     ],
     "scopes": [],
-    "selectors": []
+    "selectors": [
+     {
+      "flag": "external-id"
+     }
+    ]
    }
   },
   {
