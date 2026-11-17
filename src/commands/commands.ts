@@ -4,7 +4,7 @@ import { defineCommand } from "citty";
 import type { ArgsDef, CommandDef } from "citty";
 import { CliError } from "../core/errors.ts";
 import { unknownFlag } from "../core/flags.ts";
-import { refuseMissingValues } from "./shared.ts";
+import { refuseMissingValues, refuseRepeatedValues } from "./shared.ts";
 import { commandRows, renderCommandRows } from "../core/commands-list.ts";
 import { realIO } from "../core/io.ts";
 import { allDescriptors, loadGeneratedDescriptors } from "../public-api/commands.ts";
@@ -22,6 +22,7 @@ export function createCommandsCommand(statics: () => Record<string, CommandDef>)
     args,
     async run(cittyCtx) {
       refuseMissingValues(cittyCtx.rawArgs, args);
+      refuseRepeatedValues(cittyCtx.rawArgs, args);
       // It takes no words and no other flag: a stray one (`--filter a b`, `--fliter a`) would widen the list unnoticed.
       const unknown = unknownFlag(cittyCtx.rawArgs, Object.keys(args));
       if (unknown) throw new CliError("usage.flag", `'deel commands' has no flag ${unknown}.`, "Run it with --help to see its flags.");

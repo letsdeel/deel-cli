@@ -75,6 +75,24 @@ export function flagMissingValue(argv: string[], flags: string[]): string | unde
   return undefined;
 }
 
+// The first of `flags` that argv types more than once, in any mix of the spellings the parser reads (--a-b, --aB,
+// --a-b=v), as it was typed the second time. The parser would keep only the last value, so `--env demo … --env prod`
+// would quietly go to prod. The values are not compared: a repeat is a mistake either way. Tokens after `--` are arguments.
+export function flagRepeated(argv: string[], flags: string[]): string | undefined {
+  const seen = new Set<string>();
+  for (const token of argv) {
+    if (token === "--") return undefined;
+    if (!token.startsWith("--")) continue;
+    const at = token.indexOf("=");
+    const typed = at === -1 ? token.slice(2) : token.slice(2, at);
+    const flag = flags.find((candidate) => acceptsFlag(candidate, typed));
+    if (flag === undefined) continue;
+    if (seen.has(flag)) return typed;
+    seen.add(flag);
+  }
+  return undefined;
+}
+
 // The first flag in argv, as typed, that none of `known` accepts in any spelling the parser reads (--a-b, --aB, --no-a).
 export function unknownFlag(argv: string[], known: string[]): string | undefined {
   for (const token of argv) {

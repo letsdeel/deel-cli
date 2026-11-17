@@ -21,7 +21,7 @@ import { setLoggingEnabled, setLogBodiesEnabled } from "./core/logging.ts";
 import { EXIT } from "./core/errors.ts";
 import { CliError } from "./core/errors.ts";
 import { CLI_VERSION } from "./version.ts";
-import { commandToken, commonArgs, configFrom, gatherFiles, gatherFlagValues, outputOpts, refuseMissingValues, valuedFlags } from "./commands/shared.ts";
+import { commandToken, commonArgs, configFrom, gatherFiles, gatherFlagValues, outputOpts, refuseMissingValues, refuseRepeatedValues, valuedFlags } from "./commands/shared.ts";
 import type { Args } from "./commands/shared.ts";
 import { staticCommands } from "./commands/index.ts";
 import {
@@ -71,6 +71,8 @@ async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<st
   // Every flag of this endpoint that takes a value (its own parameters as well as the global ones), before --input, --file
   // or anything else reads a value, and before any request: citty reads a bare one as `true` or as the next flag.
   refuseMissingValues(cittyCtx.rawArgs, argsForDescriptor(descriptor));
+  // A single-value flag given twice, before anything reads it or asks to confirm; array parameters collect every value.
+  refuseRepeatedValues(cittyCtx.rawArgs, argsForDescriptor(descriptor), descriptor.params.filter((param) => param.type === "array").map(flagOf));
   setLoggingEnabled(args.log !== false);
   setLogBodiesEnabled(args["log-bodies"] === true);
 
@@ -197,6 +199,9 @@ function formCommand(descriptors: Descriptor[]): CommandDef {
     args: { ...commonArgs },
     async run(cittyCtx) {
       const rawArgs = joinSwitchValues(cittyCtx.rawArgs, switchesOf(descriptors));
+      // A picking flag given twice would pick the endpoint by its last value, so it is refused before one is picked.
+      const picking = descriptors.flatMap((d) => [...d.form!.selectors.filter((s) => s.value !== undefined).map((s) => s.flag), ...d.form!.scopes.map((s) => s.flag)]);
+      refuseRepeatedValues(rawArgs, Object.fromEntries(picking.map((flag) => [flag, { type: "string" }])) as ArgsDef);
       const descriptor = selectForm(descriptors, rawArgs);
       const form = descriptor.form!;
       // --base-url is hidden from help but still takes a value, so it is declared for the parse.
@@ -221,6 +226,8 @@ function formCommand(descriptors: Descriptor[]): CommandDef {
       const positional = new Set(form.positionals.map((p) => p.param));
       const missing = flagMissingValue(rawArgs, [...descriptor.params.filter((param) => param.type !== "boolean" && !positional.has(param.name)).map(flagOf), ...form.scopes.map((scope) => scope.flag), ...form.selectors.filter((s) => s.value !== undefined).map((s) => s.flag)]);
       if (missing) throw new CliError("usage.flag_value", `--${missing} needs a value.`, `Write --${missing}=<value>; run it with --help to see the values.`);
+      // A single-value flag given twice (array parameters collect every value), checked before the arguments are counted.
+      refuseRepeatedValues(rawArgs, defs, descriptor.params.filter((param) => param.type === "array").map(flagOf));
       const args = parseArgs(rawArgs, defs) as Args & { _: string[] };
       const given = args._.map(String);
       if (given.length !== form.positionals.length) {

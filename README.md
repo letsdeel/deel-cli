@@ -239,6 +239,8 @@ deel <command> --input field=value --file attachment=@/path/to/file.pdf
 
 `--file` is repeatable across fields and within a single field (multiple files under the same part). Some endpoints accept both JSON and multipart— those default to JSON; add `--form` to switch.
 
+Every other flag that takes a value is given once. Typing one twice (`--env demo … --env prod`, in any spelling) is a usage error and nothing is sent. Only array query params, `--file` and `--ca-cert` repeat.
+
 ## Output
 
 Output is the JSON envelope by default. Use `--no-json` on a TTY to get a human-readable view instead. The envelope is:
