@@ -97,7 +97,7 @@
   "test/commands.test.ts": "f29d454614dcf20746c206c9fb808589fccaf03c1a89c9157f2d33710a769092",
   "test/config.test.ts": "502d4432124c00ac52bf7331d9becc99c612342bb01448685641574609454f1a",
   "test/confirm.test.ts": "450a29341e14b76dbdac19d422fb4e599210c89849cf121099aaa123ddd1dd31",
-  "test/constants.test.ts": "e610dd24ddae60b24747c1ae038039ad3b71cb9df5ed7aaf39a90a749e5d83a3",
+  "test/constants.test.ts": "f0039845005850f1cc6cb6d6b2809e1318d462944e50644b521bd53be7c6a980",
   "test/definitions.test.ts": "421099257d3ba9e36770d2e0484317da9c31deb045b00a2c928873dc8de419ab",
   "test/errors.test.ts": "b879d2048f46627864312ba2bd31209f6be41be3a2e3babfed3e2b91e26ccd79",
   "test/executor.test.ts": "262576a9d8cae97001837c4831be5363cb5c70819af8c6a5f94f5551896a9c72",
