@@ -77,11 +77,11 @@ test("an optional header is sent only when given", async () => {
 });
 
 // The flag and the environment, through the whole command line: the flag is optional for citty so the environment can fill it.
-async function runStatus(argv: string[], env: Record<string, string | undefined>) {
+async function runStatus(argv: string[], env: Record<string, string | undefined>, command: string[] = ["files", "status", "get", FILE_ID]) {
   const sent: Record<string, string>[] = [];
   const realFetch = globalThis.fetch;
   const saved: Record<string, string | undefined> = {};
-  const vars = { DEEL_TOKEN: "a-token", DEEL_LOG: "off", DEEL_CLI_BASE_URL: "https://example.test/rest", DEEL_ONE_TIME_SECRET: undefined, ...env };
+  const vars = { DEEL_TOKEN: "a-token", DEEL_LOG: "off", DEEL_CLI_BASE_URL: "https://example.test/rest", DEEL_ONE_TIME_SECRET: undefined, DEEL_UPLOAD_METHOD: undefined, ...env };
   for (const [key, value] of Object.entries(vars)) {
     saved[key] = process.env[key];
     if (value === undefined) delete process.env[key];
@@ -94,7 +94,7 @@ async function runStatus(argv: string[], env: Record<string, string | undefined>
   const original = process.stdout.write;
   process.stdout.write = (() => true) as typeof process.stdout.write;
   try {
-    const result = await run(["files", "status", "get", FILE_ID, ...argv]).then(() => undefined, (error: unknown) => error);
+    const result = await run([...command, ...argv]).then(() => undefined, (error: unknown) => error);
     return { sent, error: result };
   } finally {
     process.stdout.write = original;
@@ -118,6 +118,23 @@ test("with neither the flag nor the environment variable the command stops befor
   const none = await runStatus([], {});
   assert.ok(none.error instanceof CliError && none.error.code === "usage.header");
   assert.equal(none.sent.length, 0);
+});
+
+test("an environment value is checked against the header's allowed values before any request", async () => {
+  const create = ["files", "create"];
+  const body = ["--input", '{"filename":"a.png"}'];
+  const bad = await runStatus(body, { DEEL_UPLOAD_METHOD: "Multipart" }, create);
+  assert.ok(bad.error instanceof CliError && bad.error.code === "usage.header" && /DEEL_UPLOAD_METHOD/.test(bad.error.message));
+  assert.equal(bad.sent.length, 0);
+  const good = await runStatus(body, { DEEL_UPLOAD_METHOD: "multipart" }, create);
+  assert.equal(good.error, undefined);
+  assert.equal(good.sent[0]["x-upload-method"], "multipart");
+});
+
+test("a header given several values is sent comma-joined", () => {
+  const params = [{ name: "x-list", in: "header", type: "array", required: true, flag: "list" }];
+  const { ctx, seen } = ctxWith(ok);
+  return execute({ ...descriptor("GET", "/files/{fileid}/status"), params: [descriptor("GET", "/files/{fileid}/status").params[0], ...params] } as never, { flags: { fileid: FILE_ID, "x-list": ["a", "b"] }, files: {} }, ctx, { output: OUTPUT, debug: false, form: false }).then(() => assert.equal(headerOf(seen[0], "x-list"), "a,b"));
 });
 
 test("the secret is masked in the request headers the local log records", () => {

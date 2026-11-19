@@ -89,7 +89,11 @@ async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<st
       if (value !== undefined) flags[param.name] = String(value);
       else if (param.in === "header") {
         const fromEnv = process.env[headerEnvName(param)]?.trim();
-        if (fromEnv) flags[param.name] = fromEnv;
+        if (fromEnv) {
+          // The flag is an enum for citty, which rejects a bad value; an environment value gets the same check.
+          if (param.enum && !param.enum.includes(fromEnv)) throw new CliError("usage.header", `${headerEnvName(param)} must be one of: ${param.enum.join(", ")}`, `Fix or unset ${headerEnvName(param)}.`);
+          flags[param.name] = fromEnv;
+        }
       }
     }
   }

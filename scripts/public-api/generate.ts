@@ -55,9 +55,14 @@ function mapType(schema: AnyObj | undefined): ScalarType {
 // is --one-time-secret) and read from DEEL_<FLAG> when the flag is not given (see readHeaderValue in src/core/executor.ts).
 const MANAGED_HEADERS = new Set(["authorization", "accept", "content-type", "x-beta", "x-version", "idempotency-key", "x-request-id"]);
 
+// A header flag reads DEEL_<FLAG> when it is not given, so its name must not match a variable the CLI already reads for its own
+// settings (DEEL_TOKEN holds the user's token and would be sent as the header's value).
+const CLI_ENV_FLAGS = new Set(["token", "cli-base-url", "env", "ca-cert", "cert-store", "log", "log-bodies", "log-dir", "log-max-files", "log-max-size", "oauth-client-id", "oauth-issuer", "tls-retry"].map((name) => name.replace(/-/g, "")));
+
 function headerFlag(name: string, path: string): string {
   const flag = name.toLowerCase().replace(/^x-/, "");
   if (GLOBAL_FLAG_KEYS.has(squash(flag))) throw new Error(`${path}: header "${name}" would take the global flag --${flag}`);
+  if (CLI_ENV_FLAGS.has(squash(flag))) throw new Error(`${path}: header "${name}" would read DEEL_${flag.toUpperCase().replace(/[^A-Z0-9]+/g, "_")}, a variable the CLI uses for its own settings`);
   return flag;
 }
 

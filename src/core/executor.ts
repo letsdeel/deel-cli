@@ -114,7 +114,8 @@ function buildHeaders(descriptor: Descriptor, flags: ParsedCall["flags"]): Recor
   for (const param of descriptor.params) {
     if (param.in !== "header") continue;
     const value = flags[param.name];
-    if (typeof value === "string" && value !== "") out[param.name] = value;
+    const text = Array.isArray(value) ? value.join(",") : value;
+    if (typeof text === "string" && text !== "") out[param.name] = text;
     else if (param.required) throw new CliError("usage.header", `Missing required --${flagOf(param)}`, `Pass --${flagOf(param)} <value> or set ${headerEnvName(param)}.`);
   }
   return out;

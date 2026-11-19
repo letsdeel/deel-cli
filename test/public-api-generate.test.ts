@@ -501,3 +501,10 @@ test("a header whose flag would be a global flag is refused", () => {
   const { errors } = generate([withHeader], options());
   assert.ok(errors.some((message) => /would take the global flag --fields/.test(message)), errors.join("\n"));
 });
+
+test("a header whose flag would read a variable the CLI uses for its own settings is refused", () => {
+  const [base] = widgets().filter((d) => d.method === "GET" && !d.path.includes("{"));
+  const withHeader: Definition = { ...base, operation: { ...base.operation, parameters: [{ name: "X-Token", in: "header", required: false, schema: { type: "string" } }] } };
+  const { errors } = generate([withHeader], options());
+  assert.ok(errors.some((message) => /would read DEEL_TOKEN/.test(message)), errors.join("\n"));
+});
