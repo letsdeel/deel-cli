@@ -131,6 +131,20 @@ test("an environment value is checked against the header's allowed values before
   assert.equal(good.sent[0]["x-upload-method"], "multipart");
 });
 
+test("an array-typed header reads its environment variable too, comma-separated", async () => {
+  // No endpoint declares an array header yet, so give the status command one for this test.
+  const status = (await loadGeneratedDescriptors()).find((d) => d.method === "GET" && d.path === "/files/{fileid}/status")!;
+  const extra = { name: "x-list", in: "header", type: "array", required: false, flag: "list" } as (typeof status.params)[number];
+  status.params.push(extra);
+  try {
+    const out = await runStatus(["--one-time-secret", "s"], { DEEL_LIST: "a, b" });
+    assert.equal(out.error, undefined);
+    assert.equal(out.sent[0]["x-list"], "a,b");
+  } finally {
+    status.params.splice(status.params.indexOf(extra), 1);
+  }
+});
+
 test("a header given several values is sent comma-joined", () => {
   const params = [{ name: "x-list", in: "header", type: "array", required: true, flag: "list" }];
   const { ctx, seen } = ctxWith(ok);

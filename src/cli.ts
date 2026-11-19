@@ -84,6 +84,13 @@ async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<st
       const values = gatherFlagValues(cittyCtx.rawArgs, flagOf(param));
       if (values.length) flags[param.name] = values;
       else if (args[flagOf(param)] !== undefined) flags[param.name] = [String(args[flagOf(param)])];
+      else if (param.in === "header") {
+        // Same fallback as a single-value header: DEEL_<FLAG> holds the values, comma-separated.
+        const fromEnv = (process.env[headerEnvName(param)] ?? "").split(",").map((item) => item.trim()).filter(Boolean);
+        const bad = param.enum ? fromEnv.find((item) => !param.enum!.includes(item)) : undefined;
+        if (bad !== undefined) throw new CliError("usage.header", `${headerEnvName(param)} must be one of: ${param.enum!.join(", ")}`, `Fix or unset ${headerEnvName(param)}.`);
+        if (fromEnv.length) flags[param.name] = fromEnv;
+      }
     } else {
       const value = args[flagOf(param)];
       if (value !== undefined) flags[param.name] = String(value);
