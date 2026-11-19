@@ -23,15 +23,37 @@ const REPO_ROOT = resolve(HERE, "../../..");
 
 type AnyObj = Record<string, any>;
 
-function mapType(schema: AnyObj | undefined): ScalarType {
-  const t = schema?.type;
+// Resolves the ways a spec marks a schema nullable: OAS 3.0 `nullable: true`, OAS 3.1
+// `type: ["string", "null"]`, and a `oneOf`/`anyOf` that includes `{ type: "null" }`. Returns
+// the schema with the null member stripped, so type, enum and properties read normally.
+export function normalizeSchema(schema: AnyObj | undefined): { schema: AnyObj; nullable: boolean } {
+  let out: AnyObj = schema ?? {};
+  let nullable = out.nullable === true;
+  const isNull = (member: AnyObj) => member?.type === "null";
+  for (const key of ["oneOf", "anyOf"] as const) {
+    const variants: AnyObj[] | undefined = out[key];
+    if (!Array.isArray(variants) || !variants.some(isNull)) continue;
+    nullable = true;
+    const rest = variants.filter((member) => !isNull(member));
+    const { [key]: _drop, ...outer } = out;
+    out = rest.length === 1 ? { ...rest[0], ...outer } : outer;
+  }
+  if (Array.isArray(out.type)) {
+    if (out.type.includes("null")) nullable = true;
+    out = { ...out, type: out.type.find((t: string) => t !== "null") };
+  }
+  return { schema: out, nullable };
+}
+
+function mapType(rawSchema: AnyObj | undefined): ScalarType {
+  const t = normalizeSchema(rawSchema).schema.type;
   if (t === "number" || t === "integer" || t === "boolean" || t === "array" || t === "object") return t;
   return "string";
 }
 
-function paramsFrom(op: AnyObj, headers: Record<string, string> = {}): CliParam[] {
+function paramsFrom(op: AnyObj): CliParam[] {
   const raw: AnyObj[] = op.parameters ?? [];
-  const fromPathAndQuery = raw
+  return raw
     .filter((p) => p.in === "path" || p.in === "query")
     .map((p) => ({
       name: p.name,
@@ -41,21 +63,6 @@ function paramsFrom(op: AnyObj, headers: Record<string, string> = {}): CliParam[
       ...(p.schema?.enum ? { enum: (p.schema.enum as unknown[]).filter((v): v is string => v !== null) } : {}),
       ...(p.description ? { description: p.description } : {}),
     }));
-  // Only the headers the command map names become flags; the CLI manages every other header itself.
-  const fromHeaders = Object.entries(headers).flatMap(([flag, headerName]) => {
-    const p = raw.find((candidate) => candidate.in === "header" && String(candidate.name).toLowerCase() === headerName.toLowerCase());
-    if (!p) return [];
-    return [{
-      name: flag,
-      in: "header" as const,
-      header: headerName,
-      type: mapType(p.schema),
-      required: Boolean(p.required),
-      ...(p.schema?.enum ? { enum: (p.schema.enum as unknown[]).filter((v): v is string => v !== null) } : {}),
-      ...(p.description ? { description: p.description } : {}),
-    }];
-  });
-  return [...fromPathAndQuery, ...fromHeaders];
 }
 
 function unwrapDataSchema(schema: AnyObj | undefined): { root: AnyObj | undefined; wrapped: boolean } {
@@ -70,7 +77,8 @@ export function splitFields(objSchema: AnyObj | undefined): { textProps: CliPara
   const required: string[] = objSchema?.required ?? [];
   const textProps: CliParam[] = [];
   const fileFields: string[] = [];
-  for (const [name, schema] of Object.entries<AnyObj>(props)) {
+  for (const [name, rawSchema] of Object.entries<AnyObj>(props)) {
+    const { schema, nullable } = normalizeSchema(rawSchema);
     const isBinary = schema.format === "binary";
     const isBinaryArray = schema.type === "array" && schema.items?.format === "binary";
     if (isBinary || isBinaryArray) {
@@ -85,7 +93,7 @@ export function splitFields(objSchema: AnyObj | undefined): { textProps: CliPara
         in: "body",
         type,
         required: required.includes(name),
-        ...(schema.nullable === true ? { nullable: true } : {}),
+        ...(nullable ? { nullable: true as const } : {}),
         ...(schema.enum ? { enum: (schema.enum as unknown[]).filter((v): v is string => v !== null) } : {}),
         ...(schema.description ? { description: schema.description } : {}),
         ...(properties?.length ? { properties } : {}),
@@ -135,7 +143,8 @@ export function bodyFrom(op: AnyObj): {
 }
 
 function propsToParams(props: AnyObj = {}, required: string[] = []): CliParam[] {
-  return Object.entries<AnyObj>(props).map(([name, s]) => {
+  return Object.entries<AnyObj>(props).map(([name, rawSchema]) => {
+    const s = normalizeSchema(rawSchema).schema;
     const type = mapType(s);
     // Recurse into nested objects, and into array-of-object items, so every response
     // field is visible in --help / --help --json, however deep.
@@ -146,10 +155,10 @@ function propsToParams(props: AnyObj = {}, required: string[] = []): CliParam[] 
       in: "body" as const,
       type,
       required: required.includes(name),
-      ...(s.nullable === true ? { nullable: true } : {}),
       ...(s.enum ? { enum: (s.enum as unknown[]).filter((v): v is string => v !== null) } : {}),
       ...(s.description ? { description: s.description } : {}),
       ...(properties?.length ? { properties } : {}),
+      ...(rawSchema?.["x-deel-sensitive"] === true || s["x-deel-sensitive"] === true || s.items?.["x-deel-sensitive"] === true ? { sensitive: true as const } : {}),
     };
   });
 }
@@ -182,8 +191,6 @@ type CommandEntry = {
   variant?: string;
   method: string;
   path: string;
-  confirm?: string;
-  headers?: Record<string, string>;
 };
 
 // ---------------------------------------------------------------------------
@@ -209,12 +216,7 @@ export function extract(spec: AnyObj, entries: CommandEntry[]): ExtractionResult
       continue;
     }
 
-    const params = paramsFrom(operation, entry.headers);
-    for (const [flag, headerName] of Object.entries(entry.headers ?? {})) {
-      if (!params.some((param) => param.in === "header" && param.name === flag)) {
-        hardErrors.push(`Missing header parameter: ${headerName} (flag --${flag} of "${entry.command}${entry.variant ? ` variant "${entry.variant}"` : ""}") is not on ${entry.method} ${entry.path}`);
-      }
-    }
+    const params = paramsFrom(operation);
     const { bodyKind, bodyProps, maxItems, fileFields, supportsMultipart, bodyWrapper } = bodyFrom(operation);
     const { responseKind, responseFields } = responseFrom(operation);
 
@@ -234,7 +236,6 @@ export function extract(spec: AnyObj, entries: CommandEntry[]): ExtractionResult
       path: entry.path,
       ...(operation.summary ? { summary: operation.summary } : {}),
       ...(operation["x-version"] ? { version: operation["x-version"] } : {}),
-      ...(entry.confirm ? { confirm: entry.confirm } : {}),
       async: isAsync,
       bodyKind,
       supportsMultipart,

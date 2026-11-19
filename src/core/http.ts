@@ -6,7 +6,8 @@ import { CliError } from "./errors.ts";
 import { redactHeaders } from "./auth.ts";
 import { isCertError, TLS_HINT, installCaTrust } from "./tls.ts";
 import type { Logger } from "./logging.ts";
-import { bodyLoggingEnabled } from "./logging.ts";
+import { bodyLoggingEnabled, maskMarkedFields, maskUrlQuery } from "./logging.ts";
+import type { CliParam } from "../types.ts";
 import { HEADER, HTTP_TIMEOUT_MS, RETRY_MAX_ATTEMPTS, RETRY_BASE_DELAY_MS } from "./constants.ts";
 
 export type HttpRequest = {
@@ -17,6 +18,7 @@ export type HttpRequest = {
   timeoutMs?: number;
   retryable?: boolean;
   meta?: Record<string, unknown>; // extra fields for logging (command, idempotency key, ...)
+  responseFields?: CliParam[]; // the endpoint's response fields, so the log masks the ones the spec marks sensitive
 };
 
 export type HttpResponse = {
@@ -59,8 +61,8 @@ export const fetchTransport: Transport = async (request) => {
     return { status: response.status, headers: headersToObject(response.headers), text, json };
   } catch (error) {
     const failure = error as Error;
-    if (failure.name === "AbortError") throw new CliError("network.timeout", `Request timed out: ${request.method} ${request.url}`);
-    if (isCertError(error)) throw new CliError("network.tls", `TLS verification failed: ${request.url}`, TLS_HINT);
+    if (failure.name === "AbortError") throw new CliError("network.timeout", `Request timed out: ${request.method} ${maskUrlQuery(request.url)}`);
+    if (isCertError(error)) throw new CliError("network.tls", `TLS verification failed: ${maskUrlQuery(request.url)}`, TLS_HINT);
     throw new CliError("network.error", `Network error: ${failure.message}`);
   } finally {
     clearTimeout(timer);
@@ -77,14 +79,23 @@ function isHttps(url: string): boolean {
   }
 }
 
-// Attach the bearer token, but never over a non-https URL (also guards redirects).
-export function withAuth(token: string | null): Middleware {
-  return (next) => (request) => {
-    const willSendCredential = Boolean(token) || Boolean(request.headers[HEADER.authorization]);
+// Resolves the bearer token at send time, so an OAuth access token can be refreshed first.
+export type TokenProvider = () => Promise<string | null>;
+
+// Attach the bearer token (a static string or an async provider), but never over a non-https URL
+// (also guards redirects). The provider is only called when the request carries no credential yet, and the
+// header goes on a copy, so a retry asks the provider again instead of resending a token that may have expired.
+export function withAuth(token: string | TokenProvider | null): Middleware {
+  return (next) => async (request) => {
+    const hasHeader = Boolean(request.headers[HEADER.authorization]);
+    const willSendCredential = Boolean(token) || hasHeader;
     if (willSendCredential && !isHttps(request.url)) {
-      throw new CliError("network.insecure", `Refusing to send credentials over a non-https URL: ${request.url}`, "Only https endpoints are supported.");
+      throw new CliError("network.insecure", `Refusing to send credentials over a non-https URL: ${maskUrlQuery(request.url)}`, "Only https endpoints are supported.");
     }
-    if (token && !request.headers[HEADER.authorization]) request.headers[HEADER.authorization] = `Bearer ${token}`;
+    if (token && !hasHeader) {
+      const value = typeof token === "function" ? await token() : token;
+      if (value) return next({ ...request, headers: { ...request.headers, [HEADER.authorization]: `Bearer ${value}` } });
+    }
     return next(request);
   };
 }
@@ -145,13 +156,13 @@ export function withLogging(logger: Logger, clock: () => number): Middleware {
       kind: "request",
       ...(request.meta ?? {}),
       method: request.method,
-      url: withBodies ? request.url : urlPath(request.url),
+      url: urlPath(request.url),
       request_id: request.headers[HEADER.requestId],
       status: response.status,
       duration_ms: clock() - startedAt,
       headers: redactHeaders(request.headers),
     };
-    if (withBodies) entry.response = response.json;
+    if (withBodies) entry.response = maskMarkedFields(response.json, request.responseFields);
     logger(entry);
     return response;
   };

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { envelope, applyFields, render } from "../src/core/output.ts";
 import type { OutputOpts } from "../src/core/output.ts";
 import { captureIO } from "../src/core/io.ts";
+import { readFileSync } from "node:fs";
 
 const opts = (over: Partial<OutputOpts> = {}): OutputOpts => ({ json: false, quiet: false, raw: false, ...over });
 
@@ -96,4 +97,10 @@ test("render --jq and --quiet keep operating on data only (page is not printed)"
   const io2 = captureIO({});
   await render(io2, paged, opts({ quiet: true }));
   assert.equal(io2.stdout.join("").trim(), "a\nb");
+});
+
+test("jq is loaded from the inline build so a compiled binary carries the wasm", () => {
+  const source = readFileSync(new URL("../src/core/output.ts", import.meta.url), "utf8");
+  assert.match(source, /import\("jq-wasm\/inline"\)/);
+  assert.doesNotMatch(source, /import\("jq-wasm"\)/);
 });

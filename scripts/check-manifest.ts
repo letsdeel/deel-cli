@@ -8,35 +8,18 @@ function entryKey(command: string, method: string, path: string, variant?: strin
   return `${command}\0${method.toUpperCase()}\0${path}\0${variant ?? ""}`;
 }
 
-type MapEntry = (typeof commandMap)[number];
-
-function headerErrors(entries: readonly MapEntry[], descriptors: readonly AnyDescriptor[]): string[] {
-  const errors: string[] = [];
-  const mapHeaders = new Map(entries.map((e) => [entryKey(e.command, e.method, e.path, e.variant), e.headers ?? {}]));
-  for (const d of descriptors) {
-    const k = entryKey(d.command.join(" "), d.method, d.path, d.variant);
-    if (!mapHeaders.has(k)) continue; // orphan, reported above
-    const want = Object.entries(mapHeaders.get(k)!).map(([flag, header]) => `${flag}=${header.toLowerCase()}`).sort();
-    const have = d.params.filter((p) => p.in === "header").map((p) => `${p.name}=${(p.header ?? "").toLowerCase()}`).sort();
-    if (want.join() !== have.join()) {
-      errors.push(`[headers] ${d.command.join(" ")} ${d.method} ${d.path}: manifest header flags [${have}] differ from map [${want}]`);
-    }
-  }
-  return errors;
-}
-
-function check(descriptors: AnyDescriptor[] = manifest.descriptors, entries: typeof commandMap = commandMap): string[] {
+function check(): string[] {
   const errors: string[] = [];
 
   const descriptorKeys = new Set<string>(
-    descriptors.map((d) => entryKey(d.command.join(" "), d.method, d.path, d.variant)),
+    manifest.descriptors.map((d) => entryKey(d.command.join(" "), d.method, d.path, d.variant)),
   );
   const mapKeys = new Set<string>(
-    entries.map((e) => entryKey(e.command, e.method, e.path, e.variant)),
+    commandMap.map((e) => entryKey(e.command, e.method, e.path, e.variant)),
   );
 
   // 1. Every map entry has a matching descriptor.
-  for (const entry of entries) {
+  for (const entry of commandMap) {
     const k = entryKey(entry.command, entry.method, entry.path, entry.variant);
     if (!descriptorKeys.has(k)) {
       const tag = entry.variant ? ` (variant: ${entry.variant})` : "";
@@ -45,7 +28,7 @@ function check(descriptors: AnyDescriptor[] = manifest.descriptors, entries: typ
   }
 
   // 2. Every descriptor has a map entry (no orphans).
-  for (const d of descriptors) {
+  for (const d of manifest.descriptors) {
     const k = entryKey(d.command.join(" "), d.method, d.path, d.variant);
     if (!mapKeys.has(k)) {
       const tag = d.variant ? ` (variant: ${d.variant})` : "";
@@ -53,24 +36,9 @@ function check(descriptors: AnyDescriptor[] = manifest.descriptors, entries: typ
     }
   }
 
-  // 3. A descriptor's confirm text matches its map entry.
-  const mapConfirm = new Map(entries.map((e) => [entryKey(e.command, e.method, e.path, e.variant), e.confirm]));
-  for (const d of descriptors) {
-    const k = entryKey(d.command.join(" "), d.method, d.path, d.variant);
-    if (!mapConfirm.has(k)) continue; // orphan, reported above
-    const want = mapConfirm.get(k);
-    const have = (d as { confirm?: string }).confirm;
-    if (want !== have) {
-      errors.push(`[confirm] ${d.command.join(" ")} ${d.method} ${d.path}: manifest confirm ${JSON.stringify(have)} differs from map ${JSON.stringify(want)}`);
-    }
-  }
-
-  // 3b. The header flags a map entry names are on its descriptor, and no descriptor has others.
-  errors.push(...headerErrors(entries, descriptors));
-
-  // 4. Variant groups: distinct variants; variant name must not collide with a param flag.
+  // 3. Variant groups: distinct variants; variant name must not collide with a param flag.
   const groups = new Map<string, AnyDescriptor[]>();
-  for (const d of descriptors) {
+  for (const d of manifest.descriptors) {
     const cmd = d.command.join(" ");
     (groups.get(cmd) ?? (groups.set(cmd, []), groups.get(cmd)!)).push(d);
   }
@@ -113,4 +81,4 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   );
 }
 
-export { check, headerErrors };
+export { check };

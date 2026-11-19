@@ -3,6 +3,7 @@
 // which makes output capturable in tests and TTY handling consistent.
 
 import { readFileSync } from "node:fs";
+import { isatty } from "node:tty";
 import { AGENT_ENV_SIGNALS } from "./constants.ts";
 
 export type IOStreams = {
@@ -10,28 +11,39 @@ export type IOStreams = {
   err(text: string): void;
   readStdin(): string;
   isTTY: boolean;
-  interactive: boolean;
+  interactive: boolean; // stdout is a terminal and no agent/CI signal is set: output may be formatted for a person
+  canPrompt: boolean; // a person can answer a [y/N] question: stdin and stderr are terminals and no agent/CI signal is set
 };
 
-function isAgentEnv(env: NodeJS.ProcessEnv): boolean {
+export function isAgentEnv(env: NodeJS.ProcessEnv): boolean {
   return AGENT_ENV_SIGNALS.some((signal) => (signal === "CI" ? env.CI === "true" : Boolean(env[signal])));
 }
 
-// Real streams backed by the process. Interactive only on a TTY with no agent/CI signal.
+// Whether a person can answer a [y/N] question: the answer is read from stdin and the question is asked on stderr, so
+// both must be terminals, and nobody answers under CI or an agent even when it gives the CLI a pty. stdout doesn't
+// count: `| jq` still prompts.
+export function canPromptFrom(stdinIsTTY: boolean, stderrIsTTY: boolean, env: NodeJS.ProcessEnv): boolean {
+  return stdinIsTTY && stderrIsTTY && !isAgentEnv(env);
+}
+
+// Real streams backed by the process. Interactive only on a TTY with no agent/CI signal. A prompt is read from stdin
+// and asked on stderr, so stdout may still be piped (`| jq`). isatty(0) is asked instead of process.stdin.isTTY:
+// creating process.stdin on a pipe makes fd 0 non-blocking, which breaks a later --token-stdin read (EAGAIN).
 export function realIO(): IOStreams {
   const isTTY = Boolean(process.stdout.isTTY);
-  const env = process.env;
+  const agent = isAgentEnv(process.env);
   return {
     out: (text) => void process.stdout.write(text),
     err: (text) => void process.stderr.write(text),
     readStdin: () => readFileSync(0, "utf8"),
     isTTY,
-    interactive: isTTY && !isAgentEnv(env),
+    interactive: isTTY && !agent,
+    canPrompt: canPromptFrom(isatty(0), isatty(2), process.env),
   };
 }
 
 // Test double: captures writes into buffers; feed stdin via `stdin`.
-export function captureIO(opts: { stdin?: string; isTTY?: boolean } = {}): IOStreams & { stdout: string[]; stderr: string[] } {
+export function captureIO(opts: { stdin?: string; isTTY?: boolean; canPrompt?: boolean } = {}): IOStreams & { stdout: string[]; stderr: string[] } {
   const stdout: string[] = [];
   const stderr: string[] = [];
   const isTTY = opts.isTTY ?? false;
@@ -43,5 +55,6 @@ export function captureIO(opts: { stdin?: string; isTTY?: boolean } = {}): IOStr
     readStdin: () => opts.stdin ?? "",
     isTTY,
     interactive: isTTY,
+    canPrompt: opts.canPrompt ?? isTTY,
   };
 }
