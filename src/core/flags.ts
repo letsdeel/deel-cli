@@ -7,6 +7,11 @@ export function flagOf(param: CliParam): string {
   return param.flag ?? param.name;
 }
 
+// The environment variable a header flag is read from when the flag is not given: --one-time-secret is DEEL_ONE_TIME_SECRET.
+export function headerEnvName(param: CliParam): string {
+  return `DEEL_${flagOf(param).toUpperCase().replace(/[^A-Z0-9]+/g, "_")}`;
+}
+
 // Whether the parser reads `--<key>` as the flag `flag`. It asks citty itself, so the spellings it accepts
 // (--a_b, --a-b, --aB, acronyms such as userIDs) can never drift from a copy of its rules kept here.
 export function acceptsFlag(flag: string, key: string): boolean {

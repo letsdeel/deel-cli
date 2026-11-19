@@ -330,12 +330,12 @@ test("the primary version is the newest stable one however the definitions are o
   }
 });
 
-test("header and cookie params never become flags", () => {
+test("a cookie param never becomes a flag; a header param does (see the header test below)", () => {
   const { manifest } = generate(
     parseDefinitions([gadget({ operation: gadgetOp({ parameters: [{ name: "x-trace", in: "header", schema: { type: "string" } }, { name: "sid", in: "cookie", schema: { type: "string" } }, { name: "q", in: "query", schema: { type: "string" } }] }) })]),
     options(),
   );
-  assert.deepEqual(manifest.descriptors[0].params.map((param) => param.name), ["q"]);
+  assert.deepEqual(manifest.descriptors[0].params.map((param) => param.name), ["x-trace", "q"]);
 });
 
 // ---------------- the command map ----------------
@@ -480,4 +480,24 @@ test("a confirmPrompt on an endpoint collapsed into another is an error, since i
   ];
   const { errors } = generate(definitions, options({ map }));
   assert.ok(errors.some((e) => /GET \/things\/\{thing_id\}\/b has a confirmPrompt but is collapsed into/.test(e)), errors.join("\n"));
+});
+
+test("a declared header becomes a flag named without its x- prefix; the headers the CLI manages get none", () => {
+  const [base] = widgets().filter((d) => d.method === "GET" && !d.path.includes("{"));
+  const header = (name: string, required: boolean) => ({ name, in: "header", required, schema: { type: "string" }, description: `the ${name} header` });
+  const withHeaders: Definition = {
+    ...base,
+    operation: { ...base.operation, parameters: [...(base.operation.parameters ?? []), header("X-One-Time-Secret", true), header("X-Beta", false), header("Idempotency-Key", false), header("X-Version", false)] },
+  };
+  const { manifest, errors } = generate([withHeaders], options());
+  assert.deepEqual(errors, []);
+  const headers = manifest.descriptors[0].params.filter((param) => param.in === "header");
+  assert.deepEqual(headers.map((param) => [param.name, param.flag, param.required]), [["x-one-time-secret", "one-time-secret", true]]);
+});
+
+test("a header whose flag would be a global flag is refused", () => {
+  const [base] = widgets().filter((d) => d.method === "GET" && !d.path.includes("{"));
+  const withHeader: Definition = { ...base, operation: { ...base.operation, parameters: [{ name: "X-Fields", in: "header", required: false, schema: { type: "string" } }] } };
+  const { errors } = generate([withHeader], options());
+  assert.ok(errors.some((message) => /would take the global flag --fields/.test(message)), errors.join("\n"));
 });

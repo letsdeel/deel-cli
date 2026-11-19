@@ -6,7 +6,7 @@
 import type { CliParam, Descriptor } from "./types.ts";
 import { CLI_VERSION } from "./version.ts";
 import { commonArgs } from "./commands/shared.ts";
-import { flagOf } from "./core/flags.ts";
+import { flagOf, headerEnvName } from "./core/flags.ts";
 import type { CommandDef } from "citty";
 import { withheldFieldFor } from "./core/constants.ts";
 import { domainOf, STAGE_ORDER, usageOf } from "./public-api/commands.ts";
@@ -206,7 +206,9 @@ function printFormSection(descriptor: Descriptor): void {
     for (const param of options) {
       const choices = param.enum ? `  [${param.enum.join(" | ")}]` : "";
       const requiredTag = param.required ? "  (required)" : "";
-      out(`  --${flagOf(param)}=<${param.type}>${requiredTag}${choices}${param.description ? `   ${param.description}` : ""}\n`);
+      // A header flag can also come from its environment variable; the flag wins.
+      const envHint = param.in === "header" ? `${param.description ? " " : "   "}Or set ${headerEnvName(param)}; the flag wins.` : "";
+      out(`  --${flagOf(param)}=<${param.type}>${requiredTag}${choices}${param.description ? `   ${param.description}` : ""}${envHint}\n`);
     }
     if (options.some((param) => param.type === "boolean")) out(`  A boolean is on with --<flag>, --<flag>=true or --<flag> true, and off with --no-<flag>, --<flag>=false or --<flag> false.\n`);
   }

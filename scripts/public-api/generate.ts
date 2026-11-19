@@ -50,12 +50,23 @@ function mapType(schema: AnyObj | undefined): ScalarType {
   return "string";
 }
 
+// Headers the CLI sets itself (the token, the content type, the API version, the idempotency key); a definition that declares
+// one of them gets no flag for it. Any other declared header becomes a flag, named without a leading "x-" (x-one-time-secret
+// is --one-time-secret) and read from DEEL_<FLAG> when the flag is not given (see readHeaderValue in src/core/executor.ts).
+const MANAGED_HEADERS = new Set(["authorization", "accept", "content-type", "x-beta", "x-version", "idempotency-key", "x-request-id"]);
+
+function headerFlag(name: string, path: string): string {
+  const flag = name.toLowerCase().replace(/^x-/, "");
+  if (GLOBAL_FLAG_KEYS.has(squash(flag))) throw new Error(`${path}: header "${name}" would take the global flag --${flag}`);
+  return flag;
+}
+
 const squash = (name: string) => name.toLowerCase().replace(/[-_]/g, "");
 const GLOBAL_FLAG_KEYS = new Set([...GLOBAL_FLAGS].map(squash));
 
 // citty also accepts the camelCase and kebab-case spelling of every flag, so names collide when they squash alike.
 function paramsFrom(operation: AnyObj, path: string): CliParam[] {
-  const declared = ((operation.parameters ?? []) as AnyObj[]).filter((param) => param.in === "path" || param.in === "query");
+  const declared = ((operation.parameters ?? []) as AnyObj[]).filter((param) => param.in === "path" || param.in === "query" || (param.in === "header" && !MANAGED_HEADERS.has(String(param.name).toLowerCase())));
   const inPath = pathParams(path);
   // The URL is filled from the path's own spelling, so a declared name that differs only in case or separators follows it.
   const renamed = declared.map((param) => {
@@ -70,12 +81,13 @@ function paramsFrom(operation: AnyObj, path: string): CliParam[] {
   const params = ([...renamed, ...missing] as AnyObj[])
     .map((param) => ({
       name: param.name,
-      in: param.in as "path" | "query",
+      in: param.in as "path" | "query" | "header",
       type: mapType(param.schema),
       required: param.in === "path" ? true : Boolean(param.required),
       ...(param.schema?.enum ? { enum: (param.schema.enum as unknown[]).filter((value): value is string => value !== null).map(String) } : {}),
       ...(param.description ? { description: param.description } : {}),
-      ...(param.in !== "path" && GLOBAL_FLAG_KEYS.has(squash(param.name)) ? { flag: `${param.name}-param` } : {}),
+      ...(param.in === "header" ? { name: String(param.name).toLowerCase(), flag: headerFlag(String(param.name), path) } : {}),
+      ...(param.in === "query" && GLOBAL_FLAG_KEYS.has(squash(param.name)) ? { flag: `${param.name}-param` } : {}),
     }));
   const flags = new Map<string, string>();
   for (const param of params) {

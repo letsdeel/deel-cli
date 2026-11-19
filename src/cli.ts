@@ -8,7 +8,7 @@ import { defineCommand, parseArgs, runCommand, showUsage } from "citty";
 import type { ArgsDef, CommandDef } from "citty";
 import type { Descriptor } from "./types.ts";
 import { allDescriptors, loadGeneratedDescriptors, matchForm, pickingFlags, selectForm, usageOf } from "./public-api/commands.ts";
-import { acceptsFlag, argvEnables, argvMentionsFlag, flagMissingValue, flagOf, joinSwitchValues, unknownFlag } from "./core/flags.ts";
+import { acceptsFlag, argvEnables, argvMentionsFlag, flagMissingValue, flagOf, headerEnvName, joinSwitchValues, unknownFlag } from "./core/flags.ts";
 export { unknownFlag };
 import { parseInput } from "./core/input.ts";
 import { createContext } from "./core/context.ts";
@@ -47,8 +47,9 @@ function argsForDescriptor(descriptor: Descriptor): ArgsDef {
     if (descriptor.form && (param.in === "path" || descriptor.form.scopes.some((s) => s.param === param.name))) continue; // typed as an argument or a scope flag
     args[flagOf(param)] = {
       type: param.type === "boolean" ? "boolean" : param.enum ? "enum" : "string",
-      description: param.description,
-      required: param.in === "path" ? true : param.required,
+      description: param.in === "header" ? `${param.description ?? `The ${param.name} header`} (or set ${headerEnvName(param)}; the flag wins)` : param.description,
+      // A header may come from its environment variable, which citty doesn't know: the executor refuses a missing required one.
+      required: param.in === "path" ? true : param.in === "header" ? false : param.required,
       ...(param.enum ? { options: param.enum } : {}),
     } as ArgsDef[string];
   }
@@ -86,6 +87,10 @@ async function runDescriptor(descriptor: Descriptor, cittyCtx: { args: Record<st
     } else {
       const value = args[flagOf(param)];
       if (value !== undefined) flags[param.name] = String(value);
+      else if (param.in === "header") {
+        const fromEnv = process.env[headerEnvName(param)]?.trim();
+        if (fromEnv) flags[param.name] = fromEnv;
+      }
     }
   }
   // Before --input and --file are read, the token is looked up or any request is sent (src/core/confirm.ts): a refusal
