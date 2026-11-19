@@ -13,10 +13,10 @@ export function parseInput(raw: string, bodyProps: CliParam[]): ParsedInput {
   const value = readRawValue(raw);
   const trimmed = value.trimStart();
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
-    return coerceTopLevel(parseJson(value), bodyProps);
+    return coerceTopLevel(parseJson(value), bodyProps, false);
   }
   if (value.includes("=")) {
-    return coerceTopLevel(parseShorthandObject(value), bodyProps);
+    return coerceTopLevel(parseShorthandObject(value), bodyProps, true);
   }
   throw new CliError(
     "input.unrecognized",
@@ -78,8 +78,14 @@ function unescape(text: string): string {
   return text.replace(/\\(.)/g, "$1");
 }
 
+// The text each plain value of a shorthand object was written as, so a string field gets it back unchanged
+// (007 stays 007, a b c stays one string). Values written as {..} or [..] have no entry.
+const RAW_TEXT = new WeakMap<object, Map<string, string>>();
+
 function parseShorthandObject(text: string): Record<string, unknown> {
   const result: Record<string, unknown> = {};
+  const raw = new Map<string, string>();
+  RAW_TEXT.set(result, raw);
   for (const pair of splitTopLevel(text, ",")) {
     if (pair.trim() === "") continue;
     const equalsIndex = firstTopLevelEquals(pair);
@@ -87,7 +93,12 @@ function parseShorthandObject(text: string): Record<string, unknown> {
       throw new CliError("input.shorthand", `Malformed shorthand segment (expected key=value): "${pair}"`);
     }
     const key = unescape(pair.slice(0, equalsIndex).trim());
-    result[key] = parseValue(pair.slice(equalsIndex + 1));
+    const valueText = pair.slice(equalsIndex + 1).trim();
+    result[key] = parseValue(valueText);
+    // Only a value parseValue turned into an object or list has no raw text; "[x] text" is a plain string. A later
+    // duplicate key replaces the value, so it replaces the raw text too.
+    if (isBracketed(valueText)) raw.delete(key);
+    else raw.set(key, unescape(valueText));
   }
   return result;
 }
@@ -107,17 +118,39 @@ function firstTopLevelEquals(text: string): number {
   return -1;
 }
 
+// True only when the bracket that opens at index 0 is the one that closes at the last character, so "[WIP] fix [urgent]"
+// and "{a} and {b}" are plain text, not a list or an object. Escaped characters don't count.
+function isBracketed(text: string): boolean {
+  if (!(text.startsWith("{") || text.startsWith("["))) return false;
+  let depth = 0;
+  for (let index = 0; index < text.length; index++) {
+    const char = text[index];
+    if (char === "\\") {
+      index++;
+      continue;
+    }
+    if (char === "{" || char === "[") depth++;
+    else if (char === "}" || char === "]") {
+      depth--;
+      if (depth === 0) return index === text.length - 1 && (text[0] === "{" ? char === "}" : char === "]");
+    }
+  }
+  return false;
+}
+
 function parseValue(raw: string): unknown {
   const value = raw.trim();
-  if (value.startsWith("{") && value.endsWith("}")) return parseShorthandObject(value.slice(1, -1));
-  if (value.startsWith("[") && value.endsWith("]")) {
+  if (isBracketed(value)) {
+    if (value.startsWith("{")) return parseShorthandObject(value.slice(1, -1));
     return splitTopLevel(value.slice(1, -1), ",")
       .filter((item) => item.trim() !== "")
       .map((item) => parseValue(item));
   }
   // Space-separated scalar list (e.g. tags=a b c) — spaces not inside braces/brackets.
   const parts = splitTopLevel(value, " ").filter((part) => part.trim() !== "");
-  if (parts.length > 1) return parts.map((part) => parseScalar(unescape(part.trim())));
+  if (parts.length > 1) {
+    return parts.map((part) => parseScalar(unescape(part.trim())));
+  }
   return parseScalar(unescape(value));
 }
 
@@ -131,21 +164,48 @@ function parseScalar(text: string): unknown {
 
 // ---------------- schema coercion ----------------
 
-function coerceTopLevel(value: unknown, bodyProps: CliParam[]): unknown {
+// nullLiteral: shorthand only. JSON already has a real null, so a JSON string "null" stays text.
+function coerceTopLevel(value: unknown, bodyProps: CliParam[], nullLiteral: boolean): unknown {
   if (bodyProps.length === 0 || value === null || typeof value !== "object" || Array.isArray(value)) {
     return value;
   }
   const record = value as Record<string, unknown>;
+  // Already wrapped as data={...}: the fields to restore and coerce are inside it (executor.wrapBody leaves it as is).
+  const inner = record.data;
+  if (Object.keys(record).length === 1 && inner !== null && typeof inner === "object" && !Array.isArray(inner) && !bodyProps.some((param) => param.name === "data")) {
+    coerceTopLevel(inner, bodyProps, nullLiteral);
+    return record;
+  }
+  restoreStrings(record, bodyProps);
   const paramsByName = new Map(bodyProps.map((param) => [param.name, param]));
   for (const [key, fieldValue] of Object.entries(record)) {
     const param = paramsByName.get(key);
     if (!param) continue;
-    record[key] = coerceScalar(fieldValue, param);
+    record[key] = coerceScalar(fieldValue, param, nullLiteral);
   }
   return record;
 }
 
-function coerceScalar(value: unknown, param: CliParam): unknown {
+// A string field written in shorthand was read with guesses (reason=007 as a number, reason=a b c as a list), so put the
+// text back as written. It goes into nested objects and lists of objects too; values from JSON are left alone.
+function restoreStrings(record: Record<string, unknown>, params: CliParam[]): void {
+  const raw = RAW_TEXT.get(record);
+  for (const param of params) {
+    if (!(param.name in record)) continue;
+    if (param.type === "string") {
+      const text = raw?.get(param.name);
+      if (text !== undefined) record[param.name] = text;
+    } else if (param.properties?.length) {
+      const child = record[param.name];
+      for (const item of Array.isArray(child) ? child : [child]) {
+        if (item !== null && typeof item === "object" && !Array.isArray(item)) restoreStrings(item as Record<string, unknown>, param.properties);
+      }
+    }
+  }
+}
+
+function coerceScalar(value: unknown, param: CliParam, nullLiteral: boolean): unknown {
+  if (nullLiteral && value === "null" && param.nullable) return null;
   if (typeof value !== "string") return value;
   let coerced: unknown = value;
   if (param.type === "number" || param.type === "integer") {
