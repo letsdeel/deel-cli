@@ -67,6 +67,14 @@ export const CONFIRM_TIMEOUT_MS = 60_000;
 export const AGENT_ENV_SIGNALS = ["CI", "CLAUDE_CODE", "CURSOR", "CODEX"] as const;
 
 // --- Command resolver vocabulary ---
+// The environment variables the CLI reads for its own settings. A header flag generated from a definition reads DEEL_<FLAG>
+// (src/core/flags.ts headerEnvName), so the generator refuses a header whose variable is one of these; test/constants.test.ts
+// fails when src reads a DEEL_ variable that is not listed here.
+export const CLI_SETTING_ENV = [
+  "DEEL_TOKEN", "DEEL_CLI_BASE_URL", "DEEL_ENV", "DEEL_CA_CERT", "DEEL_CERT_STORE", "DEEL_LOG", "DEEL_LOG_BODIES", "DEEL_LOG_DIR",
+  "DEEL_LOG_MAX_FILES", "DEEL_LOG_MAX_SIZE", "DEEL_OAUTH_CLIENT_ID", "DEEL_OAUTH_ISSUER", "DEEL_TLS_RETRY",
+] as const;
+
 export const RESERVED_COMMANDS = new Set(["job", "auth", "commands"]);
 export const COMMAND_SUFFIX_MODIFIERS = ["-bulk", "-async"];
 

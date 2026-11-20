@@ -6,6 +6,7 @@ import type { Definition } from "./definitions.ts";
 import { bindForm, parseCommand, pathParams } from "./command-map.ts";
 import type { Api, MapEntry } from "./command-map.ts";
 import { formUsage } from "../../src/public-api/commands.ts";
+import { CLI_SETTING_ENV } from "../../src/core/constants.ts";
 
 type AnyObj = Record<string, any>;
 
@@ -57,7 +58,7 @@ const MANAGED_HEADERS = new Set(["authorization", "accept", "content-type", "x-b
 
 // A header flag reads DEEL_<FLAG> when it is not given, so its name must not match a variable the CLI already reads for its own
 // settings (DEEL_TOKEN holds the user's token and would be sent as the header's value).
-const CLI_ENV_FLAGS = new Set(["token", "cli-base-url", "env", "ca-cert", "cert-store", "log", "log-bodies", "log-dir", "log-max-files", "log-max-size", "oauth-client-id", "oauth-issuer", "tls-retry"].map((name) => name.replace(/-/g, "")));
+const CLI_ENV_FLAGS = new Set(CLI_SETTING_ENV.map((name) => name.toLowerCase().replace(/^deel_/, "").replace(/_/g, "")));
 
 function headerFlag(name: string, path: string): string {
   const flag = name.toLowerCase().replace(/^x-/, "");

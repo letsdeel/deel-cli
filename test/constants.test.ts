@@ -1,7 +1,8 @@
 // The shared vocabulary in src/core/constants.ts: the routes and fields it names must exist where it says.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { OUTCOME_ROUTES, SEND_ONCE_ROUTES, SENSITIVE_LOG_KEYS, WITHHELD_RESPONSE_FIELDS, withheldFieldFor } from "../src/core/constants.ts";
+import { readdirSync, readFileSync } from "node:fs";
+import { CLI_SETTING_ENV, OUTCOME_ROUTES, SEND_ONCE_ROUTES, SENSITIVE_LOG_KEYS, WITHHELD_RESPONSE_FIELDS, withheldFieldFor } from "../src/core/constants.ts";
 import { isSensitiveKey } from "../src/core/logging.ts";
 import { loadGeneratedDescriptors } from "../src/public-api/commands.ts";
 import type { CliParam } from "../src/types.ts";
@@ -59,3 +60,13 @@ test("withheldFieldFor names the withheld field by any spelling of it, and nothi
   assert.deepEqual(Object.keys(WITHHELD_RESPONSE_FIELDS).every((name) => withheldFieldFor(name) === name), true);
 });
 
+
+// A header flag reads DEEL_<FLAG>; the generator refuses one that would read a setting (scripts/public-api/generate.ts), so a
+// setting missing from CLI_SETTING_ENV would let a header such as X-Token pick up the user's token.
+test("every DEEL_ variable the CLI reads for its own settings is in CLI_SETTING_ENV", () => {
+  const sources = ["src/core", "src/commands"].flatMap((dir) => readdirSync(dir).map((file) => `${dir}/${file}`)).concat(["src/cli.ts", "src/main.ts", "src/help.ts"]);
+  const header = new Set(["DEEL_ONE_TIME_SECRET", "DEEL_UPLOAD_METHOD"]); // named in comments as examples of a header's variable
+  const used = new Set(sources.flatMap((file) => readFileSync(file, "utf8").match(/DEEL_[A-Z0-9_]+/g) ?? []));
+  const missing = [...used].filter((name) => !header.has(name) && !(CLI_SETTING_ENV as readonly string[]).includes(name));
+  assert.deepEqual(missing, [], `add to CLI_SETTING_ENV in src/core/constants.ts: ${missing.join(", ")}`);
+});
