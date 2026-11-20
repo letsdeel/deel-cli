@@ -8,7 +8,7 @@ import type { Descriptor } from "../types.ts";
 import type { Ctx } from "./context.ts";
 import type { OutputOpts } from "./output.ts";
 import { CliError } from "./errors.ts";
-import { flagOf } from "./flags.ts";
+import { flagOf, headerEnvName } from "./flags.ts";
 import { apiBaseUrl } from "./config.ts";
 import { maskUrlQuery } from "./logging.ts";
 import { envelope, render } from "./output.ts";
@@ -107,6 +107,20 @@ function buildQuery(descriptor: Descriptor, flags: ParsedCall["flags"]): Record<
   return query;
 }
 
+// The header params of the endpoint (x-one-time-secret, x-upload-method): sent as given; a required one that is missing
+// is refused here, before any request, since the flag itself is optional so that its environment variable can fill it.
+function buildHeaders(descriptor: Descriptor, flags: ParsedCall["flags"]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const param of descriptor.params) {
+    if (param.in !== "header") continue;
+    const value = flags[param.name];
+    const text = Array.isArray(value) ? value.join(",") : value;
+    if (typeof text === "string" && text !== "") out[param.name] = text;
+    else if (param.required) throw new CliError("usage.header", `Missing required --${flagOf(param)}`, `Pass --${flagOf(param)} <value> or set ${headerEnvName(param)}.`);
+  }
+  return out;
+}
+
 const MIME_BY_EXT: Record<string, string> = {
   png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", gif: "image/gif", webp: "image/webp",
   pdf: "application/pdf", txt: "text/plain", csv: "text/csv",
@@ -160,6 +174,7 @@ export async function execute(descriptor: Descriptor, call: ParsedCall, ctx: Ctx
     if (!opts.output.quiet) ctx.io.err(line);
   }, !prod);
   setVersionHeaders(headers, choice);
+  Object.assign(headers, buildHeaders(descriptor, call.flags));
 
   let body: BodyInit | null = null;
   if (effectiveKind === "multipart") {

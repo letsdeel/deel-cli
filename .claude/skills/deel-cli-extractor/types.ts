@@ -1,4 +1,4 @@
-export type ParamLoc = "path" | "query" | "body";
+export type ParamLoc = "path" | "query" | "header" | "body";
 
 export type ScalarType = "string" | "number" | "integer" | "boolean" | "array" | "object";
 

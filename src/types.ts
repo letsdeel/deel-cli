@@ -1,7 +1,7 @@
 // Shared types for the Deel CLI.
 // Kept type-only so Node's type-stripping runtime never sees runtime bindings.
 
-export type ParamLoc = "path" | "query" | "body";
+export type ParamLoc = "path" | "query" | "header" | "body";
 
 export type ScalarType = "string" | "number" | "integer" | "boolean" | "array" | "object";
 
@@ -32,7 +32,7 @@ export type Descriptor = {
   bodyKind: BodyKind; // the default body encoding
   supportsMultipart: boolean; // operation also accepts multipart/form-data (use --form)
   bodyWrapper: "data" | "none"; // body is nested under a single `data` object
-  params: CliParam[]; // path + query params (become --<name> flags)
+  params: CliParam[]; // path, query and header params (become --<flag> flags; a header is sent as a request header)
   bodyProps: CliParam[]; // body fields, unwrapped from `data`; for bodyKind "json-array" these describe each array item (for --help / --generate-input)
   maxItems?: number; // for bodyKind "json-array": max number of items the API accepts in one request
   fileFields: string[]; // multipart binary field names (become --file)

@@ -60640,7 +60640,19 @@
    "bodyKind": "json",
    "supportsMultipart": false,
    "bodyWrapper": "data",
-   "params": [],
+   "params": [
+    {
+     "name": "x-upload-method",
+     "in": "header",
+     "type": "string",
+     "required": false,
+     "enum": [
+      "multipart"
+     ],
+     "description": "Declares the client is multipart-capable. The server returns a multipart response only when the declared size exceeds the configured multipart threshold (`MULTIPART_THRESHOLD`); otherwise the standard POST form.",
+     "flag": "upload-method"
+    }
+   ],
    "bodyProps": [
     {
      "name": "size",
@@ -60768,6 +60780,14 @@
      "type": "string",
      "required": true,
      "description": "File UUID from the register response."
+    },
+    {
+     "name": "x-one-time-secret",
+     "in": "header",
+     "type": "string",
+     "required": true,
+     "description": "One-time secret from the register response.",
+     "flag": "one-time-secret"
     }
    ],
    "bodyProps": [],
@@ -60828,6 +60848,14 @@
      "type": "string",
      "required": true,
      "description": "File UUID from the register response."
+    },
+    {
+     "name": "x-one-time-secret",
+     "in": "header",
+     "type": "string",
+     "required": true,
+     "description": "One-time secret from the register response.",
+     "flag": "one-time-secret"
     }
    ],
    "bodyProps": [

@@ -239,6 +239,20 @@ deel <command> --input field=value --file attachment=@/path/to/file.pdf
 
 `--file` is repeatable across fields and within a single field (multiple files under the same part). Some endpoints accept both JSON and multipart— those default to JSON; add `--form` to switch.
 
+### Upload a file
+
+A file is registered, uploaded to the target the API returns, and then handed to another endpoint as a handle (`file_id` and `one_time_secret`). Creating a file needs an organization token with `files:write`.
+
+```bash
+deel files create --input '{"filename":"logo.png","size":68}'      # prints file_id, one_time_secret and upload_parts
+# Send the bytes to upload_parts[0].url as a multipart form (every entry of its fields, then file=@logo.png).
+export DEEL_ONE_TIME_SECRET="<one_time_secret>"                     # or pass --one-time-secret
+deel files status get <file_id>                                     # pending, then ready
+deel oauth2-apps listings update <app_id> --beta --input '{"logo":{"file_id":"<file_id>","one_time_secret":"<one_time_secret>"}}'
+```
+
+The secret is sent as the `x-one-time-secret` header, never logged, and read from `--one-time-secret` or `DEEL_ONE_TIME_SECRET` (the flag wins). Any header an endpoint declares, apart from the ones the CLI sets itself, becomes a flag the same way.
+
 Every other flag that takes a value is given once. Typing one twice (`--env demo … --env prod`, in any spelling) is a usage error and nothing is sent. Only array query params, `--file` and `--ca-cert` repeat.
 
 ## Output
@@ -447,6 +461,8 @@ Location: `~/Library/Logs/deel/deel.log` (macOS),
 | `DEEL_TOKEN`        | PAT value                                                   |
 | `DEEL_ENV`          | Default environment (`prod` / `demo`)                       |
 | `DEEL_CLI_BASE_URL` | Override the API base URL (https only); `--base-url` beats it, it beats `--env`/`DEEL_ENV` |
+| `DEEL_ONE_TIME_SECRET` | The one-time secret `files status get` and `files update` send as `x-one-time-secret`; `--one-time-secret` beats it |
+| `DEEL_UPLOAD_METHOD` | `multipart` to ask `files create` for a multipart upload; `--upload-method` beats it |
 | `DEEL_LOG`          | `off` to disable local logging                              |
 | `DEEL_LOG_BODIES`   | `1` to include response bodies in the local log (off by default) |
 | `DEEL_LOG_DIR`      | Override the log directory                                  |
