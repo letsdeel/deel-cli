@@ -1,7 +1,9 @@
 // Environment selection. Default prod; --base-url is a hidden testing override.
-// Precedence: --base-url > --env > DEEL_ENV > default (prod). --base-url alone names its own environment after its host.
+// Precedence: --base-url > DEEL_CLI_BASE_URL > --env > DEEL_ENV > default (prod). A base URL given without --env or DEEL_ENV
+// (flag or DEEL_CLI_BASE_URL) names its own environment after its host.
 
 import { CliError } from "./errors.ts";
+import type { Api } from "../types.ts";
 
 // Public OAuth client id of the Deel CLI (a public client: no secret). The same in every environment.
 export const CLI_OAUTH_CLIENT_ID = "b035545c-ee8a-4884-a51f-e416447e6d62";
@@ -63,10 +65,12 @@ export function requireIssuer(config: Config): string {
 }
 
 export function resolveConfig(opts: { env?: string; baseUrl?: string; beta?: boolean }): Config {
-  // --base-url without --env is its own environment, so nothing saved for prod or demo is sent to it.
-  const env = opts.env ?? process.env.DEEL_ENV ?? (opts.baseUrl ? hostOf(opts.baseUrl) : "prod");
+  const baseUrlOverride = opts.baseUrl || process.env.DEEL_CLI_BASE_URL?.trim() || undefined;
+  const source = opts.baseUrl ? "--base-url" : "DEEL_CLI_BASE_URL";
+  // A base URL override without --env is its own environment, so nothing saved for prod or demo is sent to it.
+  const env = opts.env ?? process.env.DEEL_ENV ?? (baseUrlOverride ? hostOf(baseUrlOverride) : "prod");
   const known = ENVIRONMENTS[env];
-  let baseUrl = opts.baseUrl;
+  let baseUrl = baseUrlOverride;
   if (!baseUrl) {
     if (!known) {
       throw new CliError("config.env", `Unknown --env "${env}". Known: ${Object.keys(ENVIRONMENTS).join(", ")}`);
@@ -78,10 +82,10 @@ export function resolveConfig(opts: { env?: string; baseUrl?: string; beta?: boo
   try {
     parsed = new URL(baseUrl);
   } catch {
-    throw new CliError("config.baseurl", `Invalid --base-url "${baseUrl}".`);
+    throw new CliError("config.baseurl", `Invalid ${source} "${baseUrl}".`);
   }
   if (parsed.protocol !== "https:") {
-    throw new CliError("config.baseurl", `--base-url must use https (got "${baseUrl}").`, "The API token is only sent over https.");
+    throw new CliError("config.baseurl", `${source} must use https (got "${baseUrl}").`, "The API token is only sent over https.");
   }
   const override = httpsOverride("DEEL_OAUTH_ISSUER");
   // An unknown environment is only reachable with --base-url; its origin is the issuer, which discovery verifies.
@@ -120,6 +124,13 @@ export function resolveMcpUrl(config: Config, opts: { oauth?: boolean } = {}): s
     }
   }
   return override.value;
+}
+
+// The base URL for a command's API. REST uses the configured base as is; SCIM swaps a
+// trailing /rest for /scim (or appends /scim to a --base-url without one).
+export function apiBaseUrl(baseUrl: string, api: Api | undefined): string {
+  if (api !== "scim") return baseUrl;
+  return `${baseUrl.replace(/\/rest$/, "")}/scim`;
 }
 
 // The legacy PAT stored under the bare env name belongs to the environment's own server. Talking to another

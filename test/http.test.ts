@@ -28,6 +28,32 @@ test("withAuth adds nothing when there is no token", async () => {
   assert.equal(a.seen[0].headers["authorization"], undefined);
 });
 
+test("an error that names the request URL masks its credential query values", async () => {
+  const a = capturing();
+  await assert.rejects(
+    () => withAuth("tok")(a.next)(req({ url: "http://x/people?api_key=k123&access_token=t&page=2" })),
+    (error: Error) => /non-https URL: http:\/\/x\/people\?api_key=\*\*\*&access_token=\*\*\*&page=2$/.test(error.message),
+  );
+  assert.equal(a.seen.length, 0);
+});
+
+test("a timeout and a TLS failure name the request URL with its sensitive query values masked", async (t) => {
+  const realFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = realFetch;
+  });
+  const url = "https://x/people?email=a%40b.co&page=2";
+  const fail = (error: Error) => {
+    globalThis.fetch = (async () => {
+      throw error;
+    }) as typeof fetch;
+  };
+  fail(Object.assign(new Error("aborted"), { name: "AbortError" }));
+  await assert.rejects(() => fetchTransport(req({ url })), (error: Error) => error.message === "Request timed out: GET https://x/people?email=***&page=2");
+  fail(Object.assign(new Error("unable to verify the first certificate"), { code: "UNABLE_TO_VERIFY_LEAF_SIGNATURE" }));
+  await assert.rejects(() => fetchTransport(req({ url })), (error: Error) => error.message === "TLS verification failed: https://x/people?email=***&page=2");
+});
+
 test("withAuth refuses to send a token over a non-https URL", async () => {
   const a = capturing();
   await assert.rejects(async () => {

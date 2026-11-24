@@ -1,7 +1,7 @@
 // Shared types for the Deel CLI.
 // Kept type-only so Node's type-stripping runtime never sees runtime bindings.
 
-export type ParamLoc = "path" | "query" | "body";
+export type ParamLoc = "path" | "query" | "header" | "body";
 
 export type ScalarType = "string" | "number" | "integer" | "boolean" | "array" | "object";
 
@@ -15,6 +15,8 @@ export type CliParam = {
   description?: string;
   properties?: CliParam[];
   maxItems?: number; // for type "array": max number of items the API accepts for this field
+  flag?: string; // the CLI flag, when the API name clashes with a global flag (e.g. "fields-param")
+  sensitive?: true; // response fields: the spec marks it sensitive (`x-deel-sensitive`)
 };
 
 export type BodyKind = "none" | "json" | "json-array" | "multipart";
@@ -30,15 +32,48 @@ export type Descriptor = {
   bodyKind: BodyKind; // the default body encoding
   supportsMultipart: boolean; // operation also accepts multipart/form-data (use --form)
   bodyWrapper: "data" | "none"; // body is nested under a single `data` object
-  params: CliParam[]; // path + query params (become --<name> flags)
+  params: CliParam[]; // path, query and header params (become --<flag> flags; a header is sent as a request header)
   bodyProps: CliParam[]; // body fields, unwrapped from `data`; for bodyKind "json-array" these describe each array item (for --help / --generate-input)
   maxItems?: number; // for bodyKind "json-array": max number of items the API accepts in one request
   fileFields: string[]; // multipart binary field names (become --file)
   responseKind: "object" | "array" | "none"; // shape of the success response's data
   responseFields: CliParam[]; // top-level fields of the response data (the contract)
+  // Generated public API commands only (src/public-api/manifest.json):
+  api?: Api;
+  beta?: boolean;
+  versions?: VersionInfo[]; // every live version of the endpoint, oldest first
+  form?: CommandForm; // how the command line picks this endpoint and fills its path params
+  confirmPrompt?: string; // asked [y/N] before anything is sent (--confirm skips it); {param} is filled from the call. From the command map's entry
+};
+
+// Which of Deel's two API surfaces an endpoint belongs to; the only place the pair is spelled out.
+export type Api = "rest" | "scim";
+
+// The command-map shape of one endpoint: `deel <words> <positionals> [selectors] [scopes]`.
+export type CommandForm = {
+  positionals: { label: string; param: string }[]; // path params typed as arguments, in order
+  scopes: { flag: string; label: string; param: string; in?: "query" }[]; // params typed as `--flag <value>`: a path param, or a query param the map names
+  selectors: FormSelector[]; // fixed flags that pick this endpoint among those sharing the words
+};
+
+export type FormSelector = {
+  flag: string; // e.g. "worker-type", "as", "bulk"
+  value?: string; // e.g. "eor"; absent for a switch such as --bulk
+  optional?: true; // written [--worker-type eor]: the flag may be left out, and the command without it calls this endpoint (others sharing the words are picked by their own flags)
+};
+
+export type VersionInfo = {
+  version: string;
+  beta_until: string | null;
+  sunset_at: string | null;
 };
 
 export type Manifest = {
   apiTitle: string;
+  descriptors: Descriptor[];
+};
+
+export type GeneratedManifest = {
+  generator: string;
   descriptors: Descriptor[];
 };

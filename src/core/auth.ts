@@ -4,6 +4,7 @@
 import { readFileSync } from "node:fs";
 import { CliError } from "./errors.ts";
 import { HEADER } from "./constants.ts";
+import { isSensitiveKey } from "./logging.ts";
 import { credentialStore } from "./keychain.ts";
 import type { CredentialStore } from "./keychain.ts";
 import { ENVIRONMENTS, assertIssuerOverride, ownsLegacyPat } from "./config.ts";
@@ -123,7 +124,8 @@ export function extractIdentity(json: unknown): Identity {
 export function redactHeaders(headers: Record<string, string>): Record<string, string> {
   const redacted: Record<string, string> = {};
   for (const [name, value] of Object.entries(headers)) {
-    redacted[name] = name.toLowerCase() === HEADER.authorization ? "Bearer ***" : value;
+    // Authorization keeps its scheme; any other header that names a credential (a cookie, an API key) is masked whole.
+    redacted[name] = name.toLowerCase() === HEADER.authorization ? "Bearer ***" : isSensitiveKey(name) ? "***" : value;
   }
   return redacted;
 }

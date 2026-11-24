@@ -44,12 +44,33 @@ export function toEnvelope(err: CliError): ErrorEnvelope {
   return { code: err.code, message: err.message, next: err.next, request_id: err.requestId };
 }
 
+// The argument parser (citty) raises its own errors, and colours the flag and value names in the message.
+// An envelope is read by scripts and agents, so the colour codes (CSI sequences, e.g. ESC[36m) are cut out.
+const ANSI_CSI = /\u001b\[[0-9;]*[A-Za-z]/g;
+
+export function stripAnsi(text: string): string {
+  return text.replace(ANSI_CSI, "");
+}
+
+// An error the argument parser threw (name CLIError, or code EARG), not one of ours.
+export function isParserError(err: unknown): boolean {
+  const e = err as { name?: string; code?: string } | null;
+  return e?.name === "CLIError" || e?.code === "EARG";
+}
+
+export function usageEnvelope(err: { message?: string }): ErrorEnvelope {
+  return {
+    code: "usage",
+    message: stripAnsi(err.message ?? "Invalid usage."),
+    next: "Run the command with --help to see its arguments and flags.",
+  };
+}
+
 // What the top-level handler prints on stderr for anything `run()` rejects with: a CliError as is, a citty
 // usage error (bad flag or missing argument) as `usage`, anything else as `unexpected`.
 export function failureEnvelope(err: unknown): { error: Pick<ErrorEnvelope, "code" | "message"> | ErrorEnvelope } {
   if (err instanceof CliError) return { error: toEnvelope(err) };
-  const failure = err as { name?: string; code?: string; message?: string } | null | undefined;
-  const message = failure?.message ?? String(err);
-  if (failure?.name === "CLIError" || failure?.code === "EARG") return { error: { code: "usage", message } };
+  if (isParserError(err)) return { error: usageEnvelope(err as Error) };
+  const message = (err as { message?: string } | null | undefined)?.message ?? String(err);
   return { error: { code: "unexpected", message } };
 }

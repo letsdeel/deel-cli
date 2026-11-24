@@ -17,7 +17,7 @@ export type OutputOpts = {
 // cold-start when --jq is unused.
 async function runJq(data: unknown, filter: string): Promise<unknown[]> {
   try {
-    const { json } = await import("jq-wasm");
+    const { json } = await import("jq-wasm/inline");
     // jq-wasm parses a string input as JSON text; quote it so a text payload reaches the filter as a string.
     return await json((typeof data === "string" ? JSON.stringify(data) : data) as any, filter);
   } catch (error) {

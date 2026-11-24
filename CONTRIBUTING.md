@@ -27,6 +27,7 @@ Each piece on its own:
 | `npm test` | the `node --test` suite in `test/` |
 | `npm run test:coverage` | same suite with a coverage floor over `src/**` — lines ≥ 80 %, branches ≥ 75 %, functions ≥ 70 %. The floor only ever moves up. |
 | `npm run check:manifest` | `src/manifest.generated.ts` ↔ `src/commands.map.ts` stay consistent |
+| `npm run check:command-map` | every `src/public-api/commands.json` entry makes a command the CLI can call, takes no hand-picked or static name, and keeps a released command line unchanged (a deliberate rename follows [Changing a released command](#changing-a-released-command)) |
 | `npm run check:lockfile` | `package-lock.json` still carries every bun platform binary (an `npm install` against an existing `node_modules` can silently drop them) |
 | `npm run check:version` | `package.json` and `src/version.ts` agree and are a clean `X.Y.Z` |
 | `npm run check:shell` | `packaging/install.sh` (POSIX sh — users pipe it into `sh`), build scripts and hooks pass `sh -n`/`bash -n` and shellcheck |
@@ -58,6 +59,58 @@ say a minute later.
   skill from the OpenAPI spec (Deel-internal). To expose a new endpoint, add it to
   `src/commands.map.ts` and regenerate; a PR that changes the manifest carries the `script-generated`
   label.
+- `src/public-api/manifest.json` is also **never hand-edited**. It holds one command per documented
+  public API endpoint, written by `npm run generate:public-api -- --from <file|url>` from the public
+  definitions (`scripts/generate-public-api.ts`). Every name comes from the reviewed command map,
+  `src/public-api/commands.json`: an endpoint with no entry there is a generator error, so it ships only
+  once it has a name (see [The command map](#the-command-map)). The generator never
+  touches the hand-picked files; it only reserves their names, and a released name never changes by accident (see [Changing a released command](#changing-a-released-command)).
+  Tests use the made-up endpoints in `test/fixtures/definitions/`.
+
+## The command map
+
+Each entry in `src/public-api/commands.json` names one endpoint:
+`{ "method": "GET", "path": "/contracts/{contract_id}", "command": "deel contracts get <contract_id>" }`.
+A command line is `deel <domain> <resources…> <verb>`, then one `<param>` per path ID in path order, named as the API path names it, then
+any flags that pick this endpoint among those sharing the words: a scope flag with a label
+(`--contract <contract_id>`), a fixed selector (`--worker-type eor`, `--as worker`), or an optional one in
+brackets (`[--worker-type eor]`, or a switch, `[--bulk]`): the command picks the endpoint with or without it. Three more keys are allowed:
+
+| Key | Meaning |
+|-----|---------|
+| `api` | `"scim"` for a SCIM endpoint; REST when absent |
+| `collapse` | entries with the same key are one operation under one command line; the first is called |
+| `confirmPrompt` | the question the command asks `[y/N]` before it sends anything (`--confirm` skips it). Give it to a call that cannot be undone, and say what it does and that it cannot be undone: `"Delete webhook {id}? Deel stops sending its events, and the subscription cannot be restored."`. A `{name}` must be a path ID of the entry, and is filled from the call. The generator copies it into the manifest |
+
+`npm run check:command-map` checks that every entry makes a command the CLI can call: the line parses,
+every path ID has an argument in path order, no flag takes a global flag's name, command lines and
+endpoints are unique, no entry takes a hand-picked or static command's name, and a released command line
+(one in `src/public-api/manifest.json`) never changes by accident: [a released command line can change in a new version](#changing-a-released-command), on purpose. The generator also checks that every argument fills a
+parameter and that a flag that picks an endpoint isn't another endpoint's own flag. Every domain (the first word)
+needs an entry in `src/public-api/domains.json` with its stage and description, for `deel --help`. Names
+for new endpoints are reviewed by the maintainers; when you're unsure of one, ask in the PR.
+
+### Changing a released command
+
+The generator and `check:command-map` refuse any change to a released command line, so that nothing
+renames a command by accident (a sync or a typo). A released command can still change on purpose, in a new
+version of the CLI, for example to free a bare name for a newer endpoint that supersedes it
+(`deel immigration cases list` for `/immigration/cases`, with the older client endpoint now
+`deel immigration cases list --as client`). A pull request that does this:
+
+1. changes the line in `src/public-api/commands.json`;
+2. regenerates the manifest with `--previous` pointing at a manifest without the renamed descriptors, which
+   switches the lock off for them, and keeps every other descriptor as it was;
+3. lists, in its description, each old line and the new one, and says that it is a breaking change;
+4. has a test that the new flag form calls the endpoint and that the old bare line is refused;
+5. is approved by a maintainer, and ships in the next version, whose release notes name the renamed lines.
+
+Scripts that call the old line fail with `usage.variant` after upgrading; `--help` on the command shows the
+current forms.
+
+## Logging and masking
+
+Local NDJSON logging (`core/logging.ts`) logs metadata only by default, and never the request: no request body, and no query string on the logged URL, with or without `--log-bodies`. Under `--log-bodies` the response body is logged with a key masked, in whatever spelling (`access_token`, `accessToken`, `access-token`, `ACCESS_TOKEN`), when it contains a needle of `SENSITIVE_LOG_KEYS` or is a whole word of `SENSITIVE_LOG_WORDS` (the policy is described above them in `core/constants.ts`: credentials and the links that sign the holder in or fetch a file, nothing else by name). A link's query string and fragment (where a pre-signed link keeps its signature) are cut. A response field the spec marks sensitive (`x-deel-sensitive`, which the generator carries into the manifest as `sensitive` on the field) is masked at its position in the response of that endpoint (`maskMarkedFields`, from the response fields the executor hands the transport); the same name on another field or endpoint is not masked. Which fields carry the mark is the decision of the endpoint's owner, made in the API definition; the CLI only follows it, and no test fails a build because a new field name was not reviewed. A value that is an email address or a JWT is masked whatever its key (`looksPersonal`). Other free text, names, record ids, dates and codes stay. A request header that names a credential is masked the same way (`redactHeaders`), and a withheld response field is matched by any spelling of its name (`withheldFieldFor`). `maskUrlQuery` masks credential-named query values on the URL of the `--debug` line and of timeout, TLS and insecure-URL errors. `test/constants.test.ts` fails the build for a response field whose name looks like a credential and is neither in `WITHHELD_RESPONSE_FIELDS` nor reviewed as printed on purpose.
 
 ## Pull requests
 

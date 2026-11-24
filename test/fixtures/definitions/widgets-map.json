@@ -1,0 +1,12 @@
+[
+ {"method": "GET", "path": "/widgets", "command": "deel widgets list"},
+ {"method": "GET", "path": "/widgets/{widget_id}", "command": "deel widgets get <widget>"},
+ {"method": "POST", "path": "/widgets", "command": "deel widgets create"},
+ {"method": "PATCH", "path": "/widgets/{widget_id}", "command": "deel widgets update <widget>"},
+ {"method": "GET", "path": "/widgets/notes", "command": "deel widgets notes list"},
+ {"method": "GET", "path": "/widgets/{widget_id}/notes", "command": "deel widgets notes list --widget <widget>"},
+ {"method": "GET", "path": "/widgets/reports", "command": "deel widgets reports list"},
+ {"method": "GET", "path": "/gizmos", "command": "deel gizmos list"},
+ {"method": "DELETE", "path": "/old-things/{id}", "command": "deel old-things delete <thing>"},
+ {"method": "GET", "path": "/Users", "command": "deel scim users list", "api": "scim"}
+]

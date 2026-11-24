@@ -1,4 +1,4 @@
-export type ParamLoc = "path" | "query" | "body";
+export type ParamLoc = "path" | "query" | "header" | "body";
 
 export type ScalarType = "string" | "number" | "integer" | "boolean" | "array" | "object";
 
@@ -12,6 +12,7 @@ export type CliParam = {
   description?: string;
   properties?: CliParam[];
   maxItems?: number;
+  sensitive?: true;
 };
 
 export type BodyKind = "none" | "json" | "json-array" | "multipart";

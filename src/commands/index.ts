@@ -5,10 +5,9 @@ import type { CommandDef } from "citty";
 import { appCommand } from "./app.ts";
 import { authCommand } from "./auth.ts";
 import { jobCommand } from "./job.ts";
-import { webhooksCommand } from "./webhooks.ts";
-import { tokensCommand } from "./tokens.ts";
+import { createCommandsCommand } from "./commands.ts";
 
-export { appCommand, authCommand, jobCommand, webhooksCommand, tokensCommand };
+export { appCommand, authCommand, jobCommand };
 
 // Keyed by the top-level command name; merged into the root command tree.
 // The keys MUST stay in sync with RESERVED_COMMANDS (src/core/constants.ts),
@@ -17,6 +16,5 @@ export const staticCommands: Record<string, CommandDef> = {
   app: appCommand,
   auth: authCommand,
   job: jobCommand,
-  webhooks: webhooksCommand,
-  tokens: tokensCommand,
+  commands: createCommandsCommand(() => staticCommands),
 };

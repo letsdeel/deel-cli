@@ -6,7 +6,8 @@ import { CliError, markNotSent } from "./errors.ts";
 import { redactHeaders } from "./auth.ts";
 import { isCertError, TLS_HINT, installCaTrust } from "./tls.ts";
 import type { Logger } from "./logging.ts";
-import { bodyLoggingEnabled } from "./logging.ts";
+import { bodyLoggingEnabled, maskMarkedFields, maskUrlQuery } from "./logging.ts";
+import type { CliParam } from "../types.ts";
 import { HEADER, HTTP_TIMEOUT_MS, RETRY_MAX_ATTEMPTS, RETRY_BASE_DELAY_MS } from "./constants.ts";
 
 export type HttpRequest = {
@@ -19,6 +20,7 @@ export type HttpRequest = {
   meta?: Record<string, unknown>; // extra fields for logging (command, idempotency key, ...)
   // Never log the response body, not even under --log-bodies: it carries data under keys the log can't mask.
   omitBodyFromLog?: boolean;
+  responseFields?: CliParam[]; // the endpoint's response fields, so the log masks the ones the spec marks sensitive
 };
 
 export type HttpResponse = {
@@ -64,8 +66,8 @@ export const fetchTransport: Transport = async (request) => {
     return { status: response.status, headers: headersToObject(response.headers), text, json };
   } catch (error) {
     const failure = error as Error;
-    if (failure.name === "AbortError") throw new CliError("network.timeout", `Request timed out: ${request.method} ${request.url}`);
-    if (isCertError(error)) throw new CliError("network.tls", `TLS verification failed: ${request.url}`, TLS_HINT);
+    if (failure.name === "AbortError") throw new CliError("network.timeout", `Request timed out: ${request.method} ${maskUrlQuery(request.url)}`);
+    if (isCertError(error)) throw new CliError("network.tls", `TLS verification failed: ${maskUrlQuery(request.url)}`, TLS_HINT);
     const networkError = new CliError("network.error", `Network error: ${failure.message}`);
     // The name didn't resolve or the connection was refused: nothing reached the server.
     if (NOT_SENT_CAUSES.has(String((failure as { cause?: { code?: unknown } }).cause?.code))) markNotSent(networkError);
@@ -96,7 +98,7 @@ export function withAuth(token: string | TokenProvider | null): Middleware {
     const hasHeader = Boolean(request.headers[HEADER.authorization]);
     const willSendCredential = Boolean(token) || hasHeader;
     if (willSendCredential && !isHttps(request.url)) {
-      throw new CliError("network.insecure", `Refusing to send credentials over a non-https URL: ${request.url}`, "Only https endpoints are supported.");
+      throw new CliError("network.insecure", `Refusing to send credentials over a non-https URL: ${maskUrlQuery(request.url)}`, "Only https endpoints are supported.");
     }
     if (token && !hasHeader) {
       const value = typeof token === "function" ? await token() : token;
@@ -163,13 +165,13 @@ export function withLogging(logger: Logger, clock: () => number): Middleware {
       kind: "request",
       ...(request.meta ?? {}),
       method: request.method,
-      url: withBodies ? request.url : urlPath(request.url),
+      url: urlPath(request.url),
       request_id: request.headers[HEADER.requestId],
       status: response.status,
       duration_ms: clock() - startedAt,
       headers: redactHeaders(request.headers),
     };
-    if (logBody) entry.response = response.json;
+    if (logBody) entry.response = maskMarkedFields(response.json, request.responseFields);
     logger(entry);
     return response;
   };

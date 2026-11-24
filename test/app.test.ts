@@ -58,7 +58,7 @@ function loggedIn(accessToken = ACCESS) {
 function captureIO() {
   const out: string[] = [];
   const err: string[] = [];
-  const io: IOStreams = { out: (text) => out.push(text), err: (text) => err.push(text), readStdin: () => "", isTTY: false, interactive: false };
+  const io: IOStreams = { out: (text) => out.push(text), err: (text) => err.push(text), readStdin: () => "", isTTY: false, interactive: false, canPrompt: false };
   return { io, json: () => JSON.parse(out.join("")), out: () => out.join(""), err: () => err.join("") };
 }
 
