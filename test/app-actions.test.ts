@@ -14,6 +14,7 @@ import {
   runAction,
   runCall,
   runOutcome,
+  schemaParams,
   searchActions,
   truncationWarning,
 } from "../src/core/app-actions.ts";
@@ -439,6 +440,36 @@ test("the input skeleton follows the schema", () => {
   assert.deepEqual(inputSkeleton({ name: "x" }), {});
   const combined: ActionDetail = { name: "x", input_schema: { type: "object", properties: { path_params: { type: "object", properties: { id: { allOf: [{ type: "string" }, { pattern: "x" }] }, tags: { type: "array" }, n: { type: "number" } } } } } };
   assert.deepEqual(inputSkeleton(combined), { path_params: { id: "", tags: [], n: 0 } });
+});
+
+test("schemaParams lists each property with its type, nullability and the properties of objects and lists of objects", () => {
+  const schema = {
+    type: "object",
+    properties: {
+      path_params: { type: "object", properties: { id: { type: "string" } } },
+      query: { type: "object", properties: { org: { type: "integer", nullable: true }, any: {} } },
+      body: {
+        type: "object",
+        properties: {
+          title: { type: ["string", "null"] },
+          items: { type: "array", items: { type: "object", properties: { label: { type: "string" } } } },
+          owner: { allOf: [{ type: "object", properties: { name: { type: "string" } } }] },
+        },
+      },
+    },
+  };
+  const params = schemaParams(schema);
+  const byName = (list: typeof params | undefined, name: string) => list?.find((entry) => entry.name === name);
+  assert.deepEqual(params.map((entry) => entry.name), ["path_params", "query", "body"]);
+  assert.equal(byName(byName(params, "path_params")?.properties, "id")?.type, "string");
+  const org = byName(byName(params, "query")?.properties, "org");
+  assert.deepEqual([org?.type, org?.nullable], ["integer", true]);
+  assert.equal(byName(byName(params, "query")?.properties, "any")?.type, "object"); // no type given: nothing acts on it
+  const body = byName(params, "body")?.properties;
+  assert.deepEqual([byName(body, "title")?.type, byName(body, "title")?.nullable], ["string", true]);
+  assert.equal(byName(byName(body, "items")?.properties, "label")?.type, "string");
+  assert.equal(byName(byName(body, "owner")?.properties, "name")?.type, "string");
+  assert.deepEqual(schemaParams(undefined), []);
 });
 
 test("allOf parts are merged, with the parent's own keywords, not replaced by the last part", () => {

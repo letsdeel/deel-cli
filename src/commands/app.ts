@@ -10,7 +10,7 @@ import { setLoggingEnabled } from "../core/logging.ts";
 import { resolveMcpUrl } from "../core/config.ts";
 import { authFor, resolveToken } from "../core/auth.ts";
 import type { ResolvedToken } from "../core/auth.ts";
-import { parseInput } from "../core/input.ts";
+import { parseInput, typeShorthandBySchema } from "../core/input.ts";
 import { CliError } from "../core/errors.ts";
 import type { IOStreams } from "../core/io.ts";
 import type { Transport } from "../core/http.ts";
@@ -25,6 +25,7 @@ import {
   inputSkeleton,
   runAction,
   runCall,
+  schemaParams,
   searchActions,
   truncationWarning,
 } from "../core/app-actions.ts";
@@ -154,6 +155,7 @@ export async function runRun(args: Args, rawArgs: string[], deps?: AppDeps): Pro
   const input = actionInput(args.input === undefined ? undefined : parseInput(String(args.input), [], { exactScalars: true }));
   const { ctx, client } = prepare(args, rawArgs, deps);
   const { action, requestId } = await getAction(client, name);
+  typeShorthandBySchema(input, schemaParams(action.input_schema)); // shorthand strings and nulls, now the schema is known
   if (args["dry-run"]) {
     const call = runCall(action, input);
     await render(ctx.io, envelope({ method: "tools/call", params: { name: call.tool, arguments: call.arguments } }, { request_id: requestId, dry_run: true }), { ...outputOpts(args), quiet: false });

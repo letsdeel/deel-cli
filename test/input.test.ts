@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseInput } from "../src/core/input.ts";
+import { parseInput, typeShorthandBySchema } from "../src/core/input.ts";
 import type { CliParam } from "../src/types.ts";
 
 const props: CliParam[] = [
@@ -185,4 +185,50 @@ test("a value whose closing bracket is not the opening one's pair stays a string
 
 test("an escaped closing bracket does not close the value", () => {
   assert.deepEqual(parseInput("reason=[a\\]", props), { reason: "[a]" });
+});
+
+// ---------------- typeShorthandBySchema (deel app run: the schema is known only after the parse) ----------------
+
+const param = (name: string, type: CliParam["type"], extra: Partial<CliParam> = {}): CliParam => ({ name, in: "body", type, required: false, ...extra });
+
+test("shorthand typed by a schema gives a string field its text back, at any depth, and leaves the rest", () => {
+  const exact = { exactScalars: true };
+  const params = [param("body", "object", { properties: [param("title", "string"), param("n", "integer"), param("tags", "array"), param("owner", "object", { properties: [param("name", "string")] })] })];
+  const input = parseInput("body={title=Payroll sync 007,n=12,tags=a b c,owner={name=Jo Bloggs}}", [], exact) as Record<string, any>;
+  assert.deepEqual(input.body.title, ["Payroll", "sync", "007"]); // before: guessed as a list
+  typeShorthandBySchema(input, params);
+  assert.equal(input.body.title, "Payroll sync 007");
+  assert.equal(input.body.owner.name, "Jo Bloggs");
+  assert.equal(input.body.n, "12"); // numbers stay text for the caller's own typing
+  assert.deepEqual(input.body.tags, ["a", "b", "c"]); // a list field keeps the list
+});
+
+test("shorthand typed by a schema reaches the objects inside a list of objects", () => {
+  const params = [param("body", "object", { properties: [param("items", "array", { properties: [param("label", "string")] })] })];
+  const input = parseInput("body={items=[{label=a b},{label=c d}]}", [], { exactScalars: true }) as Record<string, any>;
+  typeShorthandBySchema(input, params);
+  assert.deepEqual(input.body.items, [{ label: "a b" }, { label: "c d" }]);
+});
+
+test("a nullable field written null becomes null, a field that is not nullable keeps the text, and so does a JSON string", () => {
+  const params = [param("query", "object", { properties: [param("orgId", "integer", { nullable: true }), param("note", "string", { nullable: true }), param("plain", "string")] })];
+  const shorthand = parseInput("query={orgId=null,note=null,plain=null}", [], { exactScalars: true }) as Record<string, any>;
+  typeShorthandBySchema(shorthand, params);
+  assert.deepEqual(shorthand.query, { orgId: null, note: null, plain: "null" });
+  const json = parseInput('{"query":{"orgId":"null","note":"null"}}', [], { exactScalars: true }) as Record<string, any>;
+  typeShorthandBySchema(json, params);
+  assert.deepEqual(json.query, { orgId: "null", note: "null" }); // from JSON, "null" is a string, as it was written
+  const real = parseInput('{"query":{"orgId":null}}', [], { exactScalars: true }) as Record<string, any>;
+  typeShorthandBySchema(real, params);
+  assert.equal(real.query.orgId, null);
+});
+
+test("typeShorthandBySchema ignores a value that is not an object, a field the schema doesn't list, and a bracketed value", () => {
+  assert.doesNotThrow(() => typeShorthandBySchema(undefined, []));
+  assert.doesNotThrow(() => typeShorthandBySchema(["x"], [param("a", "string")]));
+  const input = parseInput("body={title=a b,extra=c d,list=[x,y]}", [], { exactScalars: true }) as Record<string, any>;
+  typeShorthandBySchema(input, [param("body", "object", { properties: [param("title", "string"), param("list", "string")] })]);
+  assert.equal(input.body.title, "a b");
+  assert.deepEqual(input.body.extra, ["c", "d"]); // not in the schema: left as parsed
+  assert.deepEqual(input.body.list, ["x", "y"]); // written as a list: not a plain string
 });

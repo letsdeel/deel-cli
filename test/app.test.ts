@@ -175,6 +175,30 @@ test("run reads the action, then calls run_read_action with the parsed input", a
   assert.deepEqual(io.json().data, [{ id: "w1" }]);
 });
 
+test("run types shorthand by the action's schema: a string with spaces stays one string, null in a nullable field is null", async (t) => {
+  isolated(t);
+  const NOTE = {
+    name: "create_note",
+    method: "POST",
+    scopes: ["widgets:write"],
+    run_with: "run_write_action",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: { type: "object", properties: { org: { type: "integer", nullable: true }, limit: { type: "integer" } } },
+        body: { type: "object", properties: { title: { type: "string" }, tags: { type: "array", items: { type: "string" } } } },
+      },
+    },
+  };
+  const { transport, tools } = server((tool) => (tool === "get_action" ? { texts: [JSON.stringify(NOTE)] } : { texts: ['{"id":"n1"}'] }));
+  await runRun({ ...ARGS, _: ["create_note"], input: "query={org=null,limit=5},body={title=Payroll sync (draft),tags=a b}" }, [], deps(transport, loggedIn(), captureIO().io));
+  assert.deepEqual(tools()[1], { name: "run_write_action", arguments: { name: "create_note", query: { org: null, limit: 5 }, body: { title: "Payroll sync (draft)", tags: ["a", "b"] } } });
+  // The same text as JSON is not shorthand: its "null" stays a string.
+  const again = server((tool) => (tool === "get_action" ? { texts: [JSON.stringify(NOTE)] } : { texts: ["{}"] }));
+  await runRun({ ...ARGS, _: ["create_note"], input: '{"body":{"title":"null"},"query":{"org":null}}' }, [], deps(again.transport, loggedIn(), captureIO().io));
+  assert.deepEqual(again.tools()[1].arguments, { name: "create_note", query: { org: null }, body: { title: "null" } });
+});
+
 test("run of a write calls run_write_action without asking, and is sent once", async (t) => {
   isolated(t);
   const { transport, tools, requests } = server((tool) => (tool === "get_action" ? { texts: [JSON.stringify(APPROVE)] } : { texts: [failure(504, "UPSTREAM_TIMEOUT", "The action timed out")], isError: true }));

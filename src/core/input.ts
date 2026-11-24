@@ -190,6 +190,26 @@ function coerceTopLevel(value: unknown, bodyProps: CliParam[], nullLiteral: bool
   return record;
 }
 
+// For callers that learn the schema only after parsing (`deel app run` reads the action first): types what shorthand
+// guessed at, by the schema, in place. A string field gets the text back as written (a b c stays one string, 007 stays
+// 007) and a nullable field written `null` becomes a real null, at any depth. Only values that came from shorthand are
+// touched, so JSON input, where "null" is a string, is left alone.
+export function typeShorthandBySchema(value: unknown, params: CliParam[]): void {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return;
+  const record = value as Record<string, unknown>;
+  const raw = RAW_TEXT.get(record);
+  for (const param of params) {
+    if (!(param.name in record)) continue;
+    const text = raw?.get(param.name);
+    if (text !== undefined && param.nullable && text === "null") record[param.name] = null;
+    else if (text !== undefined && param.type === "string") record[param.name] = text;
+    else if (param.properties?.length) {
+      const child = record[param.name];
+      for (const item of Array.isArray(child) ? child : [child]) typeShorthandBySchema(item, param.properties);
+    }
+  }
+}
+
 // A string field written in shorthand was read with guesses (reason=007 as a number, reason=a b c as a list), so put the
 // text back as written. It goes into nested objects and lists of objects too; values from JSON are left alone.
 function restoreStrings(record: Record<string, unknown>, params: CliParam[]): void {

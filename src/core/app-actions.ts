@@ -10,6 +10,7 @@ import type { ResolvedToken } from "./auth.ts";
 import { RETRY_BASE_DELAY_MS, RETRY_MAX_ATTEMPTS } from "./constants.ts";
 import { callTool, toolFailure } from "./mcp.ts";
 import type { ToolFailure, ToolResult } from "./mcp.ts";
+import type { CliParam } from "../types.ts";
 import type { Transport } from "./http.ts";
 
 export const APP_TOOL = {
@@ -280,6 +281,37 @@ function effectiveSchema(schema: JsonSchema | undefined): JsonSchema | undefined
 function typeOf(schema: JsonSchema | undefined): string | undefined {
   const type: unknown = schema?.type;
   return Array.isArray(type) ? type.find((item): item is string => typeof item === "string" && item !== "null") : typeof type === "string" ? type : undefined;
+}
+
+// Whether the schema accepts null: OpenAPI 3.0 `nullable: true`, 3.1 `type: [.., "null"]`, or a null member of anyOf/oneOf.
+function isNullable(schema: JsonSchema | undefined): boolean {
+  if (!isRecord(schema)) return false;
+  if (schema.nullable === true) return true;
+  if (Array.isArray(schema.type) && schema.type.includes("null")) return true;
+  return (["anyOf", "oneOf"] as const).some((key) => Array.isArray(schema[key]) && (schema[key] as unknown[]).some((option) => isRecord(option) && option.type === "null"));
+}
+
+// The schema's properties as the parameter tree `typeShorthandBySchema` walks: each property's name, whether it is a
+// string or nullable, and the properties of an object or of the objects in a list. A type the schema doesn't give is
+// left as "object" with no properties, which nothing acts on.
+export function schemaParams(schema: JsonSchema | undefined): CliParam[] {
+  const effective = effectiveSchema(schema);
+  const properties = isRecord(effective?.properties) ? (effective.properties as Record<string, JsonSchema>) : {};
+  return Object.entries(properties).map(([name, declared]) => {
+    const property = effectiveSchema(declared);
+    const type = typeOf(property);
+    const items = type === "array" ? effectiveSchema(isRecord(property?.items) ? (property.items as JsonSchema) : undefined) : undefined;
+    const known = type === "string" || type === "integer" || type === "number" || type === "boolean" || type === "array" ? type : "object";
+    const children = known === "array" ? schemaParams(items) : known === "object" ? schemaParams(property) : [];
+    return {
+      name,
+      in: "body" as const,
+      type: known,
+      required: false,
+      ...(isNullable(declared) || isNullable(property) ? { nullable: true as const } : {}),
+      ...(children.length > 0 ? { properties: children } : {}),
+    };
+  });
 }
 
 // `--input` shorthand arrives as text (so `00123`, `1.10`, ids past 2^53 and a string field's "false" survive); this
