@@ -21,7 +21,12 @@ export const APP_TOOL = {
 
 export const SEARCH_MAX_LIMIT = 20;
 const INPUT_KEYS = ["path_params", "query", "body"] as const;
-const TRUNCATION_NOTICE = /^\[Response truncated: the action returned (\d+) bytes; only the first (\d+) bytes are shown\.\]$/;
+// The notice item the server adds after a body it cut. It has two forms: the whole body was read and is longer than
+// the cap, or reading stopped early (a body past the read limit, a timeout, a broken connection), so the full size
+// is unknown. Anything else that starts the same way is still a cut body, so a reworded notice can't pass as complete.
+const NOTICE_COMPLETE = /^\[Response truncated: the action returned (\d+) bytes; only the first (\d+) bytes are shown\.\]$/;
+const NOTICE_STOPPED = /^\[Response truncated: reading stopped after (\d+) bytes \((.+)\); only the first (\d+) bytes are shown\.\]$/;
+const NOTICE_START = "[Response truncated:";
 // Failures that happen before an action runs, or on a read, so another attempt is safe.
 const TRANSIENT_CODES = new Set(["UPSTREAM_UNAVAILABLE", "UPSTREAM_TIMEOUT", "UPSTREAM_SERVER_ERROR"]);
 const NO_RESPONSE_CODES = new Set(["UPSTREAM_TIMEOUT", "UPSTREAM_UNAVAILABLE"]);
@@ -317,14 +322,36 @@ export function runCall(action: ActionDetail, input: ActionInput): RunCall {
   return { tool, arguments: { name: action.name, ...coerceInput(input, action.input_schema) } };
 }
 
-export type RunOutcome = { data: unknown; requestId: string; truncated?: { total_bytes: number; shown_bytes: number } };
+// How a cut body is described: the whole size when the server read it all; otherwise only what it read before it stopped,
+// and why (the server's own words).
+export type Truncation = { total_bytes: number; shown_bytes: number } | { read_bytes: number; shown_bytes: number; reason: string } | { shown_bytes: number; reason: string };
+
+export type RunOutcome = { data: unknown; requestId: string; truncated?: Truncation };
+
+// The first half of the stderr warning for a cut body (the caller adds what to do about it).
+export function truncationWarning(truncated: Truncation): string {
+  if ("total_bytes" in truncated) return `the response was cut at ${truncated.shown_bytes} of ${truncated.total_bytes} bytes`;
+  if ("read_bytes" in truncated) return `the response was cut at ${truncated.shown_bytes} bytes (the server stopped reading it after ${truncated.read_bytes} bytes: ${truncated.reason})`;
+  return `the response was cut at ${truncated.shown_bytes} bytes (${truncated.reason})`;
+}
+
+function truncationOf(body: string, notices: string[]): Truncation | undefined {
+  for (const text of notices) {
+    const complete = NOTICE_COMPLETE.exec(text);
+    if (complete) return { total_bytes: Number(complete[1]), shown_bytes: Number(complete[2]) };
+    const stopped = NOTICE_STOPPED.exec(text);
+    if (stopped) return { read_bytes: Number(stopped[1]), shown_bytes: Number(stopped[3]), reason: stopped[2] };
+    if (text.startsWith(NOTICE_START)) return { shown_bytes: Buffer.byteLength(body, "utf8"), reason: text };
+  }
+  return undefined;
+}
 
 // The backend body as it came: JSON when it parses, otherwise the text. A body over the server's cap is cut and
 // followed by a notice item; cut JSON doesn't parse, so it stays text.
 export function runOutcome(result: ToolResult): RunOutcome {
   const body = result.texts[0] ?? "";
-  const notice = result.texts.slice(1).map((text) => TRUNCATION_NOTICE.exec(text)).find(Boolean);
-  if (notice) return { data: body, requestId: result.requestId, truncated: { total_bytes: Number(notice[1]), shown_bytes: Number(notice[2]) } };
+  const truncated = truncationOf(body, result.texts.slice(1));
+  if (truncated) return { data: body, requestId: result.requestId, truncated };
   let data: unknown = body;
   try {
     data = JSON.parse(body);

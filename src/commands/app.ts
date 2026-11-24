@@ -26,6 +26,7 @@ import {
   runAction,
   runCall,
   searchActions,
+  truncationWarning,
 } from "../core/app-actions.ts";
 import type { AppClient } from "../core/app-actions.ts";
 import { commonArgs, configFrom, outputOpts } from "./shared.ts";
@@ -162,7 +163,7 @@ export async function runRun(args: Args, rawArgs: string[], deps?: AppDeps): Pro
   const meta: Record<string, unknown> = { request_id: outcome.requestId };
   if (outcome.truncated) {
     meta.truncated = outcome.truncated;
-    ctx.io.err(`warning: the response was cut at ${outcome.truncated.shown_bytes} of ${outcome.truncated.total_bytes} bytes, so it is returned as text. Narrow the query to get all of it.\n`);
+    ctx.io.err(`warning: ${truncationWarning(outcome.truncated)}, so it is returned as text. Narrow the query to get all of it.\n`);
   }
   await render(ctx.io, envelope(outcome.data, meta), outputOpts(args));
 }

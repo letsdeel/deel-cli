@@ -224,6 +224,18 @@ test("a truncated response is returned as text with meta.truncated and a warning
   assert.match(io.err(), /cut at 102400 of 200000 bytes/);
 });
 
+test("a body the server stopped reading is also returned as text with meta.truncated and a warning", async (t) => {
+  isolated(t);
+  const notice = "[Response truncated: reading stopped after 5242880 bytes (the response is larger than the read limit); only the first 102400 bytes are shown.]";
+  const { transport } = server((tool) => (tool === "get_action" ? { texts: [JSON.stringify(LIST)] } : { texts: ['[{"id":', notice] }));
+  const io = captureIO();
+  await runRun({ ...ARGS, _: ["list_widgets"] }, [], deps(transport, loggedIn(), io.io));
+  const printed = io.json();
+  assert.equal(printed.data, '[{"id":');
+  assert.deepEqual(printed.meta.truncated, { read_bytes: 5242880, shown_bytes: 102400, reason: "the response is larger than the read limit" });
+  assert.match(io.err(), /cut at 102400 bytes \(the server stopped reading it after 5242880 bytes: the response is larger than the read limit\)/);
+});
+
 test("an HTTP 401 renews the stored login and retries with the new token", async (t) => {
   isolated(t);
   const store = loggedIn();

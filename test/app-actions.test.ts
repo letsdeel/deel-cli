@@ -15,6 +15,7 @@ import {
   runCall,
   runOutcome,
   searchActions,
+  truncationWarning,
 } from "../src/core/app-actions.ts";
 import type { ActionDetail, AppClient } from "../src/core/app-actions.ts";
 import type { ResolvedToken } from "../src/core/auth.ts";
@@ -401,6 +402,29 @@ test("a run returns the body as JSON when it parses, as text otherwise", () => {
 test("a cut body stays text and reports how much was shown", () => {
   const notice = "[Response truncated: the action returned 162732 bytes; only the first 102400 bytes are shown.]";
   assert.deepEqual(runOutcome(ok('{"items":[1,2', notice)), { data: '{"items":[1,2', requestId: "req", truncated: { total_bytes: 162732, shown_bytes: 102400 } });
+});
+
+test("a body the server stopped reading is reported as cut too, with the bytes it read and why", () => {
+  // The three reasons the server gives when it could not read the whole body, so the full size is unknown.
+  for (const why of ["the response is larger than the read limit", "the response did not finish in time", "the response was larger or interrupted"]) {
+    const notice = `[Response truncated: reading stopped after 5242880 bytes (${why}); only the first 102400 bytes are shown.]`;
+    assert.deepEqual(runOutcome(ok('{"items":[1,2', notice)), { data: '{"items":[1,2', requestId: "req", truncated: { read_bytes: 5242880, shown_bytes: 102400, reason: why } }, why);
+  }
+});
+
+test("a notice worded some other way is still a cut body, never a whole one", () => {
+  const notice = "[Response truncated: something the CLI has not seen before.]";
+  const outcome = runOutcome(ok('{"items":[1,2', notice));
+  assert.deepEqual(outcome.truncated, { shown_bytes: 13, reason: notice });
+  assert.equal(outcome.data, '{"items":[1,2');
+  // A second item that is not a notice is not a cut.
+  assert.equal(runOutcome(ok('{"a":1}', "some other text")).truncated, undefined);
+});
+
+test("the warning says what was cut and, when the size is unknown, what the server read", () => {
+  assert.equal(truncationWarning({ total_bytes: 200, shown_bytes: 100 }), "the response was cut at 100 of 200 bytes");
+  assert.equal(truncationWarning({ read_bytes: 500, shown_bytes: 100, reason: "the response did not finish in time" }), "the response was cut at 100 bytes (the server stopped reading it after 500 bytes: the response did not finish in time)");
+  assert.equal(truncationWarning({ shown_bytes: 100, reason: "odd" }), "the response was cut at 100 bytes (odd)");
 });
 
 // ---------------- describe --generate-input ----------------
