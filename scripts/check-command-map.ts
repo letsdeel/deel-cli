@@ -92,11 +92,12 @@ export function checkMap(entries: MapEntry[], options: CheckOptions = {}): { fai
     else fail(`same command line as ${before.path}`);
   }
 
-  // Every domain has a stage and a description in domains.json, which deel --help lists it by.
+  // domains.json gives a domain its description and its place in deel --help; it is optional. A domain missing from it
+  // is listed last, with only its command count, and works as any other: a warning, so a new domain never stops a sync.
   if (options.domains) {
     const known = new Set(options.domains);
     for (const domain of new Set(parsed.map((p) => p.words[0]))) {
-      if (!known.has(domain)) failures.push({ entry: domain, message: `'${domain}' is not in src/public-api/domains.json, which gives every domain its stage and description` });
+      if (!known.has(domain)) warnings.push({ entry: domain, message: `'${domain}' is not in src/public-api/domains.json: deel --help lists it last, without a description, until it has a stage and a description there` });
     }
     // A domain is in use through the map, a hand-picked command or a static one.
     const used = new Set([...parsed.map((p) => p.words[0]), ...(options.reserved?.commands ?? []).map((d) => d.command[0])]);
