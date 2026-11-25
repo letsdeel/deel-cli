@@ -86,8 +86,9 @@ brackets (`[--worker-type eor]`, or a switch, `[--bulk]`): the command picks the
 every path ID has an argument in path order, no flag takes a global flag's name, command lines and
 endpoints are unique, no entry takes a hand-picked or static command's name, and a released command line
 (one in `src/public-api/manifest.json`) never changes by accident: [a released command line can change in a new version](#changing-a-released-command), on purpose. The generator also checks that every argument fills a
-parameter and that a flag that picks an endpoint isn't another endpoint's own flag. Every domain (the first word)
-needs an entry in `src/public-api/domains.json` with its stage and description, for `deel --help`. Names
+parameter and that a flag that picks an endpoint isn't another endpoint's own flag. A domain (the first word)
+can have an entry in `src/public-api/domains.json` with its stage and description, for `deel --help`; without one the
+check warns, and `deel --help` lists the domain last, with only its command count. Names
 for new endpoints are reviewed by the maintainers; when you're unsure of one, ask in the PR.
 
 ### Changing a released command
