@@ -99,6 +99,12 @@ test("render --jq and --quiet keep operating on data only (page is not printed)"
   assert.equal(io2.stdout.join("").trim(), "a\nb");
 });
 
+test("--jq gets a text payload as a string, not as JSON to parse", async () => {
+  const io = captureIO();
+  await render(io, envelope('{"cut": "text'), { json: true, jq: "type", raw: true, quiet: false });
+  assert.equal(io.stdout.join(""), "string\n");
+});
+
 test("jq is loaded from the inline build so a compiled binary carries the wasm", () => {
   const source = readFileSync(new URL("../src/core/output.ts", import.meta.url), "utf8");
   assert.match(source, /import\("jq-wasm\/inline"\)/);

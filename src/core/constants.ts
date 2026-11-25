@@ -6,6 +6,13 @@ export const HTTP_TIMEOUT_MS = 30_000;
 export const RETRY_MAX_ATTEMPTS = 3;
 export const RETRY_BASE_DELAY_MS = 200;
 
+// --- Process exit ---
+// How long a process with nothing left to write may stay up before it is forced to exit.
+export const FORCED_EXIT_MS = 5_000;
+
+// --- MCP ---
+export const MCP_ACCEPT = "application/json, text/event-stream";
+
 // --- Local logging ---
 export const LOG_MAX_BYTES_DEFAULT = 10 * 1024 * 1024;
 export const LOG_MAX_FILES_DEFAULT = 5;
@@ -72,10 +79,10 @@ export const AGENT_ENV_SIGNALS = ["CI", "CLAUDE_CODE", "CURSOR", "CODEX"] as con
 // fails when src reads a DEEL_ variable that is not listed here.
 export const CLI_SETTING_ENV = [
   "DEEL_TOKEN", "DEEL_CLI_BASE_URL", "DEEL_ENV", "DEEL_CA_CERT", "DEEL_CERT_STORE", "DEEL_LOG", "DEEL_LOG_BODIES", "DEEL_LOG_DIR",
-  "DEEL_LOG_MAX_FILES", "DEEL_LOG_MAX_SIZE", "DEEL_OAUTH_CLIENT_ID", "DEEL_OAUTH_ISSUER", "DEEL_TLS_RETRY",
+  "DEEL_LOG_MAX_FILES", "DEEL_LOG_MAX_SIZE", "DEEL_MCP_URL", "DEEL_OAUTH_CLIENT_ID", "DEEL_OAUTH_ISSUER", "DEEL_TLS_RETRY",
 ] as const;
 
-export const RESERVED_COMMANDS = new Set(["job", "auth", "commands"]);
+export const RESERVED_COMMANDS = new Set(["job", "auth", "commands", "app"]);
 export const COMMAND_SUFFIX_MODIFIERS = ["-bulk", "-async"];
 
 // --- Header names (lowercase; fetch normalizes) ---

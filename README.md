@@ -24,6 +24,7 @@ deel dev logs list --status_class 4xx --beta        # your organization's failed
 - [Webhooks](#webhooks)
 - [OAuth2 apps](#oauth2-apps)
 - [API versions](#api-versions)
+- [Web-app actions](#web-app-actions)
 - [Environments](#environments)
 - [Beta endpoints](#beta-endpoints)
 - [Corporate proxies & custom CAs](#corporate-proxies--custom-cas)
@@ -322,7 +323,7 @@ Only `y` or `yes` (any case) goes on. `n`, an empty line, Ctrl-D, or no answer w
 
 ## Idempotency
 
-Every mutating request (`POST`/`PUT`/`PATCH`/`DELETE`) carries an `Idempotency-Key`. By default each run of a command gets a **new random key** (UUIDv4), and the CLI's own retries of that request (on `429` or `5xx`) reuse it, so a retried request runs at most once. Running the same command again is a new operation: `disable`, `enable`, `disable` ends disabled, and two identical `create` runs create two resources.
+Every mutating request (`POST`/`PUT`/`PATCH`/`DELETE`) to the REST API carries an `Idempotency-Key` (`deel app run` is not one: it calls the MCP endpoint and sends none). By default each run of a command gets a **new random key** (UUIDv4), and the CLI's own retries of that request (on `429` or `5xx`) reuse it, so a retried request runs at most once. Running the same command again is a new operation: `disable`, `enable`, `disable` ends disabled, and two identical `create` runs create two resources.
 
 To make a re-run a safe retry of an earlier run, for example after a timeout left you unsure whether it went through, pass the same key both times with `--idempotency-key <value>` (see the key with `--debug`). Within 24 hours the API then answers a repeated `POST`, `PUT` or `PATCH` with the first response instead of running it again. A key reused for a different request (another method, path or body) is rejected with `409 IDEMPOTENCY_KEY_REUSED`. The exception is a call that must act every time it runs, such as `deel webhooks test`: it is sent once, with no retry and no automatic key (an explicit `--idempotency-key` is still sent).
 
@@ -398,6 +399,27 @@ deel oauth2-apps listings submit <app_id> --beta                                
 
 `update` saves a draft and changes only the fields you send; each list you send (`highlights`, `support_resources`, `works_with`, `what_it_syncs`, `categories`) replaces the current one. `deel oauth2-apps listings update --help` lists every field. Test account details are accepted and never printed back. A listing in review cannot be changed (409) until the review ends; read `latest_revision.review_notes` after a rejection, edit, and submit again. A draft shows the logo you saved, but the listing goes live in the App Store only once Deel approves it.
 
+## Web-app actions
+
+`deel app` runs actions of the Deel web app that Deel has published for agents, as the signed-in user and with that user's permissions. It calls Deel's MCP endpoint (`/mcp`), which is the only way in: web-app endpoints accept an OAuth login only through it. Web-app actions carry no stability promise: they change with the web app and can change or disappear without notice, so scripts that use them should expect to break. Which actions an organization can use is decided by Deel.
+
+```bash
+deel auth login                                       # once; a PAT can't run web-app actions
+deel app search "time off"                            # actions this login can run (--limit 1-20; --quiet prints the names)
+deel app describe <name>                              # input schema, scopes, and whether it reads or writes
+deel app describe <name> --generate-input > input.json
+deel app run <name> --input file://input.json         # or --input 'path_params={id=123},query={status=open}'
+deel app run <name> --input ... --dry-run             # print the call, run nothing
+```
+
+- `--input` is one object with `path_params`, `query` and `body`, in any of the [`--input` forms](#request-input). The server checks it against the action's schema and names each field that's wrong.
+- `run` asks the server whether the action reads or writes (`run_with` from `describe`) and calls it without a confirmation step. A write is never re-sent after a timeout or a server error (reads are retried); it is sent again only after a 401 once the login is renewed, which is answered before the action runs. When a write may have run without an answer, the error says so and asks you to check with a read before running it again.
+- Shorthand values in `--input` stay text until the action's schema says a field is a number (so `00123`, `1.10` and ids past 2^53 arrive unchanged) and `true`/`false` stay text until it says a field is a boolean. A field the schema says is a string gets its text exactly as written, spaces included (`body={title=Payroll sync}` sends one string, not a list of words), and `null` in a field the schema says is nullable (`query={org=null}`) is sent as a real null, at any depth. JSON input is never rewritten: there `"null"` stays a string. Flags `deel app` doesn't use (`--file`, `--form`, `--idempotency-key`, `--debug`, `--log-bodies`) and any flag it doesn't know (a mistyped `--dryrun`, say) are refused before anything runs, rather than ignored, and so is any option written before the command words (`deel --dry-run app run ...`), which would otherwise be dropped. Large ids are only kept exact in shorthand: JSON input is parsed as JSON, which rounds numbers past 2^53, so write such an id as a string.
+- Responses over 100 KB are cut by the server. The output then holds the text that came back, `meta.truncated` says how much (`total_bytes` and `shown_bytes`; when the server stopped reading a very large or slow response, `read_bytes` and a `reason` in place of the total), and stderr has a warning.
+- A login that hides sensitive data, or one without the action's scope, gets an error naming the next step (`deel auth login`, or `deel auth login --scopes ...`).
+
+**For agents:** let the agent run `deel app search` and `deel app describe` freely, and keep `deel app run` on "ask" in your agent's permission settings, since the CLI itself never asks before a write.
+
 ## Environments
 
 | `--env`          | Base URL                                       |
@@ -449,7 +471,7 @@ All failure detail lives in the error envelope printed to stderr — never encod
 
 Each HTTP exchange is written as NDJSON to a size-capped, rotating local log (separate from any network telemetry). **By default only metadata is logged** — command, method, URL path (query string omitted), status, request id, duration, and request headers (the `Authorization` header masked to `Bearer ***`). **Response bodies are not written by default.**
 
-Opt in to full response bodies with `--log-bodies` per command, or `DEEL_LOG_BODIES=1` globally. When bodies are logged, these values are masked as `***`: credentials (keys such as `token`, `password`, `secret`, `signature`), and every response field the API definition marks as personal or employment data. Which fields carry that mark is decided by the owner of each endpoint, and the CLI follows it for that field of that endpoint's response, and the same name elsewhere is logged as it is. A link (a key named `url`, `link`, `href`...) is logged without its query string and fragment, where a pre-signed link keeps its signature. The request's own query string is never written to the log, with or without `--log-bodies`; the URL in `--debug` output and in a timeout or TLS error masks the values of credential query parameters. Whatever its key, a value that is an email address or a JWT (a `?q=` search, a free-text `note`) is masked too. Names of people and companies, record ids, dates and amounts of a contract stay, so the log still says what was called. A field the API definition has not marked is logged as it is, and the responses of the `auth` and `job` commands carry no field marks, so a response body may still contain personal data: enable this only when you need it. Disable logging entirely per-command with `--no-log`, or globally with `DEEL_LOG=off`.
+Opt in to full response bodies with `--log-bodies` per command, or `DEEL_LOG_BODIES=1` globally. When bodies are logged, these values are masked as `***`: credentials (keys such as `token`, `password`, `secret`, `signature`), and every response field the API definition marks as personal or employment data. Which fields carry that mark is decided by the owner of each endpoint, and the CLI follows it for that field of that endpoint's response, and the same name elsewhere is logged as it is. A link (a key named `url`, `link`, `href`...) is logged without its query string and fragment, where a pre-signed link keeps its signature. The request's own query string is never written to the log, with or without `--log-bodies`; the URL in `--debug` output and in a timeout or TLS error masks the values of credential query parameters. Whatever its key, a value that is an email address or a JWT (a `?q=` search, a free-text `note`) is masked too. Names of people and companies, record ids, dates and amounts of a contract stay, so the log still says what was called. A field the API definition has not marked is logged as it is, and the responses of the `auth` and `job` commands carry no field marks, so a response body may still contain personal data: enable this only when you need it. `deel app run` never logs response bodies, since an action's output is a JSON string the masking can't look into. Disable logging entirely per-command with `--no-log`, or globally with `DEEL_LOG=off`.
 
 Location: `~/Library/Logs/deel/deel.log` (macOS),
 `%LOCALAPPDATA%\deel\logs` (Windows), `$XDG_STATE_HOME/deel/logs` (Linux).
@@ -463,6 +485,7 @@ Location: `~/Library/Logs/deel/deel.log` (macOS),
 | `DEEL_CLI_BASE_URL` | Override the API base URL (https only); `--base-url` beats it, it beats `--env`/`DEEL_ENV` |
 | `DEEL_ONE_TIME_SECRET` | The one-time secret `files status get` and `files update` send as `x-one-time-secret`; `--one-time-secret` beats it |
 | `DEEL_UPLOAD_METHOD` | `multipart` to ask `files create` for a multipart upload; `--upload-method` beats it |
+| `DEEL_MCP_URL`      | MCP endpoint for `deel app` (https; default `/mcp` on the API host). A saved login is only sent to the API host or the issuer's host; use `DEEL_TOKEN` or `--token-stdin` for another |
 | `DEEL_LOG`          | `off` to disable local logging                              |
 | `DEEL_LOG_BODIES`   | `1` to include response bodies in the local log (off by default) |
 | `DEEL_LOG_DIR`      | Override the log directory                                  |
@@ -517,7 +540,7 @@ src/
   manifest.generated.ts    # hand-picked command descriptors (generated by the deel-cli-extractor skill — never hand-edited)
   commands.map.ts          # hand-picked command ↔ API endpoint mapping
   public-api/              # generated public API commands: manifest.json (never hand-edited), commands.json (the command map), domains.json (optional: each domain's description for help; its stage orders `deel --help`, and a domain it does not list comes last), loader
-  commands/                # static commands (auth, job, commands)
+  commands/                # static commands (app, auth, job, commands)
   core/                    # http, auth, keychain, config, tls, input, output, logging, …
 test/                      # automated tests (node --test), one file per module
 ```

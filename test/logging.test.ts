@@ -39,6 +39,15 @@ test("withLogging includes the response body when body logging is opted in, and 
   setLogBodiesEnabled(false);
 });
 
+test("withLogging leaves out a body the request says carries unmaskable data, even when body logging is on", async () => {
+  setLogBodiesEnabled(true);
+  const c = captured();
+  const next: Transport = async () => res({ result: { content: [{ type: "text", text: '{"email":"a@b.test"}' }] } });
+  await withLogging(c.logger, () => 0)(next)(req({ omitBodyFromLog: true }));
+  assert.equal("response" in c.entries[0], false);
+  setLogBodiesEnabled(false);
+});
+
 test("the default sink redacts credential keys by substring (access_token, password, refresh_token) and leaves other names to the spec's marks", () => {
   const dir = mkdtempSync(join(tmpdir(), "deel-log-"));
   process.env.DEEL_LOG_DIR = dir;

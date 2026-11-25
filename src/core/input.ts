@@ -9,14 +9,16 @@ import { CliError } from "./errors.ts";
 
 export type ParsedInput = unknown;
 
-export function parseInput(raw: string, bodyProps: CliParam[]): ParsedInput {
+export type ParseOpts = { exactScalars?: boolean };
+
+export function parseInput(raw: string, bodyProps: CliParam[], opts: ParseOpts = {}): ParsedInput {
   const value = readRawValue(raw);
   const trimmed = value.trimStart();
   if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
     return coerceTopLevel(parseJson(value), bodyProps, false);
   }
   if (value.includes("=")) {
-    return coerceTopLevel(parseShorthandObject(value), bodyProps, true);
+    return coerceTopLevel(parseShorthandObject(value, Boolean(opts.exactScalars)), bodyProps, true);
   }
   throw new CliError(
     "input.unrecognized",
@@ -82,7 +84,7 @@ function unescape(text: string): string {
 // (007 stays 007, a b c stays one string). Values written as {..} or [..] have no entry.
 const RAW_TEXT = new WeakMap<object, Map<string, string>>();
 
-function parseShorthandObject(text: string): Record<string, unknown> {
+function parseShorthandObject(text: string, exact: boolean): Record<string, unknown> {
   const result: Record<string, unknown> = {};
   const raw = new Map<string, string>();
   RAW_TEXT.set(result, raw);
@@ -94,7 +96,7 @@ function parseShorthandObject(text: string): Record<string, unknown> {
     }
     const key = unescape(pair.slice(0, equalsIndex).trim());
     const valueText = pair.slice(equalsIndex + 1).trim();
-    result[key] = parseValue(valueText);
+    result[key] = parseValue(valueText, exact);
     // Only a value parseValue turned into an object or list has no raw text; "[x] text" is a plain string. A later
     // duplicate key replaces the value, so it replaces the raw text too.
     if (isBracketed(valueText)) raw.delete(key);
@@ -138,27 +140,29 @@ function isBracketed(text: string): boolean {
   return false;
 }
 
-function parseValue(raw: string): unknown {
+function parseValue(raw: string, exact: boolean): unknown {
   const value = raw.trim();
   if (isBracketed(value)) {
-    if (value.startsWith("{")) return parseShorthandObject(value.slice(1, -1));
+    if (value.startsWith("{")) return parseShorthandObject(value.slice(1, -1), exact);
     return splitTopLevel(value.slice(1, -1), ",")
       .filter((item) => item.trim() !== "")
-      .map((item) => parseValue(item));
+      .map((item) => parseValue(item, exact));
   }
   // Space-separated scalar list (e.g. tags=a b c) — spaces not inside braces/brackets.
   const parts = splitTopLevel(value, " ").filter((part) => part.trim() !== "");
   if (parts.length > 1) {
-    return parts.map((part) => parseScalar(unescape(part.trim())));
+    return parts.map((part) => parseScalar(unescape(part.trim()), exact));
   }
-  return parseScalar(unescape(value));
+  return parseScalar(unescape(value), exact);
 }
 
-// Heuristic scalar coercion for nested values (top-level is re-coerced against the schema).
-function parseScalar(text: string): unknown {
-  if (text === "true") return true;
-  if (text === "false") return false;
-  if (text !== "" && !Number.isNaN(Number(text)) && /^-?\d+(\.\d+)?$/.test(text)) return Number(text);
+// Heuristic scalar coercion for nested values (top-level is re-coerced against the schema). With `exact`, numbers
+// and booleans stay text (`00123`, `1.10`, ids past 2^53 would not survive a round trip, and a string field may
+// hold "false") for the caller to type by its schema.
+function parseScalar(text: string, exact: boolean): unknown {
+  if (!exact && text === "true") return true;
+  if (!exact && text === "false") return false;
+  if (!exact && text !== "" && !Number.isNaN(Number(text)) && /^-?\d+(\.\d+)?$/.test(text)) return Number(text);
   return text;
 }
 
@@ -184,6 +188,26 @@ function coerceTopLevel(value: unknown, bodyProps: CliParam[], nullLiteral: bool
     record[key] = coerceScalar(fieldValue, param, nullLiteral);
   }
   return record;
+}
+
+// For callers that learn the schema only after parsing (`deel app run` reads the action first): types what shorthand
+// guessed at, by the schema, in place. A string field gets the text back as written (a b c stays one string, 007 stays
+// 007) and a nullable field written `null` becomes a real null, at any depth. Only values that came from shorthand are
+// touched, so JSON input, where "null" is a string, is left alone.
+export function typeShorthandBySchema(value: unknown, params: CliParam[]): void {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return;
+  const record = value as Record<string, unknown>;
+  const raw = RAW_TEXT.get(record);
+  for (const param of params) {
+    if (!(param.name in record)) continue;
+    const text = raw?.get(param.name);
+    if (text !== undefined && param.nullable && text === "null") record[param.name] = null;
+    else if (text !== undefined && param.type === "string") record[param.name] = text;
+    else if (param.properties?.length) {
+      const child = record[param.name];
+      for (const item of Array.isArray(child) ? child : [child]) typeShorthandBySchema(item, param.properties);
+    }
+  }
 }
 
 // A string field written in shorthand was read with guesses (reason=007 as a number, reason=a b c as a list), so put the

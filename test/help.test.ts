@@ -67,7 +67,7 @@ test("root help lists one line per top-level word, the word first, with no stage
     assert.doesNotMatch(out, /^ {2}(CLI|People|Hiring|Platform|Other)\b {2,}/m, "no stage column");
     // The static commands first, then the lifecycle order of domains.json (People, Hiring, Pay, Platform), by name within a stage.
     // Alphabetical order of the words alone would put `contracts` before `people`.
-    assert.deepEqual(rootWords(out), ["auth", "commands", "job", "people", "contracts", "adjustments", "jobs", "scim"]);
+    assert.deepEqual(rootWords(out), ["app", "auth", "commands", "job", "people", "contracts", "adjustments", "jobs", "scim"]);
     assert.match(out, /^GLOBAL OPTIONS/m);
   }
 });
